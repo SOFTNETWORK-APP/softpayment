@@ -5,6 +5,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, Multipart, StatusCodes}
 import akka.http.scaladsl.server.Route
 import app.softnetwork.api.server.config.Settings.RootPath
+import app.softnetwork.payment.api.PaymentGrpcServices
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.MockPaymentHandler
 import app.softnetwork.payment.launch.{PaymentGuardian, PaymentRoutes}
@@ -117,10 +118,14 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian {_: Suite =>
 
 }
 
-trait PaymentRouteTestKit extends SessionTestKit with PaymentTestKit with PaymentRoutes { _: Suite =>
+trait PaymentRouteTestKit extends SessionTestKit with PaymentTestKit with PaymentRoutes with PaymentGrpcServices {
+  _: Suite =>
+
   import app.softnetwork.serialization._
 
   override def paymentService: ActorSystem[_] => GenericPaymentService = system => MockPaymentService(system)
+
+  override lazy val additionalConfig: String = grpcConfig
 
   override def apiRoutes(system: ActorSystem[_]): Route =
     paymentService(system).route ~

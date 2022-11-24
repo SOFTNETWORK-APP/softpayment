@@ -3,11 +3,10 @@ package app.softnetwork.payment.service
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import app.softnetwork.api.server.config.Settings.RootPath
+import app.softnetwork.payment.api.PaymentClient
+import app.softnetwork.payment.data._
 import app.softnetwork.payment.config.PaymentSettings._
-import app.softnetwork.payment.handlers.MockPaymentDao
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.model.UboDeclaration.UltimateBeneficialOwner
-import app.softnetwork.payment.model.UboDeclaration.UltimateBeneficialOwner.BirthPlace
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentRouteTestKit
 import app.softnetwork.time.{now => _, _}
@@ -15,71 +14,9 @@ import app.softnetwork.persistence.now
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import java.net.URLEncoder
+import scala.util.{Failure, Success}
 
 class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
-
-  val orderUuid = "order"
-
-  val customerUuid = "customer"
-
-  val sellerUuid = "seller"
-
-  val vendorUuid = "vendor"
-
-  var cardPreRegistration: CardPreRegistration = _
-
-  var preAuthorizationId: String = _
-
-  /** natural user */
-  val firstName = "firstName"
-  val lastName = "lastName"
-  val birthday = "26/12/1972"
-  val email = "demo@softnetwork.fr"
-  val naturalUser: PaymentUser =
-    PaymentUser.defaultInstance
-      .withFirstName(firstName)
-      .withLastName(lastName)
-      .withBirthday(birthday)
-      .withEmail(email)
-
-
-  /** bank account */
-  var sellerBankAccountId: String = _
-  var vendorBankAccountId: String = _
-  val ownerName = s"$firstName $lastName"
-  val ownerAddress: Address = Address.defaultInstance
-    .withAddressLine("addressLine")
-    .withCity("Paris")
-    .withPostalCode("75002")
-    .withCountry("FR")
-  val iban = "FR1420041010050500013M02606"
-  val bic = "SOGEFRPPPSZ"
-
-  /** legal user */
-  val siret = "12345678901234"
-  val legalUser: LegalUser = LegalUser.defaultInstance
-    .withSiret(siret)
-    .withLegalName(ownerName)
-    .withLegalUserType(LegalUser.LegalUserType.SOLETRADER)
-    .withLegalRepresentative(naturalUser)
-    .withLegalRepresentativeAddress(ownerAddress)
-    .withHeadQuartersAddress(ownerAddress)
-
-  /** ultimate beneficial owner */
-  val ubo: UltimateBeneficialOwner = UltimateBeneficialOwner.defaultInstance
-    .withFirstName(firstName)
-    .withLastName(lastName)
-    .withBirthday(birthday)
-    .withBirthPlace(BirthPlace.defaultInstance.withCity("city"))
-    .withAddress(ownerAddress.addressLine)
-    .withCity(ownerAddress.city)
-    .withPostalCode(ownerAddress.postalCode)
-
-  var uboDeclarationId: String = _
-
-  var cardId: String = _
-
-  var recurringPaymentRegistrationId: String = _
 
   import app.softnetwork.serialization._
 
@@ -361,14 +298,17 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         preAuthorizationId = responseAs[CardPreAuthorized].transactionId
-        implicit val tSystem: ActorSystem[_] = typedSystem()
-        MockPaymentDao !? PayInWithCardPreAuthorized(preAuthorizationId, computeExternalUuidWithProfile(sellerUuid, Some("seller"))) await {
-          case _: PaidIn =>
-            MockPaymentDao !? PayOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 100) await {
-              case _: PaidOut =>
-              case other => fail(other.toString)
+        PaymentClient(typedSystem()).payInWithCardPreAuthorized(preAuthorizationId, computeExternalUuidWithProfile(sellerUuid, Some("seller"))) complete() match {
+          case Success(result) =>
+            assert(result.transactionId.isDefined)
+            assert(result.error.isEmpty)
+            PaymentClient(typedSystem()).payOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 100, 0, "EUR") complete() match {
+              case Success(s) =>
+                assert(s.transactionId.isDefined)
+                assert(s.error.isEmpty)
+              case Failure(f) => fail(f.getMessage)
             }
-          case other => fail(other.toString)
+          case Failure(f) => fail(f.getMessage)
         }
       }
     }
@@ -398,10 +338,11 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          implicit val tSystem: ActorSystem[_] = typedSystem()
-          MockPaymentDao !? PayOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 5100) await {
-            case _: PaidOut =>
-            case other => fail(other.toString)
+          PaymentClient(typedSystem()).payOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 5100, 0, "EUR") complete() match {
+            case Success(s) =>
+              assert(s.transactionId.isDefined)
+              assert(s.error.isEmpty)
+            case Failure(f) => fail(f.getMessage)
           }
         }
       }

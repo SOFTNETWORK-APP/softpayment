@@ -1,87 +1,21 @@
 package app.softnetwork.payment.handlers
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.payment.api.{PaymentClient, PaymentGrpcServer}
+import app.softnetwork.payment.data._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.PaymentAccount.User
-import app.softnetwork.payment.model.UboDeclaration.UltimateBeneficialOwner
-import app.softnetwork.payment.model.UboDeclaration.UltimateBeneficialOwner.BirthPlace
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentTestKit
 import app.softnetwork.time.{now => _, _}
 import app.softnetwork.persistence.now
 import org.scalatest.wordspec.AnyWordSpecLike
 
-class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with PaymentTestKit {
+import scala.util.{Failure, Success}
+
+class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with PaymentGrpcServer with PaymentTestKit {
 
   implicit lazy val system: ActorSystem[_] = typedSystem()
-
-  val orderUuid = "order"
-
-  val customerUuid = "customer"
-
-  val sellerUuid = "seller"
-
-  val vendorUuid = "vendor"
-
-  var cardPreRegistration: CardPreRegistration = _
-
-  var preAuthorizationId: String = _
-
-  var recurringPaymentRegistrationId: String = _
-
-  /** natural user */
-  val firstName = "firstName"
-  val lastName = "lastName"
-  val birthday = "26/12/1972"
-  val email = "demo@softnetwork.fr"
-  val naturalUser: PaymentUser =
-    PaymentUser.defaultInstance
-      .withExternalUuid(customerUuid)
-      .withFirstName(firstName)
-      .withLastName(lastName)
-      .withBirthday(birthday)
-      .withEmail(email)
-
-
-  /** bank account */
-  var sellerBankAccountId: String = _
-  var vendorBankAccountId: String = _
-  val ownerName = s"$firstName $lastName"
-  val ownerAddress: Address = Address.defaultInstance
-    .withAddressLine("addressLine")
-    .withCity("Paris")
-    .withPostalCode("75002")
-    .withCountry("FR")
-  val iban = "FR1420041010050500013M02606"
-  val bic = "SOGEFRPPPSZ"
-
-  /** legal user */
-  val siret = "12345678901234"
-  val legalUser: LegalUser = LegalUser.defaultInstance
-    .withSiret(siret)
-    .withLegalName(ownerName)
-    .withLegalUserType(LegalUser.LegalUserType.SOLETRADER)
-    .withLegalRepresentative(naturalUser.withExternalUuid(sellerUuid))
-    .withLegalRepresentativeAddress(ownerAddress)
-    .withHeadQuartersAddress(ownerAddress)
-
-  /** ultimate beneficial owner */
-  val ubo: UltimateBeneficialOwner = UltimateBeneficialOwner.defaultInstance
-    .withFirstName(firstName)
-    .withLastName(lastName)
-    .withBirthday(birthday)
-    .withBirthPlace(BirthPlace.defaultInstance.withCity("city"))
-    .withAddress(ownerAddress.addressLine)
-    .withCity(ownerAddress.city)
-    .withPostalCode(ownerAddress.postalCode)
-
-  var uboDeclarationId: String = _
-
-  var cardId: String = _
-
-  var mandateId: String = _
-
-  var directDebitTransactionId: String = _
 
   "Payment handler" must {
     "pre register card" in {
@@ -683,40 +617,90 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
         case result: CardPreAuthorized =>
           val transactionId = result.transactionId
           preAuthorizationId = transactionId
-          !? (PayInWithCardPreAuthorized(preAuthorizationId, computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
-            case _: PaidIn =>
-              !? (PayOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 100)) await {
-                case _: PaidOut =>
-                case other => fail(other.toString)
+          PaymentClient(typedSystem()).payInWithCardPreAuthorized(
+            preAuthorizationId,
+            computeExternalUuidWithProfile(sellerUuid, Some("seller"))
+          ) complete() match {
+            case Success(result) =>
+              assert(result.transactionId.isDefined)
+              assert(result.error.isEmpty)
+              PaymentClient(typedSystem()).payOut(
+                orderUuid,
+                computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+                100,
+                0,
+                "EUR"
+              ) complete() match {
+                case Success(s) =>
+                  assert(s.transactionId.isDefined)
+                  assert(s.error.isEmpty)
+                case Failure(f) => fail(f.getMessage)
               }
-            case other => fail(other.toString)
+            case Failure(f) => fail(f.getMessage)
           }
         case other =>  fail(other.toString)
       }
     }
 
     "pay in / out" in {
-      !? (PayIn(orderUuid, computeExternalUuidWithProfile(customerUuid, Some("customer")), 100, "EUR", computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
+      !? (PayIn(orderUuid, computeExternalUuidWithProfile(
+        customerUuid, Some("customer")),
+        100,
+        "EUR",
+        computeExternalUuidWithProfile(sellerUuid, Some("seller")))
+      ) await {
         case _: PaidIn =>
-          !? (PayOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 100)) await {
-            case _: PaidOut =>
-            case other => fail(other.toString)
+          PaymentClient(typedSystem()).payOut(
+            orderUuid,
+            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+            100,
+            0,
+            "EUR"
+          ) complete() match {
+            case Success(s) =>
+              assert(s.transactionId.isDefined)
+              assert(s.error.isEmpty)
+            case Failure(f) => fail(f.getMessage)
           }
         case other => fail(other.toString)
       }
     }
 
     "pay in / refund" in {
-      !? (PayIn(orderUuid, computeExternalUuidWithProfile(customerUuid, Some("customer")), 100, "EUR", computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
+      !? (PayIn(
+        orderUuid,
+        computeExternalUuidWithProfile(customerUuid, Some("customer")),
+        100,
+        "EUR",
+        computeExternalUuidWithProfile(sellerUuid, Some("seller")))
+      ) await {
         case result: PaidIn =>
           val payInTransactionId = result.transactionId
-          !? (Refund(orderUuid, payInTransactionId, 101, "EUR", "change my mind", initializedByClient = true)) await {
-            case IllegalTransactionAmount => // 101 > 100
-              !? (Refund(orderUuid, payInTransactionId, 50, "EUR", "change my mind", initializedByClient = true)) await {
-                case _: Refunded =>
-                case other => fail(other.toString)
+          PaymentClient(typedSystem()).refund(
+            orderUuid,
+            payInTransactionId,
+            101,
+            "EUR",
+            "change my mind",
+            initializedByClient = true
+          ) complete() match {
+            case Success(r) =>
+              assert(r.transactionId.isEmpty)
+              assert(r.error.getOrElse("") == "IllegalTransactionAmount")
+              PaymentClient(typedSystem()).refund(
+                orderUuid,
+                payInTransactionId,
+                50,
+                "EUR",
+                "change my mind",
+                initializedByClient = true
+              ) complete() match {
+                case Success(s) =>
+                  assert(s.transactionId.isDefined)
+                  assert(s.error.isEmpty)
+                case Failure(f) => fail(f.getMessage)
               }
-            case other => fail(other.toString)
+            case Failure(f) => fail(f.getMessage)
           }
         case other => fail(other.toString)
       }
@@ -737,7 +721,11 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
               assert(paymentAccount.documents.size == 1)
               assert(paymentAccount.documents.exists(_.`type` == KycDocument.KycDocumentType.KYC_IDENTITY_PROOF))
               vendorBankAccountId = paymentAccount.getBankAccount.getId
-              !? (AddKycDocument(computeExternalUuidWithProfile(vendorUuid, Some("vendor")), Seq.empty, KycDocument.KycDocumentType.KYC_IDENTITY_PROOF)) await {
+              !? (AddKycDocument(
+                computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
+                Seq.empty,
+                KycDocument.KycDocumentType.KYC_IDENTITY_PROOF)
+              ) await {
                 case result: KycDocumentAdded =>
                   !? (UpdateKycDocumentStatus(
                     result.kycDocumentId,
@@ -748,10 +736,20 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
                   }
                 case other => fail(other.toString)
               }
-              !? (Transfer(Some(orderUuid), computeExternalUuidWithProfile(sellerUuid, Some("seller")), computeExternalUuidWithProfile(vendorUuid, Some("vendor")), 50, 10)) await {
-                case result: Transfered =>
-                  assert(result.paidOutTransactionId.isDefined)
-                case other => fail(other.toString)
+              PaymentClient(typedSystem()).transfer(
+                Some(orderUuid),
+                computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+                computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
+                50,
+                10,
+                "EUR",
+                payOutRequired = true,
+                None
+              ) complete() match {
+                case Success(s) =>
+                  assert(s.paidOutTransactionId.isDefined)
+                  assert(s.error.isEmpty)
+                case Failure(f) => fail(f.getMessage)
               }
             case other => fail(other.toString)
           }
@@ -775,12 +773,22 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
     }
 
     "direct debit" in {
-      !? (DirectDebit(computeExternalUuidWithProfile(vendorUuid, Some("vendor")), 100, 0, "EUR", "Direct Debit")) await {
-        case r: DirectDebited =>
-          directDebitTransactionId = r.transactionId
+      //TODO using payment server
+      PaymentClient(typedSystem()).directDebit(
+        computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
+        100,
+        0,
+        "EUR",
+        "Direct Debit",
+        None
+      ) complete() match {
+        case Success(s) =>
+          assert(s.transactionId.isDefined)
+          assert(s.error.isEmpty)
+          directDebitTransactionId = s.getTransactionId
           !? (LoadPaymentAccount(computeExternalUuidWithProfile(vendorUuid, Some("vendor")))) await {
             case result: PaymentAccountLoaded =>
-              result.paymentAccount.transactions.find(_.id == r.transactionId) match {
+              result.paymentAccount.transactions.find(_.id == directDebitTransactionId) match {
                 case Some(transaction) =>
                   assert(transaction.currency == "EUR")
                   assert(transaction.paymentType == Transaction.PaymentType.DIRECT_DEBITED)
@@ -790,7 +798,7 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
               }
             case other => fail(other.toString)
           }
-        case other => fail(other.toString)
+        case Failure(f) => fail(f.getMessage)
       }
     }
 
@@ -906,7 +914,10 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
     }
 
     "execute first recurring card payment" in {
-      !? (PayInFirstRecurring(recurringPaymentRegistrationId, computeExternalUuidWithProfile(customerUuid, Some("customer")))) await {
+      !? (PayInFirstRecurring(
+        recurringPaymentRegistrationId,
+        computeExternalUuidWithProfile(customerUuid, Some("customer")))
+      ) await {
         case _: FirstRecurringPaidIn =>
           !? (LoadRecurringPayment(computeExternalUuidWithProfile(customerUuid, Some("customer")),
             recurringPaymentRegistrationId
@@ -953,7 +964,9 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
           !? (
             CreateOrUpdatePaymentAccount(
               paymentAccount.withLegalUser(
-                legalUser.withLegalRepresentative(legalUser.legalRepresentative.withExternalUuid(externalUuid).withProfile(profile))
+                legalUser.withLegalRepresentative(
+                  legalUser.legalRepresentative.withExternalUuid(externalUuid).withProfile(profile)
+                )
               )
             )
           ) await {
