@@ -1,6 +1,7 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.http.scaladsl.server.Route
 import app.softnetwork.payment.handlers.MangoPayPaymentHandler
 import app.softnetwork.payment.launch.PaymentApplication
@@ -11,6 +12,8 @@ import app.softnetwork.persistence.jdbc.query.JdbcSchema.SchemaType
 import app.softnetwork.persistence.jdbc.query.{JdbcJournalProvider, JdbcSchema, JdbcSchemaProvider}
 import app.softnetwork.scheduler.handlers.SchedulerHandler
 import app.softnetwork.scheduler.persistence.query.Entity2SchedulerProcessorStream
+
+import scala.concurrent.Future
 
 trait MangoPayApi extends PaymentApplication with JdbcSchemaProvider {
 
@@ -38,6 +41,11 @@ trait MangoPayApi extends PaymentApplication with JdbcSchemaProvider {
     }
 
   override def paymentService: ActorSystem[_] => GenericPaymentService = sys => MangoPayPaymentService(sys)
+
+  override def grpcServices: ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] =
+    system => Seq(
+      PaymentServiceApiHandler.partial(MangoPayServer(system))(system)
+    )
 
   override def apiRoutes(system: ActorSystem[_]): Route = super.apiRoutes(system) ~ BasicServiceRoute(system).route
 
