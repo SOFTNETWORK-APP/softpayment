@@ -1,0 +1,3 @@
+package app.softnetwork.payment.handlers
+
+object MangoPayPaymentDao extends GenericPaymentDao with MangoPayPaymentHandler

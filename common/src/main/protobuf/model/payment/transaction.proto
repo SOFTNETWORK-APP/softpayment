@@ -1,0 +1,208 @@
+syntax = "proto2";
+
+import "scalapb/scalapb.proto";
+import "google/protobuf/timestamp.proto";
+
+package app.softnetwork.payment.model;
+
+option (scalapb.options) = {
+    single_file: true
+    flat_package: true
+    import: "app.softnetwork.persistence.message._"
+    import: "app.softnetwork.persistence.model._"
+    import: "app.softnetwork.protobuf.ScalaPBTypeMappers._"
+    import: "app.softnetwork.serialization._"
+    preserve_unknown_fields: false
+};
+
+message Transaction {
+    enum TransactionNature {
+        REGULAR = 0;
+        REFUND = 1;
+    }
+    
+    enum TransactionType{
+        PAYIN = 0;
+        TRANSFER = 1;
+        PAYOUT = 2;
+        DIRECT_DEBIT = 3;
+        PRE_AUTHORIZATION = 4;
+    }
+    
+    enum TransactionStatus{
+        TRANSACTION_CREATED = 0;
+        TRANSACTION_SUCCEEDED = 1;
+        TRANSACTION_FAILED = 2;
+        TRANSACTION_NOT_SPECIFIED = 4;
+        TRANSACTION_FAILED_FOR_TECHNICAL_REASON = 5;
+    }
+    
+    enum PaymentType {
+        CARD = 0;
+        CASH = 1;
+        PAYPAL = 2;
+        APPLEPAY = 3;
+        GOOGLEPAY = 4;
+        BANK_WIRE = 5;
+        PREAUTHORIZED = 6;
+        DIRECT_DEBITED = 7;
+    }
+    
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    option (scalapb.message).extends = "Timestamped";
+    option (scalapb.message).extends = "TransactionDecorator";
+    option (scalapb.message).companion_extends = "TransactionCompanion";
+//    required string uuid = 1;
+    required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.util.Date"];
+    required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.util.Date"];
+    required string id = 4;
+    required string orderUuid = 5; // should be optional
+    required TransactionNature nature = 6;
+    required TransactionType type = 7;
+    required TransactionStatus status = 8;
+    required int32 amount = 9;
+    required string currency = 10 [default = "EUR"];
+    required int32 fees = 11 [default = 0];
+    optional string cardId =  12;
+    required string resultCode = 13;
+    required string resultMessage = 14;
+    optional string redirectUrl = 15 [default = ""]; // for 3D Secure
+    optional string reasonMessage = 16 [default = ""];  // for refund
+    required string authorId = 17;
+    optional string creditedWalletId = 18;
+    optional string creditedUserId = 19;
+    optional string debitedWalletId = 20;
+    optional string mandateId = 21;
+    optional string preAuthorizationId = 22;
+    required PaymentType paymentType = 23 [default = CARD];
+    optional string recurringPayInRegistrationId = 24;
+    optional string externalReference = 25;
+}
+
+message BrowserInfo {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required bool javaEnabled = 1 [default = false];
+    required bool javascriptEnabled = 2 [default = true];
+    required int32 colorDepth = 3;
+    required int32 screenWidth = 4;
+    required int32 screenHeight = 5;
+    required string acceptHeader = 6;
+    required string language = 7;
+    required string timeZoneOffset = 8;
+    required string userAgent = 9;
+}
+
+message PayInTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string orderUuid = 1;
+    required int32 debitedAmount = 2;
+    required string currency = 3 [default = "EUR"];
+    required string creditedWalletId = 4;
+    required string authorId = 5;
+    required string cardId = 6;
+    optional string ipAddress = 7;
+    optional BrowserInfo browserInfo = 8;
+    optional bool registerCard = 9;
+    required string statementDescriptor = 10;
+    required Transaction.PaymentType paymentType = 11 [default = CARD];
+}
+
+message RefundTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string payInTransactionId = 1;
+    required string orderUuid = 2;
+    required int32 refundAmount = 3;
+    required string currency = 4 [default = "EUR"];
+    required string authorId = 5;
+    required string reasonMessage = 6;
+    required bool initializedByClient = 7;
+}
+
+message TransferTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string authorId = 1;
+    required int32 debitedAmount = 2;
+    required int32 feesAmount = 3;
+    required string currency = 4 [default = "EUR"];
+    required string creditedUserId = 5;
+    required string creditedWalletId = 6;
+    required string debitedWalletId = 7;
+    optional string orderUuid = 8;
+    optional string externalReference = 9;
+}
+
+message PayOutTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string orderUuid = 1;
+    required int32 debitedAmount = 2;
+    required string currency = 3 [default = "EUR"];
+    required int32 feesAmount = 4;
+    required string creditedUserId = 5;
+    required string bankAccountId = 6;
+    required string authorId = 7;
+    required string debitedWalletId = 8;
+}
+
+message DirectDebitTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string authorId = 1;
+    required string creditedUserId = 2;
+    required string creditedWalletId = 3;
+    required int32 debitedAmount = 4;
+    required int32 feesAmount = 5;
+    required string currency = 6 [default = "EUR"];
+    required string mandateId = 7;
+    required string statementDescriptor = 8;
+    optional string externalReference = 9;
+}
+
+message PreAuthorizationTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string orderUuid = 1;
+    required int32 debitedAmount = 2;
+    required string currency = 3 [default = "EUR"];
+    required string authorId = 4;
+    required string cardId = 5;
+    optional string ipAddress = 6;
+    optional BrowserInfo browserInfo = 7;
+    optional bool registerCard = 8;
+}
+
+message PayInWithCardPreAuthorizedTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string orderUuid = 1;
+    required int32 debitedAmount = 2;
+    required string currency = 3 [default = "EUR"];
+    required string creditedWalletId = 4;
+    required string authorId = 5;
+    required string cardPreAuthorizedTransactionId = 6;
+}
+
+message CardPreRegistration{
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string id = 1;
+    required string accessKey = 2;
+    required string preregistrationData = 3;
+    required string cardRegistrationURL = 4;
+    required bool registerCard = 5;
+}
+
+message RecurringPaymentTransaction{
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string recurringPayInRegistrationId = 1;
+    required string statementDescriptor = 2;
+    required int32 debitedAmount = 3;
+    required int32 feesAmount = 4;
+    required string currency = 5;
+    required string externalUuid = 6;
+    extensions 50 to 100;
+}
+
+message FirstRecurringPaymentTransaction {
+    extend RecurringPaymentTransaction {
+        optional FirstRecurringPaymentTransaction first = 50;
+    }
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    optional string ipAddress = 1;
+    optional BrowserInfo browserInfo = 2;
+}
