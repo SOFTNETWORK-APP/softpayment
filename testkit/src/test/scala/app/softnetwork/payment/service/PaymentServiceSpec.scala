@@ -1,6 +1,5 @@
 package app.softnetwork.payment.service
 
-import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import app.softnetwork.api.server.config.Settings.RootPath
 import app.softnetwork.payment.api.PaymentClient
@@ -19,6 +18,8 @@ import scala.util.{Failure, Success}
 class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
   import app.softnetwork.serialization._
+
+  lazy val client: PaymentClient = PaymentClient(typedSystem())
 
   "Payment service" must {
     "pre register card" in {
@@ -298,11 +299,11 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         preAuthorizationId = responseAs[CardPreAuthorized].transactionId
-        PaymentClient(typedSystem()).payInWithCardPreAuthorized(preAuthorizationId, computeExternalUuidWithProfile(sellerUuid, Some("seller"))) complete() match {
+        client.payInWithCardPreAuthorized(preAuthorizationId, computeExternalUuidWithProfile(sellerUuid, Some("seller"))) complete() match {
           case Success(result) =>
             assert(result.transactionId.isDefined)
             assert(result.error.isEmpty)
-            PaymentClient(typedSystem()).payOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 100, 0, "EUR") complete() match {
+            client.payOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 100, 0, "EUR") complete() match {
               case Success(s) =>
                 assert(s.transactionId.isDefined)
                 assert(s.error.isEmpty)
@@ -338,7 +339,7 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          PaymentClient(typedSystem()).payOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 5100, 0, "EUR") complete() match {
+          client.payOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 5100, 0, "EUR") complete() match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
               assert(s.error.isEmpty)

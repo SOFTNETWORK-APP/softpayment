@@ -17,6 +17,8 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
 
   implicit lazy val system: ActorSystem[_] = typedSystem()
 
+  lazy val client: PaymentClient = PaymentClient(system)
+
   "Payment handler" must {
     "pre register card" in {
       !? (PreRegisterCard(
@@ -617,14 +619,14 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
         case result: CardPreAuthorized =>
           val transactionId = result.transactionId
           preAuthorizationId = transactionId
-          PaymentClient(typedSystem()).payInWithCardPreAuthorized(
+          client.payInWithCardPreAuthorized(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller"))
           ) complete() match {
             case Success(result) =>
               assert(result.transactionId.isDefined)
               assert(result.error.isEmpty)
-              PaymentClient(typedSystem()).payOut(
+              client.payOut(
                 orderUuid,
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
@@ -650,7 +652,7 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
         computeExternalUuidWithProfile(sellerUuid, Some("seller")))
       ) await {
         case _: PaidIn =>
-          PaymentClient(typedSystem()).payOut(
+          client.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             100,
@@ -676,7 +678,7 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
       ) await {
         case result: PaidIn =>
           val payInTransactionId = result.transactionId
-          PaymentClient(typedSystem()).refund(
+          client.refund(
             orderUuid,
             payInTransactionId,
             101,
@@ -687,7 +689,7 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
             case Success(r) =>
               assert(r.transactionId.isEmpty)
               assert(r.error.getOrElse("") == "IllegalTransactionAmount")
-              PaymentClient(typedSystem()).refund(
+              client.refund(
                 orderUuid,
                 payInTransactionId,
                 50,
@@ -736,7 +738,7 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
                   }
                 case other => fail(other.toString)
               }
-              PaymentClient(typedSystem()).transfer(
+              client.transfer(
                 Some(orderUuid),
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
@@ -773,8 +775,7 @@ class PaymentHandlerSpec extends MockPaymentHandler with AnyWordSpecLike with Pa
     }
 
     "direct debit" in {
-      //TODO using payment server
-      PaymentClient(typedSystem()).directDebit(
+      client.directDebit(
         computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
         100,
         0,
