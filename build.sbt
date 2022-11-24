@@ -33,11 +33,11 @@ name := "payment"
 
 ThisBuild / version := "0.3-SNAPSHOT"
 
-ThisBuild / scalaVersion := "2.12.17"
+ThisBuild / scalaVersion := "2.12.15"
 
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-feature", "-target:jvm-1.8")
 
-ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
+ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-Xlint")
 
 ThisBuild / resolvers ++= Seq(
   "Softnetwork Server" at "https://softnetwork.jfrog.io/artifactory/releases/",
