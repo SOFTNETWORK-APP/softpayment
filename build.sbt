@@ -31,9 +31,9 @@ ThisBuild / organization := "app.softnetwork"
 
 name := "payment"
 
-ThisBuild / version := "0.1-SNAPSHOT"
+ThisBuild / version := "0.3-SNAPSHOT"
 
-ThisBuild / scalaVersion := "2.12.11"
+ThisBuild / scalaVersion := "2.12.17"
 
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-feature", "-target:jvm-1.8")
 
