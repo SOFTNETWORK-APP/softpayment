@@ -15,7 +15,7 @@ import org.scalatest.wordspec.AnyWordSpecLike
 import java.net.URLEncoder
 import scala.util.{Failure, Success}
 
-class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
+class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
 
   import app.softnetwork.serialization._
 
@@ -25,10 +25,13 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
     "pre register card" in {
       createSession(customerUuid, Some("customer"))
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$CardRoute", PreRegisterCard(
-          orderUuid,
-          naturalUser
-        ))
+        Post(
+          s"/$RootPath/$PaymentPath/$CardRoute",
+          PreRegisterCard(
+            orderUuid,
+            naturalUser
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         cardPreRegistration = responseAs[CardPreRegistration]
@@ -37,18 +40,24 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "pre authorize card" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$PreAuthorizeCardRoute", Payment(
-          orderUuid,
-          5100,
-          "EUR",
-          Some(cardPreRegistration.id),
-          Some(cardPreRegistration.preregistrationData),
-          registerCard = true
-        ))
+        Post(
+          s"/$RootPath/$PaymentPath/$PreAuthorizeCardRoute",
+          Payment(
+            orderUuid,
+            5100,
+            "EUR",
+            Some(cardPreRegistration.id),
+            Some(cardPreRegistration.preregistrationData),
+            registerCard = true
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val redirection = responseAs[PaymentRedirection]
-        val params = redirection.redirectUrl.split("\\?").last.split("[&=]")
+        val params = redirection.redirectUrl
+          .split("\\?")
+          .last
+          .split("[&=]")
           .grouped(2)
           .map(a => (a(0), a(1)))
           .toMap
@@ -57,7 +66,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
     }
 
     "card pre authorization with 3ds" in {
-      Get(s"/$RootPath/$PaymentPath/$SecureModeRoute/$PreAuthorizeCardRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerCard=true"
+      Get(
+        s"/$RootPath/$PaymentPath/$SecureModeRoute/$PreAuthorizeCardRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerCard=true"
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val paymentAccount = loadPaymentAccount()
@@ -79,11 +89,14 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
     "not create bank account with wrong iban" in {
       createSession(sellerUuid, Some("seller"))
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute", BankAccountCommand(
-          BankAccount(None, ownerName, ownerAddress, "", bic),
-          naturalUser,
-          None
-        ))
+        Post(
+          s"/$RootPath/$PaymentPath/$BankRoute",
+          BankAccountCommand(
+            BankAccount(None, ownerName, ownerAddress, "", bic),
+            naturalUser,
+            None
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.BadRequest
         assert(responseAs[PaymentError].message == WrongIban.message)
@@ -92,11 +105,14 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "not create bank account with wrong bic" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute", BankAccountCommand(
-          BankAccount(None, ownerName, ownerAddress, iban, ""),
-          naturalUser,
-          None
-        ))
+        Post(
+          s"/$RootPath/$PaymentPath/$BankRoute",
+          BankAccountCommand(
+            BankAccount(None, ownerName, ownerAddress, iban, ""),
+            naturalUser,
+            None
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.BadRequest
         assert(responseAs[PaymentError].message == WrongBic.message)
@@ -105,11 +121,14 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "create bank account with natural user" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute", BankAccountCommand(
-          BankAccount(None, ownerName, ownerAddress, iban, bic),
-          naturalUser,
-          None
-        ))
+        Post(
+          s"/$RootPath/$PaymentPath/$BankRoute",
+          BankAccountCommand(
+            BankAccount(None, ownerName, ownerAddress, iban, bic),
+            naturalUser,
+            None
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val bankAccount = loadBankAccount()
@@ -119,11 +138,14 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "update bank account with natural user" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute", BankAccountCommand(
-          BankAccount(Some(sellerBankAccountId), ownerName, ownerAddress, iban, bic),
-          naturalUser.withLastName("anotherLastName"),
-          None
-        ))
+        Post(
+          s"/$RootPath/$PaymentPath/$BankRoute",
+          BankAccountCommand(
+            BankAccount(Some(sellerBankAccountId), ownerName, ownerAddress, iban, bic),
+            naturalUser.withLastName("anotherLastName"),
+            None
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val bankAccount = loadBankAccount()
@@ -135,7 +157,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "not update bank account with wrong siret" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute",
+        Post(
+          s"/$RootPath/$PaymentPath/$BankRoute",
           BankAccountCommand(
             BankAccount(
               Some(sellerBankAccountId),
@@ -156,7 +179,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "not update bank account with empty legal name" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute",
+        Post(
+          s"/$RootPath/$PaymentPath/$BankRoute",
           BankAccountCommand(
             BankAccount(
               Some(sellerBankAccountId),
@@ -177,7 +201,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "not update bank account without accepted terms of PSP" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute",
+        Post(
+          s"/$RootPath/$PaymentPath/$BankRoute",
           BankAccountCommand(
             BankAccount(
               Some(sellerBankAccountId),
@@ -198,7 +223,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "update bank account with sole trader legal user" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute",
+        Post(
+          s"/$RootPath/$PaymentPath/$BankRoute",
           BankAccountCommand(
             BankAccount(
               Some(sellerBankAccountId),
@@ -270,12 +296,15 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val declaration = loadDeclaration()
-        assert(declaration.status == UboDeclaration.UboDeclarationStatus.UBO_DECLARATION_VALIDATION_ASKED)
+        assert(
+          declaration.status == UboDeclaration.UboDeclarationStatus.UBO_DECLARATION_VALIDATION_ASKED
+        )
       }
     }
 
     "update declaration status" in {
-      Get(s"/$RootPath/$PaymentPath/$HooksRoute?EventType=UBO_DECLARATION_VALIDATED&RessourceId=$uboDeclarationId"
+      Get(
+        s"/$RootPath/$PaymentPath/$HooksRoute?EventType=UBO_DECLARATION_VALIDATED&RessourceId=$uboDeclarationId"
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val declaration = loadDeclaration()
@@ -286,7 +315,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
     "pay in / out with pre authorized card" in {
       createSession(customerUuid, Some("customer"))
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$PreAuthorizeCardRoute",
+        Post(
+          s"/$RootPath/$PaymentPath/$PreAuthorizeCardRoute",
           Payment(
             orderUuid,
             100,
@@ -299,11 +329,20 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         preAuthorizationId = responseAs[CardPreAuthorized].transactionId
-        client.payInWithCardPreAuthorized(preAuthorizationId, computeExternalUuidWithProfile(sellerUuid, Some("seller"))) complete() match {
+        client.payInWithCardPreAuthorized(
+          preAuthorizationId,
+          computeExternalUuidWithProfile(sellerUuid, Some("seller"))
+        ) complete () match {
           case Success(result) =>
             assert(result.transactionId.isDefined)
             assert(result.error.isEmpty)
-            client.payOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 100, 0, "EUR") complete() match {
+            client.payOut(
+              orderUuid,
+              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+              100,
+              0,
+              "EUR"
+            ) complete () match {
               case Success(s) =>
                 assert(s.transactionId.isDefined)
                 assert(s.error.isEmpty)
@@ -317,7 +356,9 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
     "pay in / out with 3ds" in {
       createSession(customerUuid, Some("customer"))
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder.encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
+        Post(
+          s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder
+            .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
           Payment(
             orderUuid,
             5100,
@@ -330,16 +371,26 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val redirection = responseAs[PaymentRedirection]
-        val params = redirection.redirectUrl.split("\\?").last.split("[&=]")
+        val params = redirection.redirectUrl
+          .split("\\?")
+          .last
+          .split("[&=]")
           .grouped(2)
           .map(a => (a(0), a(1)))
           .toMap
         val transactionId = params.getOrElse("transactionId", "")
-        Get(s"/$RootPath/$PaymentPath/$SecureModeRoute/$PayInRoute/$orderUuid?transactionId=$transactionId&registerCard=true"
+        Get(
+          s"/$RootPath/$PaymentPath/$SecureModeRoute/$PayInRoute/$orderUuid?transactionId=$transactionId&registerCard=true"
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          client.payOut(orderUuid, computeExternalUuidWithProfile(sellerUuid, Some("seller")), 5100, 0, "EUR") complete() match {
+          client.payOut(
+            orderUuid,
+            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+            5100,
+            0,
+            "EUR"
+          ) complete () match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
               assert(s.error.isEmpty)
@@ -365,17 +416,22 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "register recurring direct debit payment" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute", RegisterRecurringPayment("",
-          `type` = RecurringPayment.RecurringPaymentType.DIRECT_DEBIT,
-          frequency = Some(RecurringPayment.RecurringPaymentFrequency.DAILY),
-          endDate = Some(now()),
-          fixedNextAmount = Some(true),
-          nextDebitedAmount = Some(1000),
-          nextFeesAmount = Some(100)
-        ))
+        Post(
+          s"/$RootPath/$PaymentPath/$RecurringPaymentRoute",
+          RegisterRecurringPayment(
+            "",
+            `type` = RecurringPayment.RecurringPaymentType.DIRECT_DEBIT,
+            frequency = Some(RecurringPayment.RecurringPaymentFrequency.DAILY),
+            endDate = Some(now()),
+            fixedNextAmount = Some(true),
+            nextDebitedAmount = Some(1000),
+            nextFeesAmount = Some(100)
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        recurringPaymentRegistrationId = responseAs[RecurringPaymentRegistered].recurringPaymentRegistrationId
+        recurringPaymentRegistrationId =
+          responseAs[RecurringPaymentRegistered].recurringPaymentRegistrationId
         withCookies(
           Get(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/$recurringPaymentRegistrationId")
         ) ~> routes ~> check {
@@ -394,7 +450,7 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
       }
     }
 
-    "execute direct debit automatically for next recurring payment" in{
+    "execute direct debit automatically for next recurring payment" in {
       withCookies(
         Delete(s"/$RootPath/$PaymentPath/$MandateRoute")
       ) ~> routes ~> check {
@@ -406,29 +462,34 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val recurringPayment = responseAs[RecurringPaymentView]
-          assert(recurringPayment.cumulatedDebitedAmount.contains(1000))
-          assert(recurringPayment.cumulatedFeesAmount.contains(100))
-          assert(recurringPayment.lastRecurringPaymentDate.exists(_.isEqual(now())))
-          assert(recurringPayment.lastRecurringPaymentTransactionId.isDefined)
-          assert(recurringPayment.numberOfRecurringPayments.contains(1))
-          assert(recurringPayment.nextRecurringPaymentDate.isEmpty)
+        assert(recurringPayment.cumulatedDebitedAmount.contains(1000))
+        assert(recurringPayment.cumulatedFeesAmount.contains(100))
+        assert(recurringPayment.lastRecurringPaymentDate.exists(_.isEqual(now())))
+        assert(recurringPayment.lastRecurringPaymentTransactionId.isDefined)
+        assert(recurringPayment.numberOfRecurringPayments.contains(1))
+        assert(recurringPayment.nextRecurringPaymentDate.isEmpty)
       }
     }
 
     "register recurring card payment" in {
       createSession(customerUuid, Some("customer"))
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute", RegisterRecurringPayment("",
-          `type` = RecurringPayment.RecurringPaymentType.CARD,
-          frequency = Some(RecurringPayment.RecurringPaymentFrequency.DAILY),
-          endDate = Some(now().plusDays(1)),
-          fixedNextAmount = Some(true),
-          nextDebitedAmount = Some(1000),
-          nextFeesAmount = Some(100)
-        ))
+        Post(
+          s"/$RootPath/$PaymentPath/$RecurringPaymentRoute",
+          RegisterRecurringPayment(
+            "",
+            `type` = RecurringPayment.RecurringPaymentType.CARD,
+            frequency = Some(RecurringPayment.RecurringPaymentFrequency.DAILY),
+            endDate = Some(now().plusDays(1)),
+            fixedNextAmount = Some(true),
+            nextDebitedAmount = Some(1000),
+            nextFeesAmount = Some(100)
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        recurringPaymentRegistrationId = responseAs[RecurringPaymentRegistered].recurringPaymentRegistrationId
+        recurringPaymentRegistrationId =
+          responseAs[RecurringPaymentRegistered].recurringPaymentRegistrationId
         withCookies(
           Get(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/$recurringPaymentRegistrationId")
         ) ~> routes ~> check {
@@ -450,7 +511,9 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
 
     "execute first recurring card payment" in {
       withCookies(
-        Post(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/${URLEncoder.encode(recurringPaymentRegistrationId, "UTF-8")}",
+        Post(
+          s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/${URLEncoder
+            .encode(recurringPaymentRegistrationId, "UTF-8")}",
           Payment(
             "",
             0
@@ -507,10 +570,14 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit{
         status shouldEqual StatusCodes.BadRequest
       }
       withCookies(
-        Put(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute", UpdateRecurringCardPaymentRegistration("",
-          recurringPaymentRegistrationId,
-          status = Some(RecurringPayment.RecurringCardPaymentStatus.ENDED)
-        ))
+        Put(
+          s"/$RootPath/$PaymentPath/$RecurringPaymentRoute",
+          UpdateRecurringCardPaymentRegistration(
+            "",
+            recurringPaymentRegistrationId,
+            status = Some(RecurringPayment.RecurringCardPaymentStatus.ENDED)
+          )
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
       }

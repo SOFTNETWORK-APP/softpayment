@@ -7,7 +7,7 @@ import app.softnetwork.time._
 
 import java.time.LocalDate
 
-class RecurringPaymentSpec extends AnyWordSpec with Matchers{
+class RecurringPaymentSpec extends AnyWordSpec with Matchers {
 
   "Recurring Payment" must {
     // begin daily frequency
@@ -99,7 +99,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     "not compute next daily schedule with end date in the past" in {
@@ -109,7 +109,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withEndDate(now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     // begin weekly frequency
@@ -189,7 +189,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     "not compute next weekly schedule with end date in the past" in {
@@ -199,7 +199,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withEndDate(now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     // begin monthly frequency
@@ -267,7 +267,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(1)))
+          assert(
+            nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(1))
+          )
         case _ => fail()
       }
     }
@@ -279,7 +281,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     "not compute next monthly schedule with end date in the past" in {
@@ -289,7 +291,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withEndDate(now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     // begin quarterly frequency
@@ -357,7 +359,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(3)))
+          assert(
+            nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(3))
+          )
         case _ => fail()
       }
     }
@@ -369,7 +373,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     "not compute next quarterly schedule with end date in the past" in {
@@ -379,7 +383,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withEndDate(now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     // begin biannual frequency
@@ -447,7 +451,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(6)))
+          assert(
+            nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(6))
+          )
         case _ => fail()
       }
     }
@@ -459,7 +465,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     "not compute next biannual schedule with end date in the past" in {
@@ -469,7 +475,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withEndDate(now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     // begin annual frequency
@@ -537,7 +543,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(12)))
+          assert(
+            nextPaymentDate.isEqual(
+              LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(12)
+            )
+          )
         case _ => fail()
       }
     }
@@ -549,7 +559,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     "not compute next annual schedule with end date in the past" in {
@@ -559,7 +569,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withEndDate(now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     // begin bimonthly frequency
@@ -627,7 +637,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(2)))
+          assert(
+            nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear - 1, 12, 31).plusMonths(2))
+          )
         case _ => fail()
       }
     }
@@ -639,7 +651,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
     "not compute next bimonthly schedule with end date in the past" in {
@@ -649,7 +661,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers{
           .withEndDate(now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
-        case _ =>
+        case _       =>
       }
     }
   }
