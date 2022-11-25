@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
   push:
     branches: 
-      - '!master'
+      - '!main'
 #      - '*'         # matches every branch that doesn't contain a '/'
 #      - '*/*'       # matches every branch containing a single '/'
 #      - '**'        # matches every branch
-#      - '!master'   # excludes master  
+#      - '!main'     # excludes main  
   pull_request:
     branches:
       - '**'
@@ -24,8 +24,13 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # define Java options for both official sbt and sbt-extras
+      JAVA_OPTS: -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
+      JVM_OPTS:  -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v3
     - name: Set up JDK 8
       uses: actions/setup-java@v3
       with:
@@ -50,7 +55,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
       - name: Set up JDK 8
         uses: actions/setup-java@v3
         with:
