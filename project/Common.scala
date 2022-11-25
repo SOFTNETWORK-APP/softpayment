@@ -1,5 +1,3 @@
 import app.softnetwork.sbt.build._
 
-object Common
-  extends ConsoleUtils
-    with GitSupport
+object Common extends ConsoleUtils with GitSupport

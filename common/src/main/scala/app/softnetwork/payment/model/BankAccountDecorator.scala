@@ -6,7 +6,7 @@ import org.apache.commons.validator.routines.IBANValidator
 
 import scala.util.matching.Regex
 
-trait BankAccountDecorator {self: BankAccount =>
+trait BankAccountDecorator { self: BankAccount =>
   lazy val wrongIban: Boolean = !IBANValidator.getInstance.isValid(iban)
 
   lazy val wrongBic: Boolean = !BicValidator.check(bic)
@@ -18,31 +18,28 @@ trait BankAccountDecorator {self: BankAccount =>
   def validate(): Boolean = !wrongIban && !wrongBic && !wrongOwnerName && !wrongOwnerAddress
 
   def encode(): BankAccount = {
-    if(!encoded){
+    if (!encoded) {
       this
         .withBic(sha256(bic))
         .withIban(sha256(iban))
         .withEncoded(true)
-    }
-    else{
+    } else {
       this
     }
   }
 
   def checkIfSameIban(newIban: String): Boolean = {
-    if(encoded) {
+    if (encoded) {
       iban == sha256(newIban)
-    }
-    else {
+    } else {
       iban == newIban
     }
   }
 
   def checkIfSameBic(newBic: String): Boolean = {
-    if(encoded) {
+    if (encoded) {
       bic == sha256(newBic)
-    }
-    else {
+    } else {
       bic == newBic
     }
   }
@@ -52,26 +49,27 @@ trait BankAccountDecorator {self: BankAccount =>
   lazy val view: BankAccountView = BankAccountView(self)
 }
 
-case class BankAccountView(createdDate: java.util.Date,
-                           lastUpdated: java.util.Date,
-                           bankAccountId: Option[String] = None,
-                           ownerName: String,
-                           ownerAddress: AddressView,
-                           iban: String,
-                           bic: String,
-                           encoded: Boolean,
-                           active: Boolean,
-                           mandateId: Option[String] = None,
-                           mandateStatus: Option[BankAccount.MandateStatus] = None,
-                           externalUuid: String)
+case class BankAccountView(
+  createdDate: java.util.Date,
+  lastUpdated: java.util.Date,
+  bankAccountId: Option[String] = None,
+  ownerName: String,
+  ownerAddress: AddressView,
+  iban: String,
+  bic: String,
+  encoded: Boolean,
+  active: Boolean,
+  mandateId: Option[String] = None,
+  mandateStatus: Option[BankAccount.MandateStatus] = None,
+  externalUuid: String
+)
 
 object BankAccountView {
   def apply(bankAccount: BankAccount): BankAccountView = {
     val encodedBankAccount =
-      if(bankAccount.encoded){
+      if (bankAccount.encoded) {
         bankAccount
-      }
-      else{
+      } else {
         bankAccount.encode()
       }
     import encodedBankAccount._

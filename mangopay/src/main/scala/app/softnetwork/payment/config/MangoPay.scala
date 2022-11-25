@@ -9,21 +9,21 @@ import com.typesafe.scalalogging.StrictLogging
 
 import scala.util.{Failure, Success, Try}
 
-/**
-  * Created by smanciot on 16/08/2018.
+/** Created by smanciot on 16/08/2018.
   */
-object MangoPay extends StrictLogging{
+object MangoPay extends StrictLogging {
 
   case class Config(
-                     clientId: String,
-                     apiKey: String,
-                     baseUrl: String,
-                     version: String,
-                     debug: Boolean,
-                     technicalErrors: Set[String],
-                     secureModePath: String,
-                     hooksPath: String,
-                     mandatePath: String){
+    clientId: String,
+    apiKey: String,
+    baseUrl: String,
+    version: String,
+    debug: Boolean,
+    technicalErrors: Set[String],
+    secureModePath: String,
+    hooksPath: String,
+    mandatePath: String
+  ) {
 
     lazy val secureModeReturnUrl = s"""$BaseUrl/$secureModePath/$SecureModeRoute"""
 
@@ -43,7 +43,7 @@ object MangoPay extends StrictLogging{
   def apply(): MangoPayApi = {
     maybeMangoPayApi match {
       case Some(mangoPayApi) => mangoPayApi
-      case _ =>
+      case _                 =>
         // init MangoPay api
         import MangoPaySettings.MangoPayConfig._
         val mangoPayApi = new MangoPayApi
@@ -78,7 +78,11 @@ object MangoPay extends StrictLogging{
     }
   }
 
-  private[payment] def createOrUpdateHook(mangoPayApi: MangoPayApi, eventType: EventType, hooks: List[Hook]): Unit = {
+  private[payment] def createOrUpdateHook(
+    mangoPayApi: MangoPayApi,
+    eventType: EventType,
+    hooks: List[Hook]
+  ): Unit = {
     import MangoPaySettings.MangoPayConfig._
     Try {
       hooks.find(_.getEventType == eventType) match {

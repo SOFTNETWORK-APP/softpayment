@@ -10,14 +10,20 @@ import app.softnetwork.time.DateExtensions
 import com.mangopay.core.enumerations.{TransactionStatus => MangoPayTransactionStatus, _}
 import com.mangopay.core.{Address => MangoPayAddress, _}
 import com.mangopay.entities.subentities._
-import com.mangopay.entities.{BankAccount => MangoPayBankAccount, Card => _, KycDocument => _, Transaction => _, UboDeclaration => _, _}
+import com.mangopay.entities.{
+  BankAccount => MangoPayBankAccount,
+  Card => _,
+  KycDocument => _,
+  Transaction => _,
+  UboDeclaration => _,
+  _
+}
 
 import java.text.SimpleDateFormat
 import java.util
 import java.util.{Calendar, Date, TimeZone}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
-
 
 trait MockMangoPayProvider extends MangoPayProvider {
 
@@ -31,10 +37,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
 
   private val CREATED = "CREATED"
 
-  /**
-    *
-    * @param maybeNaturalUser - natural user to create
-    * @return provider user id
+  /** @param maybeNaturalUser
+    *   - natural user to create
+    * @return
+    *   provider user id
     */
   override def createOrUpdateNaturalUser(maybeNaturalUser: Option[PaymentUser]): Option[String] =
     maybeNaturalUser match {
@@ -65,10 +71,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
             if (userId.getOrElse("").trim.isEmpty) {
               Users.values.find(_.getTag == externalUuid) match {
                 case Some(u) => user.setId(u.getId)
-                case _ => user.setId(generateUUID())
+                case _       => user.setId(generateUUID())
               }
-            }
-            else {
+            } else {
               user.setId(userId.get)
             }
             Users = Users.updated(user.getId, user)
@@ -80,10 +85,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
 
-  /**
-    *
-    * @param maybeLegalUser - legal user to create
-    * @return provider user id
+  /** @param maybeLegalUser
+    *   - legal user to create
+    * @return
+    *   provider user id
     */
   override def createOrUpdateLegalUser(maybeLegalUser: Option[LegalUser]): Option[String] = {
     maybeLegalUser match {
@@ -112,10 +117,14 @@ trait MockMangoPayProvider extends MangoPayProvider {
             address.setPostalCode(legalRepresentativeAddress.postalCode)
             user.setLegalRepresentativeAddress(address)
             user.setLegalRepresentativeBirthday(c.getTimeInMillis / 1000)
-            user.setLegalRepresentativeCountryOfResidence(CountryIso.valueOf(legalRepresentative.countryOfResidence))
+            user.setLegalRepresentativeCountryOfResidence(
+              CountryIso.valueOf(legalRepresentative.countryOfResidence)
+            )
             user.setLegalRepresentativeFirstName(legalRepresentative.firstName)
             user.setLegalRepresentativeLastName(legalRepresentative.lastName)
-            user.setLegalRepresentativeNationality(CountryIso.valueOf(legalRepresentative.nationality))
+            user.setLegalRepresentativeNationality(
+              CountryIso.valueOf(legalRepresentative.nationality)
+            )
             user.setEmail(legalRepresentative.email)
             user.setCompanyNumber(siret)
             legalRepresentative.paymentUserType match {
@@ -142,8 +151,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
                   LegalUsers = LegalUsers.updated(user.getId, user)
                   Some(user.getId)
               }
-            }
-            else {
+            } else {
               user.setId(legalRepresentative.userId.get)
               LegalUsers = LegalUsers.updated(user.getId, user)
               Some(user.getId)
@@ -156,13 +164,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @param maybePayOutTransaction - pay out transaction
-    * @param idempotency            - whether to use an idempotency key for this request or not
-    * @return pay out transaction result
+  /** @param maybePayOutTransaction
+    *   - pay out transaction
+    * @param idempotency
+    *   - whether to use an idempotency key for this request or not
+    * @return
+    *   pay out transaction result
     */
-  override def payOut(maybePayOutTransaction: Option[PayOutTransaction], idempotency: Option[Boolean] = None): Option[Transaction] =
+  override def payOut(
+    maybePayOutTransaction: Option[PayOutTransaction],
+    idempotency: Option[Boolean] = None
+  ): Option[Transaction] =
     maybePayOutTransaction match {
       case Some(payOutTransaction) =>
         import payOutTransaction._
@@ -180,7 +192,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
         val meanOfPaymentDetails = new PayOutPaymentDetailsBankWire
         meanOfPaymentDetails.setBankAccountId(bankAccountId)
         payOut.setMeanOfPaymentDetails(meanOfPaymentDetails)
-        payOut.setId(generateUUID()/*orderUuid.substring(0, orderUuid.length - 1) + "o"*/)
+        payOut.setId(generateUUID() /*orderUuid.substring(0, orderUuid.length - 1) + "o"*/ )
         mlog.info(s"debitedAmount -> $debitedAmount, fees -> $feesAmount")
         assert(debitedAmount > feesAmount)
         payOut.setStatus(MangoPayTransactionStatus.SUCCEEDED)
@@ -188,28 +200,30 @@ trait MockMangoPayProvider extends MangoPayProvider {
         payOut.setResultMessage(SUCCEEDED)
         PayOuts = PayOuts.updated(payOut.getId, payOut)
         Some(
-          Transaction().copy(
-            id = payOut.getId,
-            orderUuid = orderUuid,
-            nature = Transaction.TransactionNature.REGULAR,
-            `type` = Transaction.TransactionType.PAYOUT,
-            status = payOut.getStatus,
-            amount = debitedAmount,
-            fees = feesAmount,
-            resultCode = payOut.getResultCode,
-            resultMessage = payOut.getResultMessage,
-            authorId = Some(authorId),
-            creditedUserId = Some(creditedUserId),
-            debitedWalletId = Some(debitedWalletId)
-          ).withPaymentType(Transaction.PaymentType.BANK_WIRE)
+          Transaction()
+            .copy(
+              id = payOut.getId,
+              orderUuid = orderUuid,
+              nature = Transaction.TransactionNature.REGULAR,
+              `type` = Transaction.TransactionType.PAYOUT,
+              status = payOut.getStatus,
+              amount = debitedAmount,
+              fees = feesAmount,
+              resultCode = payOut.getResultCode,
+              resultMessage = payOut.getResultMessage,
+              authorId = Some(authorId),
+              creditedUserId = Some(creditedUserId),
+              debitedWalletId = Some(debitedWalletId)
+            )
+            .withPaymentType(Transaction.PaymentType.BANK_WIRE)
         )
       case _ => None
     }
 
-  /**
-    *
-    * @param maybeBankAccount - bank account to create
-    * @return bank account id
+  /** @param maybeBankAccount
+    *   - bank account to create
+    * @return
+    *   bank account id
     */
   override def createOrUpdateBankAccount(maybeBankAccount: Option[BankAccount]): Option[String] =
     maybeBankAccount match {
@@ -231,7 +245,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
         bankAccount.setTag(tag)
         bankAccount.setType(BankAccountType.IBAN)
         bankAccount.setUserId(userId)
-        BankAccounts.values.find(bankAccount => bankAccount.isActive && bankAccount.getId == id.getOrElse("")) match {
+        BankAccounts.values.find(bankAccount =>
+          bankAccount.isActive && bankAccount.getId == id.getOrElse("")
+        ) match {
           case Some(ba) if checkEquality(bankAccount, ba) =>
             bankAccount.setId(ba.getId)
             BankAccounts = BankAccounts.updated(bankAccount.getId, bankAccount)
@@ -244,13 +260,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
 
-  /**
-    *
-    * @param maybeRefundTransaction - refund transaction
-    * @param idempotency            - whether to use an idempotency key for this request or not
-    * @return refund transaction result
+  /** @param maybeRefundTransaction
+    *   - refund transaction
+    * @param idempotency
+    *   - whether to use an idempotency key for this request or not
+    * @return
+    *   refund transaction result
     */
-  override def refund(maybeRefundTransaction: Option[RefundTransaction], idempotency: Option[Boolean] = None): Option[Transaction] =
+  override def refund(
+    maybeRefundTransaction: Option[RefundTransaction],
+    idempotency: Option[Boolean] = None
+  ): Option[Transaction] =
     maybeRefundTransaction match {
       case Some(refundTransaction) =>
         import refundTransaction._
@@ -263,8 +283,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
         refund.getRefundReason.setRefundReasonMessage(reasonMessage)
         if (initializedByClient) {
           refund.getRefundReason.setRefundReasonType(RefundReasonType.INITIALIZED_BY_CLIENT)
-        }
-        else {
+        } else {
           refund.getRefundReason.setRefundReasonType(RefundReasonType.OTHER)
         }
         refund.setDebitedFunds(new Money)
@@ -274,7 +293,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
         refund.getFees.setAmount(0) // fees are only set during transfer or payOut
         refund.getFees.setCurrency(CurrencyIso.valueOf(currency))
 
-        refund.setId(generateUUID()/*orderUuid.substring(0, orderUuid.length - 1) + "r"*/)
+        refund.setId(generateUUID() /*orderUuid.substring(0, orderUuid.length - 1) + "r"*/ )
         refund.setStatus(MangoPayTransactionStatus.SUCCEEDED)
         refund.setResultCode(OK)
         refund.setResultMessage(SUCCEEDED)
@@ -298,12 +317,14 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
 
-  /**
-    *
-    * @param maybeTransferTransaction - transfer transaction
-    * @return transfer transaction result
+  /** @param maybeTransferTransaction
+    *   - transfer transaction
+    * @return
+    *   transfer transaction result
     */
-  override def transfer(maybeTransferTransaction: Option[TransferTransaction]): Option[Transaction] = {
+  override def transfer(
+    maybeTransferTransaction: Option[TransferTransaction]
+  ): Option[Transaction] = {
     maybeTransferTransaction match {
       case Some(transferTransaction) =>
         import transferTransaction._
@@ -325,42 +346,46 @@ trait MockMangoPayProvider extends MangoPayProvider {
         transfer.setResultMessage(SUCCEEDED)
         Transfers = Transfers.updated(transfer.getId, transfer)
         Some(
-          Transaction().copy(
-            id = transfer.getId,
-            nature = Transaction.TransactionNature.REGULAR,
-            `type` = Transaction.TransactionType.TRANSFER,
-            status = transfer.getStatus,
-            amount = debitedAmount,
-            fees = feesAmount,
-            resultCode = transfer.getResultCode,
-            resultMessage = transfer.getResultMessage,
-            authorId = Some(authorId),
-            creditedUserId = Some(creditedUserId),
-            creditedWalletId = Some(creditedWalletId),
-            debitedWalletId = Some(debitedWalletId),
-            orderUuid = orderUuid,
-            externalReference = externalReference
-          ).withPaymentType(Transaction.PaymentType.BANK_WIRE)
+          Transaction()
+            .copy(
+              id = transfer.getId,
+              nature = Transaction.TransactionNature.REGULAR,
+              `type` = Transaction.TransactionType.TRANSFER,
+              status = transfer.getStatus,
+              amount = debitedAmount,
+              fees = feesAmount,
+              resultCode = transfer.getResultCode,
+              resultMessage = transfer.getResultMessage,
+              authorId = Some(authorId),
+              creditedUserId = Some(creditedUserId),
+              creditedWalletId = Some(creditedWalletId),
+              debitedWalletId = Some(debitedWalletId),
+              orderUuid = orderUuid,
+              externalReference = externalReference
+            )
+            .withPaymentType(Transaction.PaymentType.BANK_WIRE)
         )
       case _ => None
     }
   }
 
-  /**
-    *
-    * @param cardId - card id
-    * @return card
+  /** @param cardId
+    *   - card id
+    * @return
+    *   card
     */
   override def loadCard(cardId: String): Option[Card] =
     Cards.get(cardId) match {
       case None =>
         CardRegistrations.values.find(_.getCardId == cardId) match {
           case Some(_) =>
-            Cards = Cards.updated(cardId, Card.defaultInstance
-              .withId(cardId)
-              .withAlias("##################")
-              .withExpirationDate(new SimpleDateFormat("MMyy").format(now()))
-              .withActive(true)
+            Cards = Cards.updated(
+              cardId,
+              Card.defaultInstance
+                .withId(cardId)
+                .withAlias("##################")
+                .withExpirationDate(new SimpleDateFormat("MMyy").format(now()))
+                .withActive(true)
             )
             Cards.get(cardId)
           case _ => None
@@ -368,10 +393,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case some => some
     }
 
-  /**
-    *
-    * @param cardId - the id of the card to disable
-    * @return the card disabled or none
+  /** @param cardId
+    *   - the id of the card to disable
+    * @return
+    *   the card disabled or none
     */
   override def disableCard(cardId: String): Option[Card] = {
     Cards.get(cardId) match {
@@ -382,53 +407,60 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @param orderUuid     - order unique id
-    * @param transactionId - transaction id
-    * @return pay in transaction
+  /** @param orderUuid
+    *   - order unique id
+    * @param transactionId
+    *   - transaction id
+    * @return
+    *   pay in transaction
     */
-  override def loadPayIn(orderUuid: String, transactionId: String, recurringPayInRegistrationId: Option[String]): Option[Transaction] =
+  override def loadPayIn(
+    orderUuid: String,
+    transactionId: String,
+    recurringPayInRegistrationId: Option[String]
+  ): Option[Transaction] =
     PayIns.get(transactionId) match {
       case Some(result) =>
         val `type` =
           if (result.getPaymentType == PayInPaymentType.DIRECT_DEBIT) {
             Transaction.TransactionType.DIRECT_DEBIT
-          }
-          else if (result.getPaymentType == PayInPaymentType.PREAUTHORIZED) {
+          } else if (result.getPaymentType == PayInPaymentType.PREAUTHORIZED) {
             Transaction.TransactionType.PRE_AUTHORIZATION
-          }
-          else {
+          } else {
             Transaction.TransactionType.PAYIN
           }
         val cardId =
           if (result.getPaymentType == PayInPaymentType.CARD) {
             Option(result.getPaymentDetails.asInstanceOf[PayInPaymentDetailsCard].getCardId)
-          }
-          else {
+          } else {
             None
           }
         val redirectUrl =
           if (result.getExecutionType == PayInExecutionType.DIRECT) {
             Option( // for 3D Secure
-              result.getExecutionDetails.asInstanceOf[PayInExecutionDetailsDirect].getSecureModeRedirectUrl
+              result.getExecutionDetails
+                .asInstanceOf[PayInExecutionDetailsDirect]
+                .getSecureModeRedirectUrl
             )
-          }
-          else {
+          } else {
             None
           }
         val mandateId =
           if (result.getPaymentType == PayInPaymentType.DIRECT_DEBIT) {
-            Option(result.getPaymentDetails.asInstanceOf[PayInPaymentDetailsDirectDebit].getMandateId)
-          }
-          else {
+            Option(
+              result.getPaymentDetails.asInstanceOf[PayInPaymentDetailsDirectDebit].getMandateId
+            )
+          } else {
             None
           }
         val preAuthorizationId =
           if (result.getPaymentType == PayInPaymentType.PREAUTHORIZED) {
-            Option(result.getExecutionDetails.asInstanceOf[PayInPaymentDetailsPreAuthorized].getPreauthorizationId)
-          }
-          else {
+            Option(
+              result.getExecutionDetails
+                .asInstanceOf[PayInPaymentDetailsPreAuthorized]
+                .getPreauthorizationId
+            )
+          } else {
             None
           }
         val status: Transaction.TransactionStatus = result.getStatus
@@ -438,7 +470,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
             orderUuid = orderUuid,
             nature = Transaction.TransactionNature.REGULAR,
             `type` = `type`,
-            status = if(status.isTransactionCreated && redirectUrl.isDefined) Transaction.TransactionStatus.TRANSACTION_SUCCEEDED else status,
+            status =
+              if (status.isTransactionCreated && redirectUrl.isDefined)
+                Transaction.TransactionStatus.TRANSACTION_SUCCEEDED
+              else status,
             amount = result.getDebitedFunds.getAmount,
             cardId = cardId,
             fees = result.getFees.getAmount,
@@ -456,36 +491,42 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
 
-  /**
-    *
-    * @param orderUuid     - order unique id
-    * @param transactionId - transaction id
-    * @return Refund transaction
+  /** @param orderUuid
+    *   - order unique id
+    * @param transactionId
+    *   - transaction id
+    * @return
+    *   Refund transaction
     */
   override def loadRefund(orderUuid: String, transactionId: String): Option[Transaction] = None
 
-  /**
-    *
-    * @param orderUuid     - order unique id
-    * @param transactionId - transaction id
-    * @return pay out transaction
+  /** @param orderUuid
+    *   - order unique id
+    * @param transactionId
+    *   - transaction id
+    * @return
+    *   pay out transaction
     */
   override def loadPayOut(orderUuid: String, transactionId: String): Option[Transaction] = None
 
-  /**
-    *
-    * @param transactionId - transaction id
-    * @return transfer transaction
+  /** @param transactionId
+    *   - transaction id
+    * @return
+    *   transfer transaction
     */
   override def loadTransfer(transactionId: String): Option[Transaction] = None
 
-  /**
-    *
-    * @param cardPreRegistrationId - card registration id
-    * @param maybeRegistrationData - card registration data
-    * @return card id
+  /** @param cardPreRegistrationId
+    *   - card registration id
+    * @param maybeRegistrationData
+    *   - card registration data
+    * @return
+    *   card id
     */
-  override def createCard(cardPreRegistrationId: String, maybeRegistrationData: Option[String]): Option[String] =
+  override def createCard(
+    cardPreRegistrationId: String,
+    maybeRegistrationData: Option[String]
+  ): Option[String] =
     maybeRegistrationData match {
       case Some(_) =>
         CardRegistrations.get(cardPreRegistrationId) match {
@@ -498,15 +539,23 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
 
-  /**
-    *
-    * @param maybeUserId   - owner of the wallet
-    * @param currency      - currency
-    * @param externalUuid  - external unique id
-    * @param maybeWalletId - wallet id to update
-    * @return wallet id
+  /** @param maybeUserId
+    *   - owner of the wallet
+    * @param currency
+    *   - currency
+    * @param externalUuid
+    *   - external unique id
+    * @param maybeWalletId
+    *   - wallet id to update
+    * @return
+    *   wallet id
     */
-  override def createOrUpdateWallet(maybeUserId: Option[String], currency: String, externalUuid: String, maybeWalletId: Option[String]): Option[String] =
+  override def createOrUpdateWallet(
+    maybeUserId: Option[String],
+    currency: String,
+    externalUuid: String,
+    maybeWalletId: Option[String]
+  ): Option[String] =
     maybeUserId match {
       case Some(userId) =>
         val wallet = new Wallet
@@ -534,36 +583,46 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
 
-  /**
-    *
-    * @param userId - provider user id
-    * @return the first active bank account
+  /** @param userId
+    *   - provider user id
+    * @return
+    *   the first active bank account
     */
   override def getActiveBankAccount(userId: String): Option[String] =
-    BankAccounts.values.filter(bankAccount => bankAccount.getUserId == userId && bankAccount.isActive) match {
-      case bas if bas.nonEmpty => Some(bas.toList.sortWith(_.getCreationDate > _.getCreationDate).head.getId)
+    BankAccounts.values.filter(bankAccount =>
+      bankAccount.getUserId == userId && bankAccount.isActive
+    ) match {
+      case bas if bas.nonEmpty =>
+        Some(bas.toList.sortWith(_.getCreationDate > _.getCreationDate).head.getId)
       case _ => None
     }
 
-  /**
-    *
-    * @param userId        - provider user id
-    * @param bankAccountId - bank account id
-    * @return whether this bank account exists and is active
+  /** @param userId
+    *   - provider user id
+    * @param bankAccountId
+    *   - bank account id
+    * @return
+    *   whether this bank account exists and is active
     */
   override def checkBankAccount(userId: String, bankAccountId: String): Boolean =
-    BankAccounts.values.find(bankAccount => bankAccount.getUserId == userId && bankAccount.getId == bankAccountId) match {
+    BankAccounts.values.find(bankAccount =>
+      bankAccount.getUserId == userId && bankAccount.getId == bankAccountId
+    ) match {
       case Some(ba) => ba.isActive
-      case _ => false
+      case _        => false
     }
 
-  /**
-    *
-    * @param maybePreAuthorizationTransaction - pre authorization transaction
-    * @param idempotency                      - whether to use an idempotency key for this request or not
-    * @return re authorization transaction result
+  /** @param maybePreAuthorizationTransaction
+    *   - pre authorization transaction
+    * @param idempotency
+    *   - whether to use an idempotency key for this request or not
+    * @return
+    *   re authorization transaction result
     */
-  override def preAuthorizeCard(maybePreAuthorizationTransaction: Option[PreAuthorizationTransaction], idempotency: Option[Boolean]): Option[Transaction] = {
+  override def preAuthorizeCard(
+    maybePreAuthorizationTransaction: Option[PreAuthorizationTransaction],
+    idempotency: Option[Boolean]
+  ): Option[Transaction] = {
     maybePreAuthorizationTransaction match {
       case Some(preAuthorizationTransaction) =>
         import preAuthorizationTransaction._
@@ -587,7 +646,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
         cardPreAuthorization.setSecureModeRedirectUrl(
           s"${cardPreAuthorization.getSecureModeReturnUrl}&preAuthorizationId=${cardPreAuthorization.getId}"
         )
-        CardPreAuthorizations = CardPreAuthorizations.updated(cardPreAuthorization.getId, cardPreAuthorization)
+        CardPreAuthorizations =
+          CardPreAuthorizations.updated(cardPreAuthorization.getId, cardPreAuthorization)
 
         Some(
           Transaction().copy(
@@ -601,7 +661,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
             fees = 0,
             resultCode = cardPreAuthorization.getResultCode,
             resultMessage = cardPreAuthorization.getResultMessage,
-            redirectUrl = if(debitedAmount > 5000) Option(cardPreAuthorization.getSecureModeRedirectUrl) else None,
+            redirectUrl =
+              if (debitedAmount > 5000) Option(cardPreAuthorization.getSecureModeRedirectUrl)
+              else None,
             authorId = cardPreAuthorization.getAuthorId,
             paymentType = Transaction.PaymentType.CARD
           )
@@ -610,13 +672,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @param orderUuid                      - order unique id
-    * @param cardPreAuthorizedTransactionId - card pre authorized transaction id
-    * @return card pre authorized transaction
+  /** @param orderUuid
+    *   - order unique id
+    * @param cardPreAuthorizedTransactionId
+    *   - card pre authorized transaction id
+    * @return
+    *   card pre authorized transaction
     */
-  override def loadCardPreAuthorized(orderUuid: String, cardPreAuthorizedTransactionId: String): Option[Transaction] = {
+  override def loadCardPreAuthorized(
+    orderUuid: String,
+    cardPreAuthorizedTransactionId: String
+  ): Option[Transaction] = {
     CardPreAuthorizations.get(cardPreAuthorizedTransactionId) match {
       case Some(result) =>
         Some(
@@ -641,13 +707,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @param maybePayInWithCardPreAuthorizedTransaction - card pre authorized pay in transaction
-    * @param idempotency                                - whether to use an idempotency key for this request or not
-    * @return pay in with card pre authorized transaction result
+  /** @param maybePayInWithCardPreAuthorizedTransaction
+    *   - card pre authorized pay in transaction
+    * @param idempotency
+    *   - whether to use an idempotency key for this request or not
+    * @return
+    *   pay in with card pre authorized transaction result
     */
-  override def payInWithCardPreAuthorized(maybePayInWithCardPreAuthorizedTransaction: Option[PayInWithCardPreAuthorizedTransaction], idempotency: Option[Boolean]): Option[Transaction] = {
+  override def payInWithCardPreAuthorized(
+    maybePayInWithCardPreAuthorizedTransaction: Option[PayInWithCardPreAuthorizedTransaction],
+    idempotency: Option[Boolean]
+  ): Option[Transaction] = {
     maybePayInWithCardPreAuthorizedTransaction match {
       case Some(payInWithCardPreAuthorizedTransaction) =>
         import payInWithCardPreAuthorizedTransaction._
@@ -673,34 +743,40 @@ trait MockMangoPayProvider extends MangoPayProvider {
         payIn.setResultMessage(SUCCEEDED)
         PayIns = PayIns.updated(payIn.getId, payIn)
         Some(
-          Transaction().copy(
-            id = payIn.getId,
-            orderUuid = orderUuid,
-            nature = Transaction.TransactionNature.REGULAR,
-            `type` = Transaction.TransactionType.PAYIN,
-            status = payIn.getStatus,
-            amount = debitedAmount,
-            cardId = "",
-            fees = 0,
-            resultCode = Option(payIn.getResultCode).getOrElse(""),
-            resultMessage = Option(payIn.getResultMessage).getOrElse(""),
-            redirectUrl = "",
-            authorId = payIn.getAuthorId,
-            creditedWalletId = Option(payIn.getCreditedWalletId),
-            preAuthorizationId = Some(cardPreAuthorizedTransactionId)
-          ).withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
+          Transaction()
+            .copy(
+              id = payIn.getId,
+              orderUuid = orderUuid,
+              nature = Transaction.TransactionNature.REGULAR,
+              `type` = Transaction.TransactionType.PAYIN,
+              status = payIn.getStatus,
+              amount = debitedAmount,
+              cardId = "",
+              fees = 0,
+              resultCode = Option(payIn.getResultCode).getOrElse(""),
+              resultMessage = Option(payIn.getResultMessage).getOrElse(""),
+              redirectUrl = "",
+              authorId = payIn.getAuthorId,
+              creditedWalletId = Option(payIn.getCreditedWalletId),
+              preAuthorizationId = Some(cardPreAuthorizedTransactionId)
+            )
+            .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
         )
       case None => None
     }
   }
 
-  /**
-    *
-    * @param orderUuid                      - order unique id
-    * @param cardPreAuthorizedTransactionId - card pre authorized transaction id
-    * @return pre authorization cancellation transaction
+  /** @param orderUuid
+    *   - order unique id
+    * @param cardPreAuthorizedTransactionId
+    *   - card pre authorized transaction id
+    * @return
+    *   pre authorization cancellation transaction
     */
-  override def cancelPreAuthorization(orderUuid: String, cardPreAuthorizedTransactionId: String): Boolean = {
+  override def cancelPreAuthorization(
+    orderUuid: String,
+    cardPreAuthorizedTransactionId: String
+  ): Boolean = {
     CardPreAuthorizations.get(cardPreAuthorizedTransactionId) match {
       case Some(result) =>
         result.setPaymentStatus(PaymentStatus.CANCELED)
@@ -710,13 +786,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @param maybePayInTransaction - pay in transaction
-    * @param idempotency           - whether to use an idempotency key for this request or not
-    * @return pay in transaction result
+  /** @param maybePayInTransaction
+    *   - pay in transaction
+    * @param idempotency
+    *   - whether to use an idempotency key for this request or not
+    * @return
+    *   pay in transaction result
     */
-  override def payIn(maybePayInTransaction: Option[PayInTransaction], idempotency: Option[Boolean] = None): Option[Transaction] =
+  override def payIn(
+    maybePayInTransaction: Option[PayInTransaction],
+    idempotency: Option[Boolean] = None
+  ): Option[Transaction] =
     maybePayInTransaction match {
       case Some(payInTransaction) =>
         import payInTransaction._
@@ -741,10 +821,12 @@ trait MockMangoPayProvider extends MangoPayProvider {
         executionDetails.setCardId(cardId)
         // Secured Mode is activated from €100.
         executionDetails.setSecureMode(SecureMode.DEFAULT)
-        executionDetails.setSecureModeReturnUrl(s"$payInFor3DS/$orderUuid?registerCard=${registerCard.getOrElse(false)}")
+        executionDetails.setSecureModeReturnUrl(
+          s"$payInFor3DS/$orderUuid?registerCard=${registerCard.getOrElse(false)}"
+        )
         payIn.setExecutionDetails(executionDetails)
 
-        payIn.setId(generateUUID()/*orderUuid.substring(0, orderUuid.length - 1) + "p"*/)
+        payIn.setId(generateUUID() /*orderUuid.substring(0, orderUuid.length - 1) + "p"*/ )
         payIn.setStatus(MangoPayTransactionStatus.CREATED)
         payIn.setResultCode(OK)
         payIn.setResultMessage(CREATED)
@@ -765,7 +847,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
             fees = 0,
             resultCode = payIn.getResultCode,
             resultMessage = payIn.getResultMessage,
-            redirectUrl = if(debitedAmount > 5000) Option(executionDetails.getSecureModeRedirectUrl) else None,
+            redirectUrl =
+              if (debitedAmount > 5000) Option(executionDetails.getSecureModeRedirectUrl) else None,
             authorId = Some(authorId),
             creditedWalletId = Some(creditedWalletId)
           )
@@ -773,14 +856,20 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
 
-  /**
-    *
-    * @param maybeUserId  - owner of the card
-    * @param currency     - currency
-    * @param externalUuid - external unique id
-    * @return card pre registration
+  /** @param maybeUserId
+    *   - owner of the card
+    * @param currency
+    *   - currency
+    * @param externalUuid
+    *   - external unique id
+    * @return
+    *   card pre registration
     */
-  override def preRegisterCard(maybeUserId: Option[String], currency: String, externalUuid: String): Option[CardPreRegistration] =
+  override def preRegisterCard(
+    maybeUserId: Option[String],
+    currency: String,
+    externalUuid: String
+  ): Option[CardPreRegistration] =
     maybeUserId match {
       case Some(userId) =>
         val cardPreRegistration = new CardRegistration()
@@ -791,7 +880,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
         cardPreRegistration.setAccessKey("key")
         cardPreRegistration.setPreregistrationData("data")
         cardPreRegistration.setCardRegistrationUrl("url")
-        CardRegistrations = CardRegistrations.updated(cardPreRegistration.getId, cardPreRegistration)
+        CardRegistrations =
+          CardRegistrations.updated(cardPreRegistration.getId, cardPreRegistration)
         Some(
           CardPreRegistration.defaultInstance
             .withId(cardPreRegistration.getId)
@@ -802,15 +892,23 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
 
-  /**
-    *
-    * @param userId       - Provider user id
-    * @param externalUuid - external unique id
-    * @param pages        - document pages
-    * @param documentType - document type
-    * @return Provider document id
+  /** @param userId
+    *   - Provider user id
+    * @param externalUuid
+    *   - external unique id
+    * @param pages
+    *   - document pages
+    * @param documentType
+    *   - document type
+    * @return
+    *   Provider document id
     */
-  override def addDocument(userId: String, externalUuid: String, pages: Seq[Array[Byte]], documentType: KycDocument.KycDocumentType): Option[String] = {
+  override def addDocument(
+    userId: String,
+    externalUuid: String,
+    pages: Seq[Array[Byte]],
+    documentType: KycDocument.KycDocumentType
+  ): Option[String] = {
     val documentId = generateUUID()
     Documents = Documents.updated(
       documentId,
@@ -822,35 +920,47 @@ trait MockMangoPayProvider extends MangoPayProvider {
     Some(documentId)
   }
 
-  /**
-    *
-    * @param userId     - Provider user id
-    * @param documentId - Provider document id
-    * @return document validation report
+  /** @param userId
+    *   - Provider user id
+    * @param documentId
+    *   - Provider document id
+    * @return
+    *   document validation report
     */
   override def loadDocumentStatus(userId: String, documentId: String): KycDocumentValidationReport =
-    Documents.getOrElse(documentId,
+    Documents.getOrElse(
+      documentId,
       KycDocumentValidationReport.defaultInstance
         .withId(documentId)
         .withStatus(KycDocument.KycDocumentStatus.KYC_DOCUMENT_NOT_SPECIFIED)
     )
 
-  /**
-    *
-    * @param externalUuid   - external unique id
-    * @param userId         - Provider user id
-    * @param bankAccountId  - Bank account id
-    * @param idempotencyKey - whether to use an idempotency key for this request or not
-    * @return mandate result
+  /** @param externalUuid
+    *   - external unique id
+    * @param userId
+    *   - Provider user id
+    * @param bankAccountId
+    *   - Bank account id
+    * @param idempotencyKey
+    *   - whether to use an idempotency key for this request or not
+    * @return
+    *   mandate result
     */
-  override def mandate(externalUuid: String, userId: String, bankAccountId: String, idempotencyKey: Option[String] = None): Option[MandateResult] = {
+  override def mandate(
+    externalUuid: String,
+    userId: String,
+    bankAccountId: String,
+    idempotencyKey: Option[String] = None
+  ): Option[MandateResult] = {
     val mandate = new Mandate()
     mandate.setId(generateUUID())
     mandate.setBankAccountId(bankAccountId)
     mandate.setCulture(CultureCode.FR)
     mandate.setExecutionType(MandateExecutionType.WEB)
     mandate.setMandateType(MandateType.DIRECT_DEBIT)
-    mandate.setReturnUrl(s"$mandateReturnUrl?externalUuid=$externalUuid&idempotencyKey=${idempotencyKey.getOrElse("")}")
+    mandate.setReturnUrl(
+      s"$mandateReturnUrl?externalUuid=$externalUuid&idempotencyKey=${idempotencyKey.getOrElse("")}"
+    )
     mandate.setScheme(MandateScheme.SEPA)
     mandate.setStatus(MandateStatus.SUBMITTED)
     mandate.setUserId(userId)
@@ -860,14 +970,20 @@ trait MockMangoPayProvider extends MangoPayProvider {
     )
   }
 
-  /**
-    *
-    * @param maybeMandateId - optional mandate id
-    * @param userId         - Provider user id
-    * @param bankAccountId  - bank account id
-    * @return mandate associated to this bank account
+  /** @param maybeMandateId
+    *   - optional mandate id
+    * @param userId
+    *   - Provider user id
+    * @param bankAccountId
+    *   - bank account id
+    * @return
+    *   mandate associated to this bank account
     */
-  override def loadMandate(maybeMandateId: Option[String], userId: String, bankAccountId: String): Option[MandateResult] = {
+  override def loadMandate(
+    maybeMandateId: Option[String],
+    userId: String,
+    bankAccountId: String
+  ): Option[MandateResult] = {
     maybeMandateId match {
       case Some(mandateId) =>
         Mandates.get(mandateId) match {
@@ -878,17 +994,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
           case _ => None
         }
       case _ =>
-        Mandates.values.
-          filter(m => m.getBankAccountId == bankAccountId && m.getUserId == userId).
-          map(m => MandateResult.defaultInstance.withId(m.getId).withStatus(m.getStatus)).
-          headOption
+        Mandates.values
+          .filter(m => m.getBankAccountId == bankAccountId && m.getUserId == userId)
+          .map(m => MandateResult.defaultInstance.withId(m.getId).withStatus(m.getStatus))
+          .headOption
     }
   }
 
-  /**
-    *
-    * @param mandateId - Provider mandate id
-    * @return mandate result
+  /** @param mandateId
+    *   - Provider mandate id
+    * @return
+    *   mandate result
     */
   override def cancelMandate(mandateId: String): Option[MandateResult] = {
     Mandates.get(mandateId) match {
@@ -901,13 +1017,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @param maybeDirectDebitTransaction - direct debit transaction
-    * @param idempotency                 - whether to use an idempotency key for this request or not
-    * @return direct debit transaction result
+  /** @param maybeDirectDebitTransaction
+    *   - direct debit transaction
+    * @param idempotency
+    *   - whether to use an idempotency key for this request or not
+    * @return
+    *   direct debit transaction result
     */
-  override def directDebit(maybeDirectDebitTransaction: Option[DirectDebitTransaction], idempotency: Option[Boolean] = None): Option[Transaction] = {
+  override def directDebit(
+    maybeDirectDebitTransaction: Option[DirectDebitTransaction],
+    idempotency: Option[Boolean] = None
+  ): Option[Transaction] = {
     maybeDirectDebitTransaction match {
       case Some(directDebitTransaction) =>
         import directDebitTransaction._
@@ -941,35 +1061,43 @@ trait MockMangoPayProvider extends MangoPayProvider {
         PayIns = PayIns.updated(payIn.getId, payIn)
         ClientFees += feesAmount.toDouble / 100
         Some(
-          Transaction().copy(
-            id = payIn.getId,
-            nature = Transaction.TransactionNature.REGULAR,
-            `type` = Transaction.TransactionType.DIRECT_DEBIT,
-            status = payIn.getStatus,
-            amount = debitedAmount,
-            fees = feesAmount,
-            resultCode = payIn.getResultCode,
-            resultMessage = payIn.getResultMessage,
-            redirectUrl = None,
-            authorId = Some(authorId),
-            creditedUserId = Some(creditedUserId),
-            creditedWalletId = Some(creditedWalletId),
-            mandateId = Some(mandateId),
-            externalReference = externalReference
-          ).withPaymentType(Transaction.PaymentType.DIRECT_DEBITED)
+          Transaction()
+            .copy(
+              id = payIn.getId,
+              nature = Transaction.TransactionNature.REGULAR,
+              `type` = Transaction.TransactionType.DIRECT_DEBIT,
+              status = payIn.getStatus,
+              amount = debitedAmount,
+              fees = feesAmount,
+              resultCode = payIn.getResultCode,
+              resultMessage = payIn.getResultMessage,
+              redirectUrl = None,
+              authorId = Some(authorId),
+              creditedUserId = Some(creditedUserId),
+              creditedWalletId = Some(creditedWalletId),
+              mandateId = Some(mandateId),
+              externalReference = externalReference
+            )
+            .withPaymentType(Transaction.PaymentType.DIRECT_DEBITED)
         )
       case _ => None
     }
   }
 
-  /**
-    *
-    * @param walletId        - Provider wallet id
-    * @param transactionId   - Provider transaction id
-    * @param transactionDate - Provider transaction date
-    * @return transaction if it exists
+  /** @param walletId
+    *   - Provider wallet id
+    * @param transactionId
+    *   - Provider transaction id
+    * @param transactionDate
+    *   - Provider transaction date
+    * @return
+    *   transaction if it exists
     */
-  override def directDebitTransaction(walletId: String, transactionId: String, transactionDate: Date): Option[Transaction] = {
+  override def directDebitTransaction(
+    walletId: String,
+    transactionId: String,
+    transactionDate: Date
+  ): Option[Transaction] = {
     PayIns.get(transactionId) match {
       case Some(payIn) =>
         Some(
@@ -992,16 +1120,15 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @return client fees
+  /** @return
+    *   client fees
     */
   override def clientFees(): Option[Double] = Some(ClientFees)
 
-  /**
-    *
-    * @param userId - Provider user id
-    * @return Ultimate Beneficial Owner Declaration
+  /** @param userId
+    *   - Provider user id
+    * @return
+    *   Ultimate Beneficial Owner Declaration
     */
   override def createDeclaration(userId: String): Option[UboDeclaration] = {
     val uboDeclaration = UboDeclaration.defaultInstance
@@ -1012,14 +1139,20 @@ trait MockMangoPayProvider extends MangoPayProvider {
     Some(uboDeclaration)
   }
 
-  /**
-    *
-    * @param userId                  - Provider user id
-    * @param uboDeclarationId        - Provider declaration id
-    * @param ultimateBeneficialOwner - Ultimate Beneficial Owner
-    * @return Ultimate Beneficial Owner created or updated
+  /** @param userId
+    *   - Provider user id
+    * @param uboDeclarationId
+    *   - Provider declaration id
+    * @param ultimateBeneficialOwner
+    *   - Ultimate Beneficial Owner
+    * @return
+    *   Ultimate Beneficial Owner created or updated
     */
-  override def createOrUpdateUBO(userId: String, uboDeclarationId: String, ultimateBeneficialOwner: UboDeclaration.UltimateBeneficialOwner): Option[UboDeclaration.UltimateBeneficialOwner] = {
+  override def createOrUpdateUBO(
+    userId: String,
+    uboDeclarationId: String,
+    ultimateBeneficialOwner: UboDeclaration.UltimateBeneficialOwner
+  ): Option[UboDeclaration.UltimateBeneficialOwner] = {
     UboDeclarations.get(uboDeclarationId) match {
       case Some(uboDeclaration) =>
         ultimateBeneficialOwner.id match {
@@ -1027,7 +1160,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
             UboDeclarations = UboDeclarations.updated(
               uboDeclarationId,
               uboDeclaration
-                .withUbos(uboDeclaration.ubos.filterNot(_.id.getOrElse("") == id) :+ ultimateBeneficialOwner)
+                .withUbos(
+                  uboDeclaration.ubos.filterNot(_.id.getOrElse("") == id) :+ ultimateBeneficialOwner
+                )
             )
             Some(ultimateBeneficialOwner)
           case _ =>
@@ -1042,25 +1177,32 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @param userId           - Provider user id
-    * @param uboDeclarationId - Provider declaration id
-    * @return declaration with Ultimate Beneficial Owner(s)
+  /** @param userId
+    *   - Provider user id
+    * @param uboDeclarationId
+    *   - Provider declaration id
+    * @return
+    *   declaration with Ultimate Beneficial Owner(s)
     */
   override def getDeclaration(userId: String, uboDeclarationId: String): Option[UboDeclaration] =
     UboDeclarations.get(uboDeclarationId)
 
-  /**
-    *
-    * @param userId           - Provider user id
-    * @param uboDeclarationId - Provider declaration id
-    * @return Ultimate Beneficial Owner declaration
+  /** @param userId
+    *   - Provider user id
+    * @param uboDeclarationId
+    *   - Provider declaration id
+    * @return
+    *   Ultimate Beneficial Owner declaration
     */
-  override def validateDeclaration(userId: String, uboDeclarationId: String): Option[UboDeclaration] = {
+  override def validateDeclaration(
+    userId: String,
+    uboDeclarationId: String
+  ): Option[UboDeclaration] = {
     UboDeclarations.get(uboDeclarationId) match {
       case Some(uboDeclaration) =>
-        val updated = uboDeclaration.withStatus(UboDeclaration.UboDeclarationStatus.UBO_DECLARATION_VALIDATION_ASKED)
+        val updated = uboDeclaration.withStatus(
+          UboDeclaration.UboDeclarationStatus.UBO_DECLARATION_VALIDATION_ASKED
+        )
         UboDeclarations = UboDeclarations.updated(
           uboDeclarationId,
           updated
@@ -1068,18 +1210,26 @@ trait MockMangoPayProvider extends MangoPayProvider {
         Some(updated)
       case _ => None
     }
-   }
+  }
 
-  /**
-    *
-    * @param userId           - Provider user id
-    * @param walletId         - Provider wallet id
-    * @param cardId           - Provider card id
-    * @param recurringPayment - recurring payment to register
-    * @return recurring card payment registration result
+  /** @param userId
+    *   - Provider user id
+    * @param walletId
+    *   - Provider wallet id
+    * @param cardId
+    *   - Provider card id
+    * @param recurringPayment
+    *   - recurring payment to register
+    * @return
+    *   recurring card payment registration result
     */
-  override def registerRecurringCardPayment(userId: String, walletId: String, cardId: String, recurringPayment: RecurringPayment): Option[RecurringPayment.RecurringCardPaymentResult] = {
-    if(recurringPayment.`type`.isCard){
+  override def registerRecurringCardPayment(
+    userId: String,
+    walletId: String,
+    cardId: String,
+    recurringPayment: RecurringPayment
+  ): Option[RecurringPayment.RecurringCardPaymentResult] = {
+    if (recurringPayment.`type`.isCard) {
       import recurringPayment.{cardId => _, _}
       val createRecurringPayment = new CreateRecurringPayment
       createRecurringPayment.setAuthorId(userId)
@@ -1102,23 +1252,23 @@ trait MockMangoPayProvider extends MangoPayProvider {
       (recurringPayment.frequency match {
         case Some(frequency) =>
           frequency match {
-            case RecurringPayment.RecurringPaymentFrequency.DAILY => Some("Daily")
-            case RecurringPayment.RecurringPaymentFrequency.WEEKLY => Some("Weekly")
-            case RecurringPayment.RecurringPaymentFrequency.MONTHLY => Some("Monthly")
+            case RecurringPayment.RecurringPaymentFrequency.DAILY     => Some("Daily")
+            case RecurringPayment.RecurringPaymentFrequency.WEEKLY    => Some("Weekly")
+            case RecurringPayment.RecurringPaymentFrequency.MONTHLY   => Some("Monthly")
             case RecurringPayment.RecurringPaymentFrequency.BIMONTHLY => Some("Bimonthly")
             case RecurringPayment.RecurringPaymentFrequency.QUARTERLY => Some("Quarterly")
-            case RecurringPayment.RecurringPaymentFrequency.BIANNUAL => Some("Semiannual")
-            case RecurringPayment.RecurringPaymentFrequency.ANNUAL => Some("Annual")
-            case _ => None
+            case RecurringPayment.RecurringPaymentFrequency.BIANNUAL  => Some("Semiannual")
+            case RecurringPayment.RecurringPaymentFrequency.ANNUAL    => Some("Annual")
+            case _                                                    => None
           }
         case _ => None
       }) match {
         case Some(frequency) => createRecurringPayment.setFrequency(frequency)
-        case _ =>
+        case _               =>
       }
       recurringPayment.fixedNextAmount match {
         case Some(fixedNextAmount) => createRecurringPayment.setFixedNextAmount(fixedNextAmount)
-        case _ =>
+        case _                     =>
       }
       recurringPayment.nextDebitedAmount match {
         case Some(nextDebitedAmount) =>
@@ -1138,7 +1288,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
       }
       recurringPayment.migration match {
         case Some(migration) => createRecurringPayment.setMigration(migration)
-        case _ =>
+        case _               =>
       }
 
       val registration =
@@ -1159,26 +1309,31 @@ trait MockMangoPayProvider extends MangoPayProvider {
           .withId(registration.id)
           .withStatus(registration.status)
       )
-    }
-    else{
+    } else {
       None
     }
   }
 
-  /**
-    *
-    * @param recurringPayInRegistrationId - recurring payIn registration id
-    * @param cardId                       - Provider card id
-    * @param status                       - optional recurring payment status
-    * @return recurring card payment registration updated result
+  /** @param recurringPayInRegistrationId
+    *   - recurring payIn registration id
+    * @param cardId
+    *   - Provider card id
+    * @param status
+    *   - optional recurring payment status
+    * @return
+    *   recurring card payment registration updated result
     */
-  override def updateRecurringCardPaymentRegistration(recurringPayInRegistrationId: String, cardId: Option[String], status: Option[RecurringPayment.RecurringCardPaymentStatus]): Option[RecurringPayment.RecurringCardPaymentResult] = {
-    if(cardId.isDefined || status.isDefined){
+  override def updateRecurringCardPaymentRegistration(
+    recurringPayInRegistrationId: String,
+    cardId: Option[String],
+    status: Option[RecurringPayment.RecurringCardPaymentStatus]
+  ): Option[RecurringPayment.RecurringCardPaymentResult] = {
+    if (cardId.isDefined || status.isDefined) {
       RecurringCardPaymentRegistrations.get(recurringPayInRegistrationId) match {
         case Some(recurringCardPaymentRegistration) =>
           val updatedRecurringCardPaymentRegistration =
             recurringCardPaymentRegistration.copy(
-              status = status.map(_.name).getOrElse(recurringCardPaymentRegistration.status),
+              status = status.map(_.name).getOrElse(recurringCardPaymentRegistration.status)
             )
           updatedRecurringCardPaymentRegistration.registration.setCardId(
             cardId.getOrElse(recurringCardPaymentRegistration.registration.getCardId)
@@ -1195,18 +1350,19 @@ trait MockMangoPayProvider extends MangoPayProvider {
           )
         case _ => None
       }
-    }
-    else{
+    } else {
       None
     }
   }
 
-  /**
-    *
-    * @param recurringPayInRegistrationId - recurring payIn registration id
-    * @return recurring card payment registration result
+  /** @param recurringPayInRegistrationId
+    *   - recurring payIn registration id
+    * @return
+    *   recurring card payment registration result
     */
-  override def loadRecurringCardPayment(recurringPayInRegistrationId: String): Option[RecurringPayment.RecurringCardPaymentResult] = {
+  override def loadRecurringCardPayment(
+    recurringPayInRegistrationId: String
+  ): Option[RecurringPayment.RecurringCardPaymentResult] = {
     RecurringCardPaymentRegistrations.get(recurringPayInRegistrationId) match {
       case Some(recurringCardPaymentRegistration) =>
         Some(
@@ -1219,13 +1375,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  /**
-    *
-    * @param recurringPaymentTransaction - recurring payment transaction
-    * @return resulted payIn transaction
+  /** @param recurringPaymentTransaction
+    *   - recurring payment transaction
+    * @return
+    *   resulted payIn transaction
     */
-  override def createRecurringCardPayment(recurringPaymentTransaction: RecurringPaymentTransaction): Option[Transaction] = {
-    RecurringCardPaymentRegistrations.get(recurringPaymentTransaction.recurringPayInRegistrationId) match {
+  override def createRecurringCardPayment(
+    recurringPaymentTransaction: RecurringPaymentTransaction
+  ): Option[Transaction] = {
+    RecurringCardPaymentRegistrations.get(
+      recurringPaymentTransaction.recurringPayInRegistrationId
+    ) match {
       case Some(recurringPaymentRegistration) =>
         recurringPaymentTransaction.extension[Option[FirstRecurringPaymentTransaction]](
           FirstRecurringPaymentTransaction.first
@@ -1245,7 +1405,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
             recurringPayInCIT.setFees(fees)
             recurringPayInCIT.setTag(externalUuid)
             recurringPayInCIT.setStatementDescriptor(statementDescriptor)
-            recurringPayInCIT.setSecureModeReturnURL(s"$recurringPaymentFor3DS/$recurringPayInRegistrationId")
+            recurringPayInCIT.setSecureModeReturnURL(
+              s"$recurringPaymentFor3DS/$recurringPayInRegistrationId"
+            )
 
             import recurringPaymentRegistration._
 
@@ -1269,7 +1431,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             executionDetails.setSecureModeReturnUrl(recurringPayInCIT.getSecureModeReturnURL)
             payIn.setExecutionDetails(executionDetails)
 
-            payIn.setId(generateUUID()/*orderUuid.substring(0, orderUuid.length - 1) + "p"*/)
+            payIn.setId(generateUUID() /*orderUuid.substring(0, orderUuid.length - 1) + "p"*/ )
             payIn.setStatus(MangoPayTransactionStatus.CREATED)
             payIn.setResultCode(OK)
             payIn.setResultMessage(CREATED)
@@ -1278,7 +1440,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
             )
 
             val previousState = recurringPaymentRegistration.currentState
-            RecurringCardPaymentRegistrations = RecurringCardPaymentRegistrations.updated(recurringPayInRegistrationId,
+            RecurringCardPaymentRegistrations = RecurringCardPaymentRegistrations.updated(
+              recurringPayInRegistrationId,
               recurringPaymentRegistration.copy(
                 status = "pending",
                 currentState = RecurringCardPaymentState(
@@ -1302,7 +1465,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
                 fees = feesAmount,
                 resultCode = payIn.getResultCode,
                 resultMessage = payIn.getResultMessage,
-                redirectUrl = if(debitedAmount > 5000) Option(executionDetails.getSecureModeRedirectUrl) else None,
+                redirectUrl =
+                  if (debitedAmount > 5000) Option(executionDetails.getSecureModeRedirectUrl)
+                  else None,
                 authorId = Some(registration.getAuthorId),
                 creditedWalletId = Some(registration.getCreditedWalletId),
                 recurringPayInRegistrationId = recurringPayInRegistrationId
@@ -1342,7 +1507,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             executionDetails.setCardId(registration.getCardId)
             payIn.setExecutionDetails(executionDetails)
 
-            payIn.setId(generateUUID()/*orderUuid.substring(0, orderUuid.length - 1) + "p"*/)
+            payIn.setId(generateUUID() /*orderUuid.substring(0, orderUuid.length - 1) + "p"*/ )
             payIn.setStatus(MangoPayTransactionStatus.CREATED)
             payIn.setResultCode(OK)
             payIn.setResultMessage(CREATED)
@@ -1351,7 +1516,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
             )
 
             val previousState = recurringPaymentRegistration.currentState
-            RecurringCardPaymentRegistrations = RecurringCardPaymentRegistrations.updated(recurringPayInRegistrationId,
+            RecurringCardPaymentRegistrations = RecurringCardPaymentRegistrations.updated(
+              recurringPayInRegistrationId,
               recurringPaymentRegistration.copy(
                 status = "pending",
                 currentState = RecurringCardPaymentState(
@@ -1418,11 +1584,13 @@ object MockMangoPayProvider {
 
   var RecurringCardPaymentRegistrations: Map[String, RecurringCardPaymentRegistration] = Map.empty
 
-  var ClientFees: Double = 0D
+  var ClientFees: Double = 0d
 
 }
 
-case class RecurringCardPaymentRegistration(id: String,
-                                            status: String,
-                                            currentState: RecurringCardPaymentState,
-                                            registration: CreateRecurringPayment)
+case class RecurringCardPaymentRegistration(
+  id: String,
+  status: String,
+  currentState: RecurringCardPaymentState,
+  registration: CreateRecurringPayment
+)

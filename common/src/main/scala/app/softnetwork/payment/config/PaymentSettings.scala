@@ -3,8 +3,7 @@ package app.softnetwork.payment.config
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
-/**
-  * Created by smanciot on 05/07/2018.
+/** Created by smanciot on 05/07/2018.
   */
 trait PaymentSettings extends StrictLogging {
 

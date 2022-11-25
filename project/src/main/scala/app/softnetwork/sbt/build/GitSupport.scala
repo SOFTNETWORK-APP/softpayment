@@ -8,8 +8,8 @@ trait GitSupport extends ConsoleUtils {
     val extracted = Project.extract(state)
     val git = extracted.get(GitKeys.gitReader)
     val name = extracted.get(Keys.name)
-    "[" + cyan(bold(name)) + "](" + green(git.withGit(_.branch)) +  ") " +
-      (if(git.withGit(_.hasUncommittedChanges)) yellow("✗ ")
-      else "") + "> "
+    "[" + cyan(bold(name)) + "](" + green(git.withGit(_.branch)) + ") " +
+    (if (git.withGit(_.hasUncommittedChanges)) yellow("✗ ")
+     else "") + "> "
   }
 }

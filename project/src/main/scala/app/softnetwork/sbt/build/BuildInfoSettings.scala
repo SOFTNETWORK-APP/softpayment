@@ -2,11 +2,10 @@ package app.softnetwork.sbt.build
 
 import com.typesafe.sbt.SbtGit.git
 import sbt.Keys._
-import sbtbuildinfo.{BuildInfoOption, BuildInfoKey}
+import sbtbuildinfo.{BuildInfoKey, BuildInfoOption}
 import sbtbuildinfo.BuildInfoKeys._
 
-/**
-  * Created by smanciot on 23/05/2018.
+/** Created by smanciot on 23/05/2018.
   */
 object BuildInfoSettings {
 

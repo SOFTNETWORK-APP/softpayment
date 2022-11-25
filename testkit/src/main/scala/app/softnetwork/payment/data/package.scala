@@ -33,7 +33,6 @@ package object data {
       .withBirthday(birthday)
       .withEmail(email)
 
-
   /** bank account */
   var sellerBankAccountId: String = _
   var vendorBankAccountId: String = _

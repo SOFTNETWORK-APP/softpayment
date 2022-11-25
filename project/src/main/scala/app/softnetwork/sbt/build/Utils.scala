@@ -6,7 +6,7 @@ object Utils {
 
   def getCurrentIpAddress: String = {
     var ip: String = ""
-    val en         = NetworkInterface.getNetworkInterfaces
+    val en = NetworkInterface.getNetworkInterfaces
     while (en.hasMoreElements) {
       val ni = en.nextElement
       val ee = ni.getInetAddresses

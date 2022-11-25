@@ -12,27 +12,32 @@ import app.softnetwork.persistence.query.{EventProcessorStream, JournalProvider}
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentCommandEvent]{
+trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentCommandEvent] {
   _: JournalProvider with GenericPaymentHandler =>
 
   override lazy val tag: String = PaymentSettings.ExternalToPaymentAccountTag
 
-  /**
-    *
-    * @return whether or not the events processed by this processor stream would be published to the main bus event
+  /** @return
+    *   whether or not the events processed by this processor stream would be published to the main
+    *   bus event
     */
   def forTests: Boolean = false
 
-  /**
+  /** Processing event
     *
-    * Processing event
-    *
-    * @param event         - event to process
-    * @param persistenceId - persistence id
-    * @param sequenceNr    - sequence number
+    * @param event
+    *   - event to process
+    * @param persistenceId
+    *   - persistence id
+    * @param sequenceNr
+    *   - sequence number
     * @return
     */
-  override protected def processEvent(event: PaymentCommandEvent, persistenceId: PersistenceId, sequenceNr: Long): Future[Done] = {
+  override protected def processEvent(
+    event: PaymentCommandEvent,
+    persistenceId: PersistenceId,
+    sequenceNr: Long
+  ): Future[Done] = {
     event match {
       case evt: WrapPaymentCommandEvent =>
         val promise = Promise[Done]
@@ -45,114 +50,169 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentC
         promise.future
       case evt: CreateOrUpdatePaymentAccountCommandEvent =>
         val command = CreateOrUpdatePaymentAccount(evt.paymentAccount)
-        !? (command) map {
+        !?(command) map {
           case PaymentAccountCreated =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case PaymentAccountUpdated =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: PayInWithCardPreAuthorizedCommandEvent =>
         import evt._
         val command = PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount)
-        !? (command) map {
+        !?(command) map {
           case _: PaidInResult =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: RefundCommandEvent =>
         import evt._
-        val command = Refund(orderUuid, payInTransactionId, refundAmount, currency, reasonMessage, initializedByClient)
-        !? (command) map {
+        val command = Refund(
+          orderUuid,
+          payInTransactionId,
+          refundAmount,
+          currency,
+          reasonMessage,
+          initializedByClient
+        )
+        !?(command) map {
           case _: Refunded =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: PayOutCommandEvent =>
         import evt._
         val command = PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency)
-        !? (command) map {
+        !?(command) map {
           case _: PaidOut =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: TransferCommandEvent =>
         import evt._
-        val command = Transfer(orderUuid, debitedAccount, creditedAccount, debitedAmount, feesAmount, currency, payOutRequired, externalReference)
-        !? (command) map {
+        val command = Transfer(
+          orderUuid,
+          debitedAccount,
+          creditedAccount,
+          debitedAmount,
+          feesAmount,
+          currency,
+          payOutRequired,
+          externalReference
+        )
+        !?(command) map {
           case _: Transfered =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: DirectDebitCommandEvent =>
         import evt._
-        val command = DirectDebit(creditedAccount, debitedAmount, feesAmount, currency, statementDescriptor, externalReference)
-        !? (command) map {
+        val command = DirectDebit(
+          creditedAccount,
+          debitedAmount,
+          feesAmount,
+          currency,
+          statementDescriptor,
+          externalReference
+        )
+        !?(command) map {
           case _: DirectDebited =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: LoadDirectDebitTransactionCommandEvent =>
         import evt._
         val command = LoadDirectDebitTransaction(directDebitTransactionId)
-        !? (command) map {
+        !?(command) map {
           case _: DirectDebited =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: RegisterRecurringPaymentCommandEvent =>
         import evt._
-        val command = RegisterRecurringPayment(debitedAccount, firstDebitedAmount, firstFeesAmount, currency, `type`, startDate, endDate, frequency, fixedNextAmount, nextDebitedAmount, nextFeesAmount)
-        !? (command) map {
+        val command = RegisterRecurringPayment(
+          debitedAccount,
+          firstDebitedAmount,
+          firstFeesAmount,
+          currency,
+          `type`,
+          startDate,
+          endDate,
+          frequency,
+          fixedNextAmount,
+          nextDebitedAmount,
+          nextFeesAmount
+        )
+        !?(command) map {
           case _: RecurringPaymentRegistered =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: CancelPreAuthorizationCommandEvent =>
         import evt._
         val command = CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId)
-        !? (command) map {
+        !?(command) map {
           case _: PreAuthorizationCanceled =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case evt: CancelMandateCommandEvent =>
         import evt._
         val command = CancelMandate(externalUuid)
-        !? (command) map {
+        !?(command) map {
           case MandateCanceled =>
-            if(forTests) system.eventStream.tell(Publish(event))
+            if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>
-            logger.error(s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}")
+            logger.error(
+              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            )
             Done
         }
       case other =>
@@ -162,6 +222,3 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentC
   }
 
 }
-
-
-

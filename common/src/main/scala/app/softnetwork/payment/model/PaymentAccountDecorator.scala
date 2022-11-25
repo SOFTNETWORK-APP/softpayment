@@ -2,23 +2,21 @@ package app.softnetwork.payment.model
 
 import app.softnetwork.persistence._
 
-trait PaymentAccountDecorator {self: PaymentAccount =>
+trait PaymentAccountDecorator { self: PaymentAccount =>
 
   lazy val maybeUser: Option[PaymentUser] = {
-    if(user.isLegalUser){
+    if (user.isLegalUser) {
       Some(getLegalUser.legalRepresentative)
-    }
-    else if(user.isNaturalUser){
+    } else if (user.isNaturalUser) {
       Some(getNaturalUser)
-    }
-    else{
+    } else {
       None
     }
   }
 
   lazy val externalUuid: String = maybeUser match {
     case Some(user) => user.externalUuid
-    case _ => generateUUID()
+    case _          => generateUUID()
   }
 
   lazy val profile: Option[String] = maybeUser.flatMap(_.profile)
@@ -26,7 +24,7 @@ trait PaymentAccountDecorator {self: PaymentAccount =>
   lazy val externalUuidWithProfile: String = {
     maybeUser match {
       case Some(user) => user.externalUuidWithProfile
-      case _ => externalUuid
+      case _          => externalUuid
     }
   }
 
@@ -51,11 +49,13 @@ trait PaymentAccountDecorator {self: PaymentAccount =>
   lazy val documentOutdated: Boolean = documents.exists(_.status.isKycDocumentOutOfDate)
 
   lazy val mandateExists: Boolean = bankAccount.flatMap(_.mandateId).isDefined &&
-    bankAccount.flatMap(_.mandateStatus).exists(s => s.isMandateCreated || s.isMandateActivated || s.isMandateSubmitted)
+    bankAccount
+      .flatMap(_.mandateStatus)
+      .exists(s => s.isMandateCreated || s.isMandateActivated || s.isMandateSubmitted)
 
   lazy val mandateRequired: Boolean =
     recurryingPayments.exists(r => r.`type`.isDirectDebit && r.nextPaymentDate.isDefined) ||
-      transactions.exists(t => t.paymentType.isDirectDebited && t.status.isTransactionCreated)
+    transactions.exists(t => t.paymentType.isDirectDebited && t.status.isTransactionCreated)
 
   lazy val mandateActivated: Boolean = bankAccount.flatMap(_.mandateId).isDefined &&
     bankAccount.flatMap(_.mandateStatus).exists(s => s.isMandateActivated || s.isMandateSubmitted)
@@ -63,21 +63,23 @@ trait PaymentAccountDecorator {self: PaymentAccount =>
   def resetUserId(userId: Option[String] = None): PaymentAccount = {
     val updatedBankAccount = bankAccount match {
       case Some(s) => Some(s.withUserId(userId.getOrElse("")))
-      case _ => None
+      case _       => None
     }
-    if(user.isLegalUser){
+    if (user.isLegalUser) {
       val user = getLegalUser
-      self.withLegalUser(user.withLegalRepresentative(user.legalRepresentative.copy(userId = userId))).copy(
-        bankAccount = updatedBankAccount
-      )
-    }
-    else if(user.isNaturalUser){
+      self
+        .withLegalUser(user.withLegalRepresentative(user.legalRepresentative.copy(userId = userId)))
+        .copy(
+          bankAccount = updatedBankAccount
+        )
+    } else if (user.isNaturalUser) {
       val user = getNaturalUser
-      self.withNaturalUser(user.copy(userId = userId)).copy(
-        bankAccount = updatedBankAccount
-      )
-    }
-    else{
+      self
+        .withNaturalUser(user.copy(userId = userId))
+        .copy(
+          bankAccount = updatedBankAccount
+        )
+    } else {
       self.copy(
         bankAccount = updatedBankAccount
       )
@@ -85,15 +87,15 @@ trait PaymentAccountDecorator {self: PaymentAccount =>
   }
 
   def resetWalletId(walletId: Option[String] = None): PaymentAccount = {
-    if(user.isLegalUser){
+    if (user.isLegalUser) {
       val user = getLegalUser
-      self.withLegalUser(user.withLegalRepresentative(user.legalRepresentative.copy(walletId = walletId)))
-    }
-    else if(user.isNaturalUser){
+      self.withLegalUser(
+        user.withLegalRepresentative(user.legalRepresentative.copy(walletId = walletId))
+      )
+    } else if (user.isNaturalUser) {
       val user = getNaturalUser
       self.withNaturalUser(user.copy(walletId = walletId))
-    }
-    else{
+    } else {
       self
     }
   }
@@ -102,36 +104,38 @@ trait PaymentAccountDecorator {self: PaymentAccount =>
     self.copy(bankAccount = self.bankAccount.map(_.copy(id = id)))
   }
 
-  lazy val hasAcceptedTermsOfPSP: Boolean = !legalUser || getLegalUser.lastAcceptedTermsOfPSP.isDefined
+  lazy val hasAcceptedTermsOfPSP: Boolean =
+    !legalUser || getLegalUser.lastAcceptedTermsOfPSP.isDefined
 
   lazy val view: PaymentAccountView = PaymentAccountView(self)
 }
 
-case class PaymentAccountView(createdDate: java.util.Date,
-                              lastUpdated: java.util.Date,
-                              naturalUser: Option[PaymentUserView] = None,
-                              legalUser: Option[LegalUserView] = None,
-                              cards: Seq[CardView] = Seq.empty,
-                              bankAccount: Option[BankAccountView] = None,
-                              documents: Seq[KycDocumentView] = Seq.empty,
-                              paymentAccountStatus: PaymentAccount.PaymentAccountStatus,
-                              transactions: Seq[TransactionView] = Seq.empty)
+case class PaymentAccountView(
+  createdDate: java.util.Date,
+  lastUpdated: java.util.Date,
+  naturalUser: Option[PaymentUserView] = None,
+  legalUser: Option[LegalUserView] = None,
+  cards: Seq[CardView] = Seq.empty,
+  bankAccount: Option[BankAccountView] = None,
+  documents: Seq[KycDocumentView] = Seq.empty,
+  paymentAccountStatus: PaymentAccount.PaymentAccountStatus,
+  transactions: Seq[TransactionView] = Seq.empty
+)
 
-object PaymentAccountView{
+object PaymentAccountView {
   def apply(paymentAccount: PaymentAccount): PaymentAccountView = {
     import paymentAccount._
-    PaymentAccountView(createdDate,
+    PaymentAccountView(
+      createdDate,
       lastUpdated,
-      if(user.isNaturalUser){
+      if (user.isNaturalUser) {
         Option(getNaturalUser.view)
-      }
-      else{
+      } else {
         None
       },
-      if(user.isLegalUser){
+      if (user.isLegalUser) {
         Option(getLegalUser.view)
-      }
-      else{
+      } else {
         None
       },
       cards.map(_.view),

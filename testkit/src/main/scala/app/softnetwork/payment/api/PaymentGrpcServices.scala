@@ -12,10 +12,12 @@ trait PaymentGrpcServices extends GrpcServices {
 
   def port: Int
 
-  override def grpcServices: ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] =
-    system => Seq(
-      PaymentServiceApiHandler.partial(MockPaymentServer(system))(system)
-    )
+  override def grpcServices
+    : ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] =
+    system =>
+      Seq(
+        PaymentServiceApiHandler.partial(MockPaymentServer(system))(system)
+      )
 
   def grpcConfig: String = s"""
                               |# Important: enable HTTP/2 in ActorSystem's config

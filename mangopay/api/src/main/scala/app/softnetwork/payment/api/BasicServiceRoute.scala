@@ -14,7 +14,11 @@ import org.softnetwork.session.model.Session
 
 import scala.concurrent.ExecutionContext
 
-trait BasicServiceRoute extends SessionService with Directives with DefaultComplete with Json4sSupport {
+trait BasicServiceRoute
+    extends SessionService
+    with Directives
+    with DefaultComplete
+    with Json4sSupport {
 
   import app.softnetwork.persistence.generateUUID
   import app.softnetwork.serialization._
@@ -31,7 +35,7 @@ trait BasicServiceRoute extends SessionService with Directives with DefaultCompl
     }
   }
 
-  lazy val basic: Route = path("basic"){
+  lazy val basic: Route = path("basic") {
     get {
       // check anti CSRF token
       randomTokenCsrfProtection(checkHeader) {
@@ -67,8 +71,8 @@ trait BasicServiceRoute extends SessionService with Directives with DefaultCompl
 
   private def BasicAuthAuthenticator(credentials: Credentials): Option[String] = {
     credentials match {
-      case p@Credentials.Provided(_) => Some(p.identifier)
-      case _ => None
+      case p @ Credentials.Provided(_) => Some(p.identifier)
+      case _                           => None
     }
   }
 

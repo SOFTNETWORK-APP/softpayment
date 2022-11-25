@@ -8,9 +8,11 @@ import app.softnetwork.payment.api.{MockPaymentServer, PaymentServiceApiHandler}
 import scala.concurrent.Future
 
 trait MockPaymentServiceRoutes extends GenericPaymentServiceRoutes {
-  override def grpcServices: ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] =
-    system => Seq(
-      PaymentServiceApiHandler.partial(MockPaymentServer(system))(system)
-    )
+  override def grpcServices
+    : ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] =
+    system =>
+      Seq(
+        PaymentServiceApiHandler.partial(MockPaymentServer(system))(system)
+      )
   override def apiRoutes(system: ActorSystem[_]): Route = MockPaymentService(system).route
 }

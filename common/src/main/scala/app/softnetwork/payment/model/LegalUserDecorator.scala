@@ -4,8 +4,8 @@ import app.softnetwork.validation.RegexValidator
 
 import scala.util.matching.Regex
 
-trait LegalUserDecorator {self: LegalUser =>
-  lazy val  wrongSiret: Boolean = !SiretValidator.check(siret)
+trait LegalUserDecorator { self: LegalUser =>
+  lazy val wrongSiret: Boolean = !SiretValidator.check(siret)
 
   lazy val wrongLegalRepresentativeAddress: Boolean = legalRepresentativeAddress.wrongAddress
 
@@ -23,17 +23,18 @@ object SiretValidator extends RegexValidator {
   val regex: Regex = """^[0-9]{14}""".r
 }
 
-case class LegalUserView(legalUserType: LegalUser.LegalUserType,
-                         legalName: String,
-                         siret: String,
-                         legalRepresentative: PaymentUserView,
-                         legalRepresentativeAddress: AddressView,
-                         headQuartersAddress: AddressView,
-                         uboDeclaration: Option[UboDeclarationView] = None,
-                         lastAcceptedTermsOfPSP: Option[java.util.Date] = None
-                        )
+case class LegalUserView(
+  legalUserType: LegalUser.LegalUserType,
+  legalName: String,
+  siret: String,
+  legalRepresentative: PaymentUserView,
+  legalRepresentativeAddress: AddressView,
+  headQuartersAddress: AddressView,
+  uboDeclaration: Option[UboDeclarationView] = None,
+  lastAcceptedTermsOfPSP: Option[java.util.Date] = None
+)
 
-object LegalUserView{
+object LegalUserView {
   def apply(legalUser: LegalUser): LegalUserView = {
     import legalUser._
     LegalUserView(

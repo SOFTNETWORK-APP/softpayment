@@ -8,14 +8,13 @@ import java.time.LocalDate
 
 trait RecurringPaymentDecorator { _: RecurringPayment =>
   lazy val nextPaymentDate: Option[LocalDate] = {
-    if(`type`.isCard && getCardStatus.isEnded){
+    if (`type`.isCard && getCardStatus.isEnded) {
       None
-    }
-    else{
+    } else {
       val today: LocalDate = startDate.getOrElse(now()).toLocalDate
       val maybePreviousPayment: Option[LocalDate] = lastRecurringPaymentDate match {
         case Some(value) => Some(value)
-        case _ => None
+        case _           => None
       }
 
       frequency match {
@@ -28,23 +27,21 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
                   if (end.isAfter(today)) {
                     maybePreviousPayment match {
                       case Some(previousPayment) => Some(previousPayment.plusDays(1))
-                      case _ => Some(today)
+                      case _                     => Some(today)
                     }
-                  }
-                  else if (end.isEqual(today)) {
+                  } else if (end.isEqual(today)) {
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         Some(today).filter(previousPayment.isBefore)
                       case _ => Some(today)
                     }
-                  }
-                  else {
+                  } else {
                     None
                   }
                 case _ =>
                   maybePreviousPayment match {
                     case Some(previousPayment) => Some(previousPayment.plusDays(1))
-                    case _ => Some(today)
+                    case _                     => Some(today)
                   }
               }
             // begin weekly frequency
@@ -57,50 +54,48 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          weekNumber(previousPayment) < currentWeekNumber || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(today) && (weekNumber(
+                            previousPayment
+                          ) < currentWeekNumber || previousYear < currentYear)
                         ) {
                           val nextWeek = previousPayment.plusWeeks(1)
                           if (nextWeek.isBefore(end) || nextWeek.isEqual(end)) {
                             Some(nextWeek)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else {
+                        } else {
                           val nextWeek = previousPayment.plusWeeks(1)
                           if (nextWeek.isBefore(end) || nextWeek.isEqual(end)) {
                             Some(nextWeek)
-                          }
-                          else {
+                          } else {
                             None
                           }
                         }
                       case _ => Some(today)
                     }
-                  }
-                  else if (end.isEqual(today)) {
+                  } else if (end.isEqual(today)) {
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          weekNumber(previousPayment) < currentWeekNumber || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(today) && (weekNumber(
+                            previousPayment
+                          ) < currentWeekNumber || previousYear < currentYear)
                         ) {
                           Some(today)
-                        }
-                        else
+                        } else
                           None
                       case _ => Some(today)
                     }
-                  }
-                  else {
+                  } else {
                     None
                   }
                 case _ =>
                   maybePreviousPayment match {
                     case Some(previousPayment) => Some(previousPayment.plusWeeks(1))
-                    case _ => Some(today)
+                    case _                     => Some(today)
                   }
               }
             // begin monthly frequency
@@ -113,56 +108,53 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          previousPayment.getMonthValue < currentMonthValue || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(
+                            today
+                          ) && (previousPayment.getMonthValue < currentMonthValue || previousYear < currentYear)
                         ) {
                           val nextMonth = previousPayment.plusMonths(1)
                           if (nextMonth.isBefore(end) || nextMonth.isEqual(end)) {
                             Some(nextMonth)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else {
+                        } else {
                           val nextMonth = previousPayment.plusMonths(1)
                           if (nextMonth.isBefore(end) || nextMonth.isEqual(end)) {
                             Some(nextMonth)
-                          }
-                          else {
+                          } else {
                             None
                           }
                         }
                       case _ => Some(today)
                     }
-                  }
-                  else if (end.isEqual(today)) {
+                  } else if (end.isEqual(today)) {
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          previousPayment.getMonthValue < currentMonthValue || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(
+                            today
+                          ) && (previousPayment.getMonthValue < currentMonthValue || previousYear < currentYear)
                         ) {
                           val nextMonth = previousPayment.plusMonths(1)
                           if (nextMonth.isBefore(end) || nextMonth.isEqual(end)) {
                             Some(nextMonth)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else
+                        } else
                           None
                       case _ => Some(today)
                     }
-                  }
-                  else {
+                  } else {
                     None
                   }
                 case _ =>
                   maybePreviousPayment match {
                     case Some(previousPayment) => Some(previousPayment.plusMonths(1))
-                    case _ => Some(today)
+                    case _                     => Some(today)
                   }
               }
             // begin bimonthly frequency
@@ -175,56 +167,53 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          bimonthlyNumber(previousPayment) < currentBimonthly || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(today) && (bimonthlyNumber(
+                            previousPayment
+                          ) < currentBimonthly || previousYear < currentYear)
                         ) {
                           val nextBimonthly = previousPayment.plusMonths(2)
                           if (nextBimonthly.isBefore(end) || nextBimonthly.isEqual(end)) {
                             Some(nextBimonthly)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else {
+                        } else {
                           val nextBimonthly = previousPayment.plusMonths(2)
                           if (nextBimonthly.isBefore(end) || nextBimonthly.isEqual(end)) {
                             Some(nextBimonthly)
-                          }
-                          else {
+                          } else {
                             None
                           }
                         }
                       case _ => Some(today)
                     }
-                  }
-                  else if (end.isEqual(today)) {
+                  } else if (end.isEqual(today)) {
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          bimonthlyNumber(previousPayment) < currentBimonthly || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(today) && (bimonthlyNumber(
+                            previousPayment
+                          ) < currentBimonthly || previousYear < currentYear)
                         ) {
                           val nextBimonthly = previousPayment.plusMonths(2)
                           if (nextBimonthly.isBefore(end) || nextBimonthly.isEqual(end)) {
                             Some(nextBimonthly)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else
+                        } else
                           None
                       case _ => Some(today)
                     }
-                  }
-                  else {
+                  } else {
                     None
                   }
                 case _ =>
                   maybePreviousPayment match {
                     case Some(previousPayment) => Some(previousPayment.plusMonths(2))
-                    case _ => Some(today)
+                    case _                     => Some(today)
                   }
               }
             // begin quarterly frequency
@@ -237,56 +226,53 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          quarterNumber(previousPayment) < currentQuarter || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(today) && (quarterNumber(
+                            previousPayment
+                          ) < currentQuarter || previousYear < currentYear)
                         ) {
                           val nextQuarter = previousPayment.plusMonths(3)
                           if (nextQuarter.isBefore(end) || nextQuarter.isEqual(end)) {
                             Some(nextQuarter)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else {
+                        } else {
                           val nextQuarter = previousPayment.plusMonths(3)
                           if (nextQuarter.isBefore(end) || nextQuarter.isEqual(end)) {
                             Some(nextQuarter)
-                          }
-                          else {
+                          } else {
                             None
                           }
                         }
                       case _ => Some(today)
                     }
-                  }
-                  else if (end.isEqual(today)) {
+                  } else if (end.isEqual(today)) {
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          quarterNumber(previousPayment) < currentQuarter || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(today) && (quarterNumber(
+                            previousPayment
+                          ) < currentQuarter || previousYear < currentYear)
                         ) {
                           val nextQuarter = previousPayment.plusMonths(3)
                           if (nextQuarter.isBefore(end) || nextQuarter.isEqual(end)) {
                             Some(nextQuarter)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else
+                        } else
                           None
                       case _ => Some(today)
                     }
-                  }
-                  else {
+                  } else {
                     None
                   }
                 case _ =>
                   maybePreviousPayment match {
                     case Some(previousPayment) => Some(previousPayment.plusMonths(3))
-                    case _ => Some(today)
+                    case _                     => Some(today)
                   }
               }
             // begin biannual frequency
@@ -299,56 +285,53 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          semesterNumber(previousPayment) < currentSemester || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(today) && (semesterNumber(
+                            previousPayment
+                          ) < currentSemester || previousYear < currentYear)
                         ) {
                           val nextQuarter = previousPayment.plusMonths(6)
                           if (nextQuarter.isBefore(end) || nextQuarter.isEqual(end)) {
                             Some(nextQuarter)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else {
+                        } else {
                           val nextQuarter = previousPayment.plusMonths(6)
                           if (nextQuarter.isBefore(end) || nextQuarter.isEqual(end)) {
                             Some(nextQuarter)
-                          }
-                          else {
+                          } else {
                             None
                           }
                         }
                       case _ => Some(today)
                     }
-                  }
-                  else if (end.isEqual(today)) {
+                  } else if (end.isEqual(today)) {
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
-                        if (previousPayment.isBefore(today) && (
-                          semesterNumber(previousPayment) < currentSemester || previousYear < currentYear)
+                        if (
+                          previousPayment.isBefore(today) && (semesterNumber(
+                            previousPayment
+                          ) < currentSemester || previousYear < currentYear)
                         ) {
                           val nextQuarter = previousPayment.plusMonths(6)
                           if (nextQuarter.isBefore(end) || nextQuarter.isEqual(end)) {
                             Some(nextQuarter)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else
+                        } else
                           None
                       case _ => Some(today)
                     }
-                  }
-                  else {
+                  } else {
                     None
                   }
                 case _ =>
                   maybePreviousPayment match {
                     case Some(previousPayment) => Some(previousPayment.plusMonths(6))
-                    case _ => Some(today)
+                    case _                     => Some(today)
                   }
               }
             // begin annual frequency
@@ -364,24 +347,20 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
                           val nextYear = previousPayment.plusMonths(12)
                           if (nextYear.isBefore(end) || nextYear.isEqual(end)) {
                             Some(nextYear)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else {
+                        } else {
                           val nextYear = previousPayment.plusMonths(12)
                           if (nextYear.isBefore(end) || nextYear.isEqual(end)) {
                             Some(nextYear)
-                          }
-                          else {
+                          } else {
                             None
                           }
                         }
                       case _ => Some(today)
                     }
-                  }
-                  else if (end.isEqual(today)) {
+                  } else if (end.isEqual(today)) {
                     maybePreviousPayment match {
                       case Some(previousPayment) =>
                         val previousYear: Int = previousPayment.getYear
@@ -389,26 +368,23 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
                           val nextYear = previousPayment.plusMonths(12)
                           if (nextYear.isBefore(end) || nextYear.isEqual(end)) {
                             Some(nextYear)
-                          }
-                          else {
+                          } else {
                             Some(today)
                           }
-                        }
-                        else
+                        } else
                           None
                       case _ => Some(today)
                     }
-                  }
-                  else {
+                  } else {
                     None
                   }
                 case _ =>
                   maybePreviousPayment match {
                     case Some(previousPayment) => Some(previousPayment.plusMonths(12))
-                    case _ => Some(today)
+                    case _                     => Some(today)
                   }
               }
-            case _ =>  None //TODO annual, ...
+            case _ => None //TODO annual, ...
           }
         case _ => None
       }
@@ -418,26 +394,28 @@ trait RecurringPaymentDecorator { _: RecurringPayment =>
   lazy val view: RecurringPaymentView = RecurringPaymentView(this)
 }
 
-case class RecurringPaymentView(id: Option[String] = None,
-                                createdDate: java.util.Date,
-                                lastUpdated: java.util.Date,
-                                firstDebitedAmount: Int,
-                                firstFeesAmount: Int,
-                                currency: String,
-                                `type`: RecurringPayment.RecurringPaymentType,
-                                cardStatus: Option[RecurringPayment.RecurringCardPaymentStatus] = None,
-                                startDate: Option[java.util.Date] = None,
-                                endDate: Option[java.util.Date] = None,
-                                frequency: Option[RecurringPayment.RecurringPaymentFrequency] = None,
-                                nextRecurringPaymentDate: Option[java.util.Date] = None,
-                                fixedNextAmount: Option[Boolean] = None,
-                                nextDebitedAmount: Option[Int] = None,
-                                nextFeesAmount: Option[Int] = None,
-                                lastRecurringPaymentTransactionId: Option[String] = None,
-                                lastRecurringPaymentDate: Option[java.util.Date] = None,
-                                numberOfRecurringPayments: Option[Int] = None,
-                                cumulatedDebitedAmount: Option[Int] = None,
-                                cumulatedFeesAmount: Option[Int] = None)
+case class RecurringPaymentView(
+  id: Option[String] = None,
+  createdDate: java.util.Date,
+  lastUpdated: java.util.Date,
+  firstDebitedAmount: Int,
+  firstFeesAmount: Int,
+  currency: String,
+  `type`: RecurringPayment.RecurringPaymentType,
+  cardStatus: Option[RecurringPayment.RecurringCardPaymentStatus] = None,
+  startDate: Option[java.util.Date] = None,
+  endDate: Option[java.util.Date] = None,
+  frequency: Option[RecurringPayment.RecurringPaymentFrequency] = None,
+  nextRecurringPaymentDate: Option[java.util.Date] = None,
+  fixedNextAmount: Option[Boolean] = None,
+  nextDebitedAmount: Option[Int] = None,
+  nextFeesAmount: Option[Int] = None,
+  lastRecurringPaymentTransactionId: Option[String] = None,
+  lastRecurringPaymentDate: Option[java.util.Date] = None,
+  numberOfRecurringPayments: Option[Int] = None,
+  cumulatedDebitedAmount: Option[Int] = None,
+  cumulatedFeesAmount: Option[Int] = None
+)
 
 object RecurringPaymentView {
   def apply(recurringPayment: RecurringPayment): RecurringPaymentView = {

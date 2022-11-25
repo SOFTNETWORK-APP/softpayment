@@ -29,7 +29,10 @@ trait GrpcClientFactory[T <: GrpcClient] {
         val shutdown = CoordinatedShutdown(classicSystem)
         val cli = init(sys)
         client = Some(cli)
-        shutdown.addTask(CoordinatedShutdown.PhaseServiceRequestsDone, s"$name-graceful-terminate") { () =>
+        shutdown.addTask(
+          CoordinatedShutdown.PhaseServiceRequestsDone,
+          s"$name-graceful-terminate"
+        ) { () =>
           client = None
           cli.akkaGrpcClient.close()
         }

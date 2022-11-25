@@ -1,35 +1,37 @@
 package app.softnetwork.payment.model
 
-trait TransactionDecorator {self: Transaction =>
+trait TransactionDecorator { self: Transaction =>
   lazy val uuid: String = self.id
 
   lazy val view: TransactionView = TransactionView(self)
 }
 
-case class TransactionView(createdDate: java.util.Date,
-                           lastUpdated: java.util.Date,
-                           id: String,
-                           orderUuid: String,
-                           nature: Transaction.TransactionNature,
-                           `type`: Transaction.TransactionType,
-                           status: Transaction.TransactionStatus,
-                           amount: Int,
-                           currency: String,
-                           fees: Int,
+case class TransactionView(
+  createdDate: java.util.Date,
+  lastUpdated: java.util.Date,
+  id: String,
+  orderUuid: String,
+  nature: Transaction.TransactionNature,
+  `type`: Transaction.TransactionType,
+  status: Transaction.TransactionStatus,
+  amount: Int,
+  currency: String,
+  fees: Int,
 //                           cardId: Option[String] = None,
-                           resultCode: String,
-                           resultMessage: String,
+  resultCode: String,
+  resultMessage: String,
 //                           redirectUrl: Option[String] = None,
-                           reasonMessage: Option[String] = None,
-                           authorId: String,
+  reasonMessage: Option[String] = None,
+  authorId: String,
 //                           creditedWalletId: Option[String] = None,
 //                           creditedUserId: Option[String] = None,
 //                           debitedWalletId: Option[String] = None,
 //                           mandateId: Option[String] = None,
 //                           preAuthorizationId: Option[String] = None,
-                           paymentType: Transaction.PaymentType)
+  paymentType: Transaction.PaymentType
+)
 
-object TransactionView{
+object TransactionView {
   def apply(transaction: Transaction): TransactionView = {
     import transaction._
     TransactionView(
