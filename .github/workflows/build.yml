@@ -43,7 +43,7 @@ jobs:
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
-        files: common/target/scala-2.12/scoverage-report/scoverage.xml,core/target/scala-2.12/scoverage-report/scoverage.xml,mangopay/target/scala-2.12/scoverage-report/scoverage.xml,teskit/target/scala-2.12/scoverage-report/scoverage.xml
+        files: common/target/scala-2.12/scoverage-report/scoverage.xml,core/target/scala-2.12/scoverage-report/scoverage.xml,teskit/target/scala-2.12/scoverage-report/scoverage.xml
         flags: unittests
         fail_ci_if_error: true
         verbose: true
