@@ -9,8 +9,7 @@ import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.persistence.query.{EventProcessorStream, JournalProvider}
 
-import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success}
+import scala.concurrent.Future
 
 trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentCommandEvent] {
   _: JournalProvider with GenericPaymentHandler =>
@@ -39,15 +38,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentC
     sequenceNr: Long
   ): Future[Done] = {
     event match {
-      case evt: WrapPaymentCommandEvent =>
-        val promise = Promise[Done]
-        processEvent(evt.event, persistenceId, sequenceNr) onComplete {
-          case Success(_) => promise.success(Done)
-          case Failure(f) =>
-            logger.error(f.getMessage)
-            promise.failure(f)
-        }
-        promise.future
+      case evt: WrapPaymentCommandEvent => processEvent(evt.event, persistenceId, sequenceNr)
       case evt: CreateOrUpdatePaymentAccountCommandEvent =>
         val command = CreateOrUpdatePaymentAccount(evt.paymentAccount)
         !?(command) map {

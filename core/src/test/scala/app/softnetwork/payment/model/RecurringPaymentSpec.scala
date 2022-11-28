@@ -9,6 +9,15 @@ import java.time.LocalDate
 
 class RecurringPaymentSpec extends AnyWordSpec with Matchers {
 
+  def computeRecurringPaymentWithinMaximumOneYearTimeFrame(
+    frequency: RecurringPayment.RecurringPaymentFrequency
+  ): RecurringPayment = {
+    RecurringPayment.defaultInstance
+      .withFrequency(frequency)
+      .withEndDate(LocalDate.of(LocalDate.now().getYear, 12, 31))
+      .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
+  }
+
   "Recurring Payment" must {
     // begin daily frequency
     "compute next daily schedule without end date" in {
@@ -170,11 +179,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       }
     }
     "compute next weekly schedule with end date the 31th of december this year and previous payment the 31th of december last year" in {
-      val recurringPayment =
-        RecurringPayment.defaultInstance
-          .withFrequency(RecurringPayment.RecurringPaymentFrequency.WEEKLY)
-          .withEndDate(LocalDate.of(LocalDate.now().getYear, 12, 31))
-          .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
+      val recurringPayment = computeRecurringPaymentWithinMaximumOneYearTimeFrame(
+        RecurringPayment.RecurringPaymentFrequency.WEEKLY
+      )
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(LocalDate.of(LocalDate.now().getYear, 1, 7)))
@@ -260,11 +267,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       }
     }
     "compute next monthly schedule with end date the 31th of december this year and previous payment the 31th of december last year" in {
-      val recurringPayment =
-        RecurringPayment.defaultInstance
-          .withFrequency(RecurringPayment.RecurringPaymentFrequency.MONTHLY)
-          .withEndDate(LocalDate.of(LocalDate.now().getYear, 12, 31))
-          .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
+      val recurringPayment = computeRecurringPaymentWithinMaximumOneYearTimeFrame(
+        RecurringPayment.RecurringPaymentFrequency.MONTHLY
+      )
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(
@@ -352,11 +357,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       }
     }
     "compute next quarterly schedule with end date the 31th of december this year and previous payment the 31th of december last year" in {
-      val recurringPayment =
-        RecurringPayment.defaultInstance
-          .withFrequency(RecurringPayment.RecurringPaymentFrequency.QUARTERLY)
-          .withEndDate(LocalDate.of(LocalDate.now().getYear, 12, 31))
-          .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
+      val recurringPayment = computeRecurringPaymentWithinMaximumOneYearTimeFrame(
+        RecurringPayment.RecurringPaymentFrequency.QUARTERLY
+      )
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(
@@ -444,11 +447,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       }
     }
     "compute next biannual schedule with end date the 31th of december this year and previous payment the 31th of december last year" in {
-      val recurringPayment =
-        RecurringPayment.defaultInstance
-          .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIANNUAL)
-          .withEndDate(LocalDate.of(LocalDate.now().getYear, 12, 31))
-          .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
+      val recurringPayment = computeRecurringPaymentWithinMaximumOneYearTimeFrame(
+        RecurringPayment.RecurringPaymentFrequency.BIANNUAL
+      )
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(
@@ -536,11 +537,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       }
     }
     "compute next annual schedule with end date the 31th of december this year and previous payment the 31th of december last year" in {
-      val recurringPayment =
-        RecurringPayment.defaultInstance
-          .withFrequency(RecurringPayment.RecurringPaymentFrequency.ANNUAL)
-          .withEndDate(LocalDate.of(LocalDate.now().getYear, 12, 31))
-          .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
+      val recurringPayment = computeRecurringPaymentWithinMaximumOneYearTimeFrame(
+        RecurringPayment.RecurringPaymentFrequency.ANNUAL
+      )
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(
@@ -630,11 +629,9 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       }
     }
     "compute next bimonthly schedule with end date the 31th of december this year and previous payment the 31th of december last year" in {
-      val recurringPayment =
-        RecurringPayment.defaultInstance
-          .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIMONTHLY)
-          .withEndDate(LocalDate.of(LocalDate.now().getYear, 12, 31))
-          .withLastRecurringPaymentDate(LocalDate.of(LocalDate.now().getYear - 1, 12, 31))
+      val recurringPayment = computeRecurringPaymentWithinMaximumOneYearTimeFrame(
+        RecurringPayment.RecurringPaymentFrequency.BIMONTHLY
+      )
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(
