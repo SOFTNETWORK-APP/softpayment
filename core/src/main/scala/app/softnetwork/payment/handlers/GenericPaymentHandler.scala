@@ -8,10 +8,9 @@ import app.softnetwork.payment.model._
 import app.softnetwork.persistence._
 import app.softnetwork.persistence.typed.CommandTypeKey
 
-import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success}
 
 trait GenericPaymentHandler extends EntityPattern[PaymentCommand, PaymentResult] {
   _: CommandTypeKey[PaymentCommand] =>
@@ -22,16 +21,10 @@ trait GenericPaymentHandler extends EntityPattern[PaymentCommand, PaymentResult]
     key: T
   )(implicit system: ActorSystem[_]): Future[Option[Recipient]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    val promise = Promise[Option[Recipient]]
-    keyValueDao.lookupKeyValue(key) onComplete {
-      case Success(value) =>
-        value match {
-          case None => promise.success(Some(generateUUID(Some(key))))
-          case some => promise.success(some)
-        }
-      case Failure(_) => promise.success(Some(generateUUID(Some(key))))
+    keyValueDao.lookupKeyValue(key) map {
+      case None => Some(generateUUID(Some(key)))
+      case some => some
     }
-    promise.future
   }
 
   override def !?(

@@ -4,6 +4,8 @@ import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import akka.grpc.scaladsl.AkkaGrpcClient
 
+import app.softnetwork.persistence.typed._
+
 import scala.concurrent.ExecutionContext
 
 trait GrpcClient {
@@ -13,7 +15,7 @@ trait GrpcClient {
 
   def name: String
 
-  def akkaGrpcClient: AkkaGrpcClient
+  def grpcClient: AkkaGrpcClient
 }
 
 trait GrpcClientFactory[T <: GrpcClient] {
@@ -24,7 +26,6 @@ trait GrpcClientFactory[T <: GrpcClient] {
     client match {
       case Some(value) => value
       case _ =>
-        import app.softnetwork.persistence.typed._
         implicit val classicSystem: _root_.akka.actor.ActorSystem = sys
         val shutdown = CoordinatedShutdown(classicSystem)
         val cli = init(sys)
@@ -34,7 +35,7 @@ trait GrpcClientFactory[T <: GrpcClient] {
           s"$name-graceful-terminate"
         ) { () =>
           client = None
-          cli.akkaGrpcClient.close()
+          cli.grpcClient.close()
         }
         cli
     }

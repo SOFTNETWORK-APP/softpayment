@@ -8,13 +8,13 @@ import java.util.Date
 import scala.concurrent.Future
 
 trait PaymentClient extends GrpcClient {
-  implicit lazy val akkaGrpcClient: PaymentServiceApiClient =
+  implicit lazy val grpcClient: PaymentServiceApiClient =
     PaymentServiceApiClient(
       GrpcClientSettings.fromConfig(name)
     )
 
   def createOrUpdatePaymentAccount(paymentAccount: PaymentAccount): Future[Boolean] = {
-    akkaGrpcClient.createOrUpdatePaymentAccount(
+    grpcClient.createOrUpdatePaymentAccount(
       CreateOrUpdatePaymentAccountRequest(Some(paymentAccount))
     ) map (_.succeeded)
   }
@@ -23,7 +23,7 @@ trait PaymentClient extends GrpcClient {
     preAuthorizationId: String,
     creditedAccount: String
   ): Future[TransactionResponse] = {
-    akkaGrpcClient.payInWithCardPreAuthorized(
+    grpcClient.payInWithCardPreAuthorized(
       PayInWithCardPreAuthorizedRequest(preAuthorizationId, creditedAccount)
     )
   }
@@ -32,7 +32,7 @@ trait PaymentClient extends GrpcClient {
     orderUuid: String,
     cardPreAuthorizedTransactionId: String
   ): Future[Option[Boolean]] = {
-    akkaGrpcClient.cancelPreAuthorization(
+    grpcClient.cancelPreAuthorization(
       CancelPreAuthorizationRequest(orderUuid, cardPreAuthorizedTransactionId)
     ) map (_.preAuthorizationCanceled)
   }
@@ -45,7 +45,7 @@ trait PaymentClient extends GrpcClient {
     reasonMessage: String,
     initializedByClient: Boolean
   ): Future[TransactionResponse] = {
-    akkaGrpcClient.refund(
+    grpcClient.refund(
       RefundRequest(
         orderUuid,
         payInTransactionId,
@@ -64,7 +64,7 @@ trait PaymentClient extends GrpcClient {
     feesAmount: Int,
     currency: String
   ): Future[TransactionResponse] = {
-    akkaGrpcClient.payOut(
+    grpcClient.payOut(
       PayOutRequest(orderUuid, creditedAccount, creditedAmount, feesAmount, currency)
     )
   }
@@ -79,7 +79,7 @@ trait PaymentClient extends GrpcClient {
     payOutRequired: Boolean,
     externalReference: Option[String]
   ): Future[TransferResponse] = {
-    akkaGrpcClient.transfer(
+    grpcClient.transfer(
       TransferRequest(
         orderUuid,
         debitedAccount,
@@ -101,7 +101,7 @@ trait PaymentClient extends GrpcClient {
     statementDescriptor: String,
     externalReference: Option[String]
   ): Future[TransactionResponse] = {
-    akkaGrpcClient.directDebit(
+    grpcClient.directDebit(
       DirectDebitRequest(
         creditedAccount,
         debitedAmount,
@@ -114,7 +114,7 @@ trait PaymentClient extends GrpcClient {
   }
 
   def loadDirectDebitTransaction(directDebitTransactionId: String): Future[TransactionResponse] = {
-    akkaGrpcClient.loadDirectDebitTransaction(
+    grpcClient.loadDirectDebitTransaction(
       LoadDirectDebitTransactionRequest(directDebitTransactionId)
     )
   }
@@ -132,7 +132,7 @@ trait PaymentClient extends GrpcClient {
     nextDebitedAmount: Option[Int],
     nextFeesAmount: Option[Int]
   ): Future[Option[String]] = {
-    akkaGrpcClient.registerRecurringPayment(
+    grpcClient.registerRecurringPayment(
       RegisterRecurringPaymentRequest(
         debitedAccount,
         firstDebitedAmount,
@@ -154,7 +154,7 @@ trait PaymentClient extends GrpcClient {
   }
 
   def cancelMandate(externalUuid: String): Future[Boolean] = {
-    akkaGrpcClient.cancelMandate(CancelMandateRequest(externalUuid)) map (_.succeeded)
+    grpcClient.cancelMandate(CancelMandateRequest(externalUuid)) map (_.succeeded)
   }
 
 }

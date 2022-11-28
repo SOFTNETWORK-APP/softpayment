@@ -20,9 +20,9 @@ function printInfo() {
 
 function clean() {
     IFS=$SAVEIFS
-    exit $1
+    exit "$1"
 }
 
 export CLUSTER_IP=$(hostname -i | awk '{print $1}')
 
-/opt/docker/bin/mangopay-api -DCLUSTER_MANAGEMENT_HOST=$CLUSTER_IP
+/opt/docker/bin/mangopay-api -DCLUSTER_MANAGEMENT_HOST="$CLUSTER_IP"
