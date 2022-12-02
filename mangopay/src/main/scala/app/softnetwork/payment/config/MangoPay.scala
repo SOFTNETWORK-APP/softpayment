@@ -74,6 +74,7 @@ object MangoPay extends StrictLogging {
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_CREATED, hooks)
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_ACTIVATED, hooks)
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_EXPIRED, hooks)
+        maybeMangoPayApi = Some(mangoPayApi)
         mangoPayApi
     }
   }
