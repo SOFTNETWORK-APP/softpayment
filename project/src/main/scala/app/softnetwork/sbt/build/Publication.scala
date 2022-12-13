@@ -1,15 +1,13 @@
 package app.softnetwork.sbt.build
 
-import java.util.Date
-
 import sbt._
 
 object Publication {
 
   def settings: Seq[Def.Setting[_]] = Seq(
-    (Keys.publishTo in ThisBuild) := selectDestination((Keys.version in Keys.publish).value),
-    Keys.publishMavenStyle := true,
-    Keys.credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
+    ThisBuild / Keys.publishTo := selectDestination((Keys.version in Keys.publish).value),
+    ThisBuild / Keys.publishMavenStyle := true,
+    ThisBuild / Keys.credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
   )
 
   val artifactoryUrl = "https://softnetwork.jfrog.io/artifactory/"

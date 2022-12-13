@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  release:
     runs-on: self-hosted
 #    runs-on: ubuntu-latest
     env:

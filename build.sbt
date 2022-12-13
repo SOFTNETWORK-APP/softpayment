@@ -31,7 +31,7 @@ ThisBuild / organization := "app.softnetwork"
 
 name := "payment"
 
-ThisBuild / version := "0.1.0.0"
+ThisBuild / version := "0.1.1"
 
 ThisBuild / scalaVersion := "2.12.15"
 
@@ -44,6 +44,8 @@ ThisBuild / resolvers ++= Seq(
   "Maven Central Server" at "https://repo1.maven.org/maven2",
   "Typesafe Server" at "https://repo.typesafe.com/typesafe/releases"
 )
+
+ThisBuild / versionScheme := Some("early-semver")
 
 val scalatest = Seq(
   "org.scalatest" %% "scalatest" % Versions.scalatest  % Test
