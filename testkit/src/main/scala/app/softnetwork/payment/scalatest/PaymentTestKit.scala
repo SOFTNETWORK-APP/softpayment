@@ -155,7 +155,7 @@ trait PaymentRouteTestKit
   override def paymentService: ActorSystem[_] => GenericPaymentService = system =>
     MockPaymentService(system)
 
-  override lazy val additionalConfig: String = grpcConfig
+  override lazy val additionalConfig: String = paymentGrpcConfig
 
   override def apiRoutes(system: ActorSystem[_]): Route =
     paymentService(system).route ~

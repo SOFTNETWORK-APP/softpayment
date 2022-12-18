@@ -16,7 +16,7 @@ import app.softnetwork.payment.spi._
 import app.softnetwork.persistence._
 import app.softnetwork.persistence.message.{BroadcastEvent, CrudEvent}
 import app.softnetwork.persistence.typed._
-import app.softnetwork.scheduler.config.Settings
+import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.serialization.asJson
 import app.softnetwork.time.{now => _, _}
 import org.slf4j.Logger
@@ -70,7 +70,7 @@ trait GenericPaymentBehavior
       case _: SchedulerEventWithCommand =>
         Set(
           s"$persistenceId-to-scheduler",
-          Settings.SchedulerConfig.eventStreams.entityToSchedulerTag
+          SchedulerSettings.SchedulerConfig.eventStreams.entityToSchedulerTag
         )
       case _ => Set(persistenceId)
     }

@@ -7,6 +7,6 @@ organization := "app.softnetwork.payment"
 name := "payment-testkit"
 
 libraryDependencies ++= Seq(
-  "app.softnetwork.persistence" %% "persistence-scheduler-testkit" % Versions.genericPersistence,
+  "app.softnetwork.scheduler" %% "scheduler-testkit" % Versions.scheduler,
   "app.softnetwork.persistence" %% "persistence-session-testkit" % Versions.genericPersistence
 )

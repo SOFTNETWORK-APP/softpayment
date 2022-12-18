@@ -5,7 +5,7 @@ import sbt._
 object Publication {
 
   def settings: Seq[Def.Setting[_]] = Seq(
-    ThisBuild / Keys.publishTo := selectDestination((Keys.version in Keys.publish).value),
+    ThisBuild / Keys.publishTo := selectDestination((Keys.publish / Keys.version).value),
     ThisBuild / Keys.publishMavenStyle := true,
     ThisBuild / Keys.credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
   )
