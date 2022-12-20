@@ -2,6 +2,7 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import akka.grpc.GrpcClientSettings
+import app.softnetwork.api.server.client.{GrpcClient, GrpcClientFactory}
 import app.softnetwork.payment.model.{PaymentAccount, RecurringPayment}
 
 import java.util.Date

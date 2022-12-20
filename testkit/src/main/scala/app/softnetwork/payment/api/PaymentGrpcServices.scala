@@ -2,17 +2,14 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import app.softnetwork.api.server.scalatest.ServerTestKit
 import app.softnetwork.payment.launch.PaymentGuardian
 import app.softnetwork.scheduler.api.SchedulerGrpcServices
 
 import scala.concurrent.Future
 
 trait PaymentGrpcServices extends SchedulerGrpcServices {
-  _: PaymentGuardian =>
-
-  def interface: String
-
-  def port: Int
+  _: PaymentGuardian with ServerTestKit =>
 
   override def grpcServices
     : ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] =

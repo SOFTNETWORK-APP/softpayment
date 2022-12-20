@@ -4,7 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, Multipart, StatusCodes}
 import akka.http.scaladsl.server.Route
-import app.softnetwork.api.server.config.Settings.RootPath
+import app.softnetwork.api.server.config.ServerSettings.RootPath
 import app.softnetwork.payment.api.PaymentGrpcServices
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.MockPaymentHandler

@@ -1,7 +1,7 @@
 package app.softnetwork.payment.service
 
 import akka.http.scaladsl.model.StatusCodes
-import app.softnetwork.api.server.config.Settings.RootPath
+import app.softnetwork.api.server.config.ServerSettings.RootPath
 import app.softnetwork.payment.api.PaymentClient
 import app.softnetwork.payment.data._
 import app.softnetwork.payment.config.PaymentSettings._
