@@ -18,8 +18,6 @@ trait Scheduler2PaymentProcessorStream
     extends Scheduler2EntityProcessorStream[PaymentCommand, PaymentResult] {
   _: GenericPaymentHandler with JournalProvider =>
 
-  protected val forTests = false
-
   /** @param schedule
     *   - the schedule to trigger
     * @return

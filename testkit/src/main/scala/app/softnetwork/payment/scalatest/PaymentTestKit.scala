@@ -50,7 +50,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     : ActorSystem[_] => Scheduler2PaymentProcessorStream = sys =>
     new Scheduler2PaymentProcessorStream with MockPaymentHandler with InMemoryJournalProvider {
       override val tag: String = s"${MockPaymentBehavior.persistenceId}-scheduler"
-      override protected val forTests: Boolean = true
+      override val forTests: Boolean = true
       override implicit def system: ActorSystem[_] = sys
     }
 

@@ -2582,7 +2582,8 @@ trait GenericPaymentBehavior
                                 s"$nextRecurringPayment#${recurringPayment.getId}",
                                 1,
                                 Some(false),
-                                Some(value)
+                                Some(value),
+                                None
                               )
                             )
                           )
@@ -2733,7 +2734,8 @@ trait GenericPaymentBehavior
                     s"$nextRecurringPayment#${recurringPayment.getId}",
                     1,
                     Some(false),
-                    Some(value)
+                    Some(value),
+                    None
                   )
                 )
               )
@@ -2965,7 +2967,8 @@ trait GenericPaymentBehavior
                           s"$nextRecurringPayment#${recurringPayment.getId}",
                           1,
                           Some(false),
-                          Some(value)
+                          Some(value),
+                          None
                         )
                       )
                     )
@@ -3032,7 +3035,8 @@ trait GenericPaymentBehavior
                           s"$nextRecurringPayment#${recurringPayment.getId}",
                           1,
                           Some(false),
-                          Some(value)
+                          Some(value),
+                          None
                         )
                       )
                     )
