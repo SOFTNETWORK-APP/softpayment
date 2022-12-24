@@ -446,7 +446,14 @@ trait GenericPaymentBehavior
                                   registerCard = false,
                                   transaction
                                 )
-                              case _ => Effect.none.thenRun(_ => PayInFailed("unknown") ~> replyTo)
+                              case _ =>
+                                Effect.none.thenRun(_ =>
+                                  PayInFailed(
+                                    "",
+                                    Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                                    "unknown"
+                                  ) ~> replyTo
+                                )
                             }
                           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
                         }
@@ -512,11 +519,21 @@ trait GenericPaymentBehavior
                                           transaction
                                         )
                                       case _ =>
-                                        Effect.none.thenRun(_ => PayInFailed("unknown") ~> replyTo)
+                                        Effect.none.thenRun(_ =>
+                                          PayInFailed(
+                                            "",
+                                            Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                                            "unknown"
+                                          ) ~> replyTo
+                                        )
                                     }
                                   case _ =>
                                     Effect.none.thenRun(_ =>
-                                      PayInFailed("no credited wallet") ~> replyTo
+                                      PayInFailed(
+                                        "",
+                                        Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                                        "no credited wallet"
+                                      ) ~> replyTo
                                     )
                                 }
                               case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
@@ -524,7 +541,14 @@ trait GenericPaymentBehavior
                           case Failure(_) =>
                             Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
                         }
-                      case _ => Effect.none.thenRun(_ => PayInFailed("no card") ~> replyTo)
+                      case _ =>
+                        Effect.none.thenRun(_ =>
+                          PayInFailed(
+                            "",
+                            Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                            "no card"
+                          ) ~> replyTo
+                        )
                     }
                   case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
                 }
@@ -543,7 +567,13 @@ trait GenericPaymentBehavior
                         .withPaymentType(paymentType)
                     )
                   )
-                  .thenRun(_ => PayInFailed(s"$paymentType not supported") ~> replyTo)
+                  .thenRun(_ =>
+                    PayInFailed(
+                      "",
+                      Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                      s"$paymentType not supported"
+                    ) ~> replyTo
+                  )
             }
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
@@ -620,7 +650,13 @@ trait GenericPaymentBehavior
                                   .withTransaction(transaction)
                               ) :+ upsertedEvent
                             )
-                            .thenRun(_ => RefundFailed(transaction.resultMessage) ~> replyTo)
+                            .thenRun(_ =>
+                              RefundFailed(
+                                "",
+                                Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                                transaction.resultMessage
+                              ) ~> replyTo
+                            )
                         case _ =>
                           if (
                             transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated
@@ -648,7 +684,7 @@ trait GenericPaymentBehavior
                                     .withPaymentType(transaction.paymentType)
                                 ) :+ upsertedEvent
                               )
-                              .thenRun(_ => Refunded(transaction.id) ~> replyTo)
+                              .thenRun(_ => Refunded(transaction.id, transaction.status) ~> replyTo)
                           } else {
                             log.info(
                               "Order-{} could not be refunded: {} -> {}",
@@ -665,7 +701,13 @@ trait GenericPaymentBehavior
                                     .withTransaction(transaction)
                                 ) :+ upsertedEvent
                               )
-                              .thenRun(_ => RefundFailed(transaction.resultMessage) ~> replyTo)
+                              .thenRun(_ =>
+                                RefundFailed(
+                                  transaction.id,
+                                  transaction.status,
+                                  transaction.resultMessage
+                                ) ~> replyTo
+                              )
                           }
                       }
                     case _ =>
@@ -682,7 +724,11 @@ trait GenericPaymentBehavior
                           )
                         )
                         .thenRun(_ =>
-                          RefundFailed("no transaction returned by provider") ~> replyTo
+                          RefundFailed(
+                            "",
+                            Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                            "no transaction returned by provider"
+                          ) ~> replyTo
                         )
                   }
                 }
@@ -742,7 +788,13 @@ trait GenericPaymentBehavior
                                     .withDocument(updatedPaymentAccount)
                                     .withLastUpdated(lastUpdated)
                                 )
-                                .thenRun(_ => PayOutFailed(transaction.resultMessage) ~> replyTo)
+                                .thenRun(_ =>
+                                  PayOutFailed(
+                                    transaction.id,
+                                    transaction.status,
+                                    transaction.resultMessage
+                                  ) ~> replyTo
+                                )
                             } else if (
                               transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated
                             ) {
@@ -769,7 +821,9 @@ trait GenericPaymentBehavior
                                     .withDocument(updatedPaymentAccount)
                                     .withLastUpdated(lastUpdated)
                                 )
-                                .thenRun(_ => PaidOut(transaction.id) ~> replyTo)
+                                .thenRun(_ =>
+                                  PaidOut(transaction.id, transaction.status) ~> replyTo
+                                )
                             } else {
                               log.error(
                                 "Order-{} could not be paid out : {} -> {}",
@@ -789,7 +843,13 @@ trait GenericPaymentBehavior
                                     .withDocument(updatedPaymentAccount)
                                     .withLastUpdated(lastUpdated)
                                 )
-                                .thenRun(_ => PayOutFailed(transaction.resultMessage) ~> replyTo)
+                                .thenRun(_ =>
+                                  PayOutFailed(
+                                    transaction.id,
+                                    transaction.status,
+                                    transaction.resultMessage
+                                  ) ~> replyTo
+                                )
                             }
                           case _ =>
                             log.error(
@@ -805,15 +865,39 @@ trait GenericPaymentBehavior
                                 )
                               )
                               .thenRun(_ =>
-                                PayOutFailed("no transaction returned by provider") ~> replyTo
+                                PayOutFailed(
+                                  "",
+                                  Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                                  "no transaction returned by provider"
+                                ) ~> replyTo
                               )
                         }
-                      case _ => Effect.none.thenRun(_ => PayOutFailed("no bank account") ~> replyTo)
+                      case _ =>
+                        Effect.none.thenRun(_ =>
+                          PayOutFailed(
+                            "",
+                            Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                            "no bank account"
+                          ) ~> replyTo
+                        )
                     }
-                  case _ => Effect.none.thenRun(_ => PayOutFailed("no wallet id") ~> replyTo)
+                  case _ =>
+                    Effect.none.thenRun(_ =>
+                      PayOutFailed(
+                        "",
+                        Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                        "no wallet id"
+                      ) ~> replyTo
+                    )
                 }
               case _ =>
-                Effect.none.thenRun(_ => PayOutFailed("no payment provider user id") ~> replyTo)
+                Effect.none.thenRun(_ =>
+                  PayOutFailed(
+                    "",
+                    Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                    "no payment provider user id"
+                  ) ~> replyTo
+                )
             }
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
@@ -922,7 +1006,7 @@ trait GenericPaymentBehavior
                     )
                     .thenRun(_ =>
                       {
-                        Transfered(transaction.id, payOutTransactionId)
+                        Transferred(transaction.id, transaction.status, payOutTransactionId)
                       } ~> replyTo
                     )
                 } else {
@@ -939,7 +1023,13 @@ trait GenericPaymentBehavior
                         .withDocument(updatedPaymentAccount)
                         .withLastUpdated(lastUpdated)
                     )
-                    .thenRun(_ => TransferFailed(transaction.resultMessage) ~> replyTo)
+                    .thenRun(_ =>
+                      TransferFailed(
+                        transaction.id,
+                        transaction.status,
+                        transaction.resultMessage
+                      ) ~> replyTo
+                    )
                 }
               case _ => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
             }
@@ -1139,7 +1229,9 @@ trait GenericPaymentBehavior
                                       .withLastUpdated(lastUpdated)
                                       .withDocument(updatedPaymentAccount)
                                   )
-                                  .thenRun(_ => DirectDebited(transaction.id) ~> replyTo)
+                                  .thenRun(_ =>
+                                    DirectDebited(transaction.id, transaction.status) ~> replyTo
+                                  )
                               } else {
                                 Effect
                                   .persist(
@@ -1155,7 +1247,11 @@ trait GenericPaymentBehavior
                                       .withDocument(updatedPaymentAccount)
                                   )
                                   .thenRun(_ =>
-                                    DirectDebitFailed(transaction.resultMessage) ~> replyTo
+                                    DirectDebitFailed(
+                                      transaction.id,
+                                      transaction.status,
+                                      transaction.resultMessage
+                                    ) ~> replyTo
                                   )
                               }
                             case _ => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
@@ -1216,7 +1312,9 @@ trait GenericPaymentBehavior
                                 .withLastUpdated(lastUpdated)
                                 .withDocument(updatedPaymentAccount)
                             )
-                            .thenRun(_ => DirectDebited(transaction.id) ~> replyTo)
+                            .thenRun(_ =>
+                              DirectDebited(transaction.id, transaction.status) ~> replyTo
+                            )
                         } else {
                           Effect
                             .persist(
@@ -1231,7 +1329,13 @@ trait GenericPaymentBehavior
                                 .withLastUpdated(lastUpdated)
                                 .withDocument(updatedPaymentAccount)
                             )
-                            .thenRun(_ => DirectDebitFailed(transaction.resultMessage) ~> replyTo)
+                            .thenRun(_ =>
+                              DirectDebitFailed(
+                                transaction.id,
+                                transaction.status,
+                                transaction.resultMessage
+                              ) ~> replyTo
+                            )
                         }
                       case _ => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
                     }
@@ -1276,7 +1380,11 @@ trait GenericPaymentBehavior
                     )
                   case _ =>
                     Effect.none.thenRun(_ =>
-                      FirstRecurringCardPaymentFailed("no transaction") ~> replyTo
+                      FirstRecurringCardPaymentFailed(
+                        "",
+                        Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                        "no transaction"
+                      ) ~> replyTo
                     )
                 }
               case _ => Effect.none.thenRun(_ => RecurringPaymentNotFound ~> replyTo)
@@ -1301,7 +1409,11 @@ trait GenericPaymentBehavior
                     )
                   case _ =>
                     Effect.none.thenRun(_ =>
-                      FirstRecurringCardPaymentFailed("no transaction") ~> replyTo
+                      FirstRecurringCardPaymentFailed(
+                        "",
+                        Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                        "no transaction"
+                      ) ~> replyTo
                     )
                 }
               case _ => Effect.none.thenRun(_ => RecurringPaymentNotFound ~> replyTo)
@@ -2750,7 +2862,13 @@ trait GenericPaymentBehavior
           }
         }
       )
-      .thenRun(_ => NextRecurringPaymentFailed(reason) ~> replyTo)
+      .thenRun(_ =>
+        NextRecurringPaymentFailed(
+          "",
+          Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          reason
+        ) ~> replyTo
+      )
   }
 
   private def addMandate(
@@ -2987,8 +3105,8 @@ trait GenericPaymentBehavior
                 .withLastUpdated(lastUpdated)
             )
             .thenRun(_ =>
-              (if (first) FirstRecurringPaidIn(transaction.id)
-               else NextRecurringPaid(transaction.id)) ~> replyTo
+              (if (first) FirstRecurringPaidIn(transaction.id, transaction.status)
+               else NextRecurringPaid(transaction.id, transaction.status)) ~> replyTo
             )
         } else {
           log.error(
@@ -3057,9 +3175,17 @@ trait GenericPaymentBehavior
             .thenRun(_ =>
               (
                 if (first)
-                  FirstRecurringCardPaymentFailed(transaction.getReasonMessage)
+                  FirstRecurringCardPaymentFailed(
+                    transaction.id,
+                    transaction.status,
+                    transaction.getReasonMessage
+                  )
                 else
-                  NextRecurringPaymentFailed(transaction.getReasonMessage)
+                  NextRecurringPaymentFailed(
+                    transaction.id,
+                    transaction.status,
+                    transaction.getReasonMessage
+                  )
               ) ~> replyTo
             )
         }
@@ -3147,7 +3273,7 @@ trait GenericPaymentBehavior
                 .withDocument(updatedPaymentAccount)
                 .withLastUpdated(lastUpdated)
             )
-            .thenRun(_ => PaidIn(transaction.id) ~> replyTo)
+            .thenRun(_ => PaidIn(transaction.id, transaction.status) ~> replyTo)
         } else {
           log.error(
             "Order-{} could not be paid in: {} -> {}",
@@ -3167,7 +3293,9 @@ trait GenericPaymentBehavior
                 .withDocument(updatedPaymentAccount)
                 .withLastUpdated(lastUpdated)
             )
-            .thenRun(_ => PayInFailed(transaction.resultMessage) ~> replyTo)
+            .thenRun(_ =>
+              PayInFailed(transaction.id, transaction.status, transaction.resultMessage) ~> replyTo
+            )
         }
     }
   }

@@ -7,13 +7,16 @@ import app.softnetwork.payment.message.PaymentMessages.{
   CancelPreAuthorization,
   CreateOrUpdatePaymentAccount,
   DirectDebit,
+  DirectDebitFailed,
   DirectDebited,
   LoadDirectDebitTransaction,
   MandateCanceled,
   PaidIn,
   PaidOut,
+  PayInFailed,
   PayInWithCardPreAuthorized,
   PayOut,
+  PayOutFailed,
   PaymentAccountCreated,
   PaymentAccountUpdated,
   PaymentCommand,
@@ -21,12 +24,15 @@ import app.softnetwork.payment.message.PaymentMessages.{
   PreAuthorizationCanceled,
   RecurringPaymentRegistered,
   Refund,
+  RefundFailed,
   Refunded,
   RegisterRecurringPayment,
   Transfer,
-  Transfered
+  TransferFailed,
+  Transferred
 }
 import app.softnetwork.payment.model.RecurringPayment
+import app.softnetwork.payment.serialization._
 import app.softnetwork.persistence.typed.CommandTypeKey
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -57,9 +63,27 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
   ): Future[TransactionResponse] = {
     import in._
     !?(PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount)) map {
-      case r: PaidIn       => TransactionResponse(transactionId = Some(r.transactionId))
-      case e: PaymentError => TransactionResponse(error = Some(e.message))
-      case _               => TransactionResponse(error = Some("unknown"))
+      case r: PaidIn =>
+        TransactionResponse(
+          transactionId = Some(r.transactionId),
+          transactionStatus = r.transactionStatus
+        )
+      case f: PayInFailed =>
+        TransactionResponse(
+          transactionId = Some(f.transactionId),
+          transactionStatus = f.transactionStatus,
+          error = Some(f.message)
+        )
+      case e: PaymentError =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some(e.message)
+        )
+      case _ =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some("unknown")
+        )
     }
   }
 
@@ -86,18 +110,54 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
         initializedByClient
       )
     ) map {
-      case r: Refunded     => TransactionResponse(transactionId = Some(r.transactionId))
-      case e: PaymentError => TransactionResponse(error = Some(e.message))
-      case _               => TransactionResponse(error = Some("unknown"))
+      case r: Refunded =>
+        TransactionResponse(
+          transactionId = Some(r.transactionId),
+          transactionStatus = r.transactionStatus
+        )
+      case f: RefundFailed =>
+        TransactionResponse(
+          transactionId = Some(f.transactionId),
+          transactionStatus = f.transactionStatus,
+          error = Some(f.message)
+        )
+      case e: PaymentError =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some(e.message)
+        )
+      case _ =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some("unknown")
+        )
     }
   }
 
   override def payOut(in: PayOutRequest): Future[TransactionResponse] = {
     import in._
     !?(PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency)) map {
-      case r: PaidOut      => TransactionResponse(transactionId = Some(r.transactionId))
-      case e: PaymentError => TransactionResponse(error = Some(e.message))
-      case _               => TransactionResponse(error = Some("unknown"))
+      case r: PaidOut =>
+        TransactionResponse(
+          transactionId = Some(r.transactionId),
+          transactionStatus = r.transactionStatus
+        )
+      case f: PayOutFailed =>
+        TransactionResponse(
+          transactionId = Some(f.transactionId),
+          transactionStatus = f.transactionStatus,
+          error = Some(f.message)
+        )
+      case e: PaymentError =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some(e.message)
+        )
+      case _ =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some("unknown")
+        )
     }
   }
 
@@ -115,9 +175,28 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
         externalReference
       )
     ) map {
-      case r: Transfered =>
-        TransferResponse(Some(r.transferedTransactionId), r.paidOutTransactionId)
-      case _ => TransferResponse()
+      case r: Transferred =>
+        TransferResponse(
+          Some(r.transferredTransactionId),
+          r.transferredTransactionStatus,
+          r.paidOutTransactionId
+        )
+      case f: TransferFailed =>
+        TransferResponse(
+          Some(f.transferredTransactionId),
+          f.transferredTransactionStatus,
+          error = Some(f.message)
+        )
+      case e: PaymentError =>
+        TransferResponse(
+          transferredTransactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some(e.message)
+        )
+      case _ =>
+        TransferResponse(
+          transferredTransactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some("unknown")
+        )
     }
   }
 
@@ -133,9 +212,27 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
         externalReference
       )
     ) map {
-      case r: DirectDebited => TransactionResponse(transactionId = Some(r.transactionId))
-      case e: PaymentError  => TransactionResponse(error = Some(e.message))
-      case _                => TransactionResponse(error = Some("unknown"))
+      case r: DirectDebited =>
+        TransactionResponse(
+          transactionId = Some(r.transactionId),
+          transactionStatus = r.transactionStatus
+        )
+      case f: DirectDebitFailed =>
+        TransactionResponse(
+          transactionId = Some(f.transactionId),
+          transactionStatus = f.transactionStatus,
+          error = Some(f.message)
+        )
+      case e: PaymentError =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some(e.message)
+        )
+      case _ =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some("unknown")
+        )
     }
   }
 
@@ -144,9 +241,27 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
   ): Future[TransactionResponse] = {
     import in._
     !?(LoadDirectDebitTransaction(directDebitTransactionId)) map {
-      case r: DirectDebited => TransactionResponse(transactionId = Some(r.transactionId))
-      case e: PaymentError  => TransactionResponse(error = Some(e.message))
-      case _                => TransactionResponse(error = Some("unknown"))
+      case r: DirectDebited =>
+        TransactionResponse(
+          transactionId = Some(r.transactionId),
+          transactionStatus = r.transactionStatus
+        )
+      case f: DirectDebitFailed =>
+        TransactionResponse(
+          transactionId = Some(f.transactionId),
+          transactionStatus = f.transactionStatus,
+          error = Some(f.message)
+        )
+      case e: PaymentError =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some(e.message)
+        )
+      case _ =>
+        TransactionResponse(
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some("unknown")
+        )
     }
   }
 

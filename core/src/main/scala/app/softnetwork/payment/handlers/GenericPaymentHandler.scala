@@ -104,7 +104,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
       case result: PaymentRedirection => Right(Left(result))
       case result: PaidIn             => Right(Right(result))
       case error: PayInFailed         => Left(error)
-      case _                          => Left(PayInFailed("unknown"))
+      case _ =>
+        Left(PayInFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 
@@ -149,7 +150,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
     !?(PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount)) map {
       case result: PaidIn     => Right(result)
       case error: PayInFailed => Left(error)
-      case _                  => Left(PayInFailed("unknown"))
+      case _ =>
+        Left(PayInFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 
@@ -174,7 +176,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
     ) map {
       case result: Refunded    => Right(result)
       case error: RefundFailed => Left(error)
-      case _                   => Left(RefundFailed("unknown"))
+      case _ =>
+        Left(RefundFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 
@@ -185,7 +188,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
     !?(PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount)) map {
       case result: PaidOut     => Right(result)
       case error: PayOutFailed => Left(error)
-      case _                   => Left(PayOutFailed("unknown"))
+      case _ =>
+        Left(PayOutFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 
@@ -196,7 +200,7 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
     debitedAmount: Int,
     feesAmount: Int = 0,
     payOutRequired: Boolean = true
-  )(implicit system: ActorSystem[_]): Future[Either[TransferFailed, Transfered]] = {
+  )(implicit system: ActorSystem[_]): Future[Either[TransferFailed, Transferred]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
     !?(
       Transfer(
@@ -208,9 +212,10 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
         payOutRequired
       )
     ) map {
-      case result: Transfered    => Right(result)
+      case result: Transferred   => Right(result)
       case error: TransferFailed => Left(error)
-      case _                     => Left(TransferFailed("unknown"))
+      case _ =>
+        Left(TransferFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 }

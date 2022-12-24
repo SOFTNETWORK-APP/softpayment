@@ -113,7 +113,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentC
           externalReference
         )
         !?(command) map {
-          case _: Transfered =>
+          case _: Transferred =>
             if (forTests) system.eventStream.tell(Publish(event))
             Done
           case other =>

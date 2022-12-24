@@ -581,18 +581,23 @@ object PaymentMessages {
 
   trait PaidInResult extends PaymentResult
 
-  case class PaidIn(transactionId: String) extends PaidInResult
+  case class PaidIn(transactionId: String, transactionStatus: Transaction.TransactionStatus)
+      extends PaidInResult
 
-  case class PaidOut(transactionId: String) extends PaymentResult
+  case class PaidOut(transactionId: String, transactionStatus: Transaction.TransactionStatus)
+      extends PaymentResult
 
-  case class Refunded(transactionId: String) extends PaymentResult
+  case class Refunded(transactionId: String, transactionStatus: Transaction.TransactionStatus)
+      extends PaymentResult
 
-  case class Transfered(
-    transferedTransactionId: String,
+  case class Transferred(
+    transferredTransactionId: String,
+    transferredTransactionStatus: Transaction.TransactionStatus,
     paidOutTransactionId: Option[String] = None
   ) extends PaymentResult
 
-  case class DirectDebited(transactionId: String) extends PaymentResult
+  case class DirectDebited(transactionId: String, transactionStatus: Transaction.TransactionStatus)
+      extends PaymentResult
 
   case class PaymentRedirection(redirectUrl: String) extends PaidInResult
 
@@ -605,9 +610,15 @@ object PaymentMessages {
 
   case class RecurringPaymentLoaded(recurringPayment: RecurringPayment) extends PaymentResult
 
-  case class FirstRecurringPaidIn(transactionId: String) extends PaidInResult
+  case class FirstRecurringPaidIn(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus
+  ) extends PaidInResult
 
-  case class NextRecurringPaid(transactionId: String) extends PaidInResult
+  case class NextRecurringPaid(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus
+  ) extends PaidInResult
 
   case class PreAuthorizationCanceled(preAuthorizationCanceled: Boolean) extends PaymentResult
 
@@ -674,15 +685,35 @@ object PaymentMessages {
 
   case class CardPreAuthorizationFailed(resultMessage: String) extends PaymentError(resultMessage)
 
-  case class PayInFailed(resultMessage: String) extends PaymentError(resultMessage)
+  case class PayInFailed(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus,
+    resultMessage: String
+  ) extends PaymentError(resultMessage)
 
-  case class PayOutFailed(resultMessage: String) extends PaymentError(resultMessage)
+  case class PayOutFailed(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus,
+    resultMessage: String
+  ) extends PaymentError(resultMessage)
 
-  case class RefundFailed(resultMessage: String) extends PaymentError(resultMessage)
+  case class RefundFailed(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus,
+    resultMessage: String
+  ) extends PaymentError(resultMessage)
 
-  case class TransferFailed(resultMessage: String) extends PaymentError(resultMessage)
+  case class TransferFailed(
+    transferredTransactionId: String,
+    transferredTransactionStatus: Transaction.TransactionStatus,
+    resultMessage: String
+  ) extends PaymentError(resultMessage)
 
-  case class DirectDebitFailed(resultMessage: String) extends PaymentError(resultMessage)
+  case class DirectDebitFailed(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus,
+    resultMessage: String
+  ) extends PaymentError(resultMessage)
 
   case object PaymentAccountNotFound extends PaymentError("PaymentAccountNotFound")
 
@@ -770,11 +801,17 @@ object PaymentMessages {
   case object RecurringCardPaymentRegistrationNotUpdated
       extends PaymentError("RecurringCardPaymentRegistrationNotUpdated")
 
-  case class FirstRecurringCardPaymentFailed(reason: String)
-      extends PaymentError(s"FirstRecurringPaymentFailed: $reason")
+  case class FirstRecurringCardPaymentFailed(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus,
+    reason: String
+  ) extends PaymentError(s"FirstRecurringPaymentFailed: $reason")
 
-  case class NextRecurringPaymentFailed(reason: String)
-      extends PaymentError(s"NextRecurringPaymentFailed: $reason")
+  case class NextRecurringPaymentFailed(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus,
+    reason: String
+  ) extends PaymentError(s"NextRecurringPaymentFailed: $reason")
 
   case object Schedule4PaymentNotTriggered extends PaymentError("Schedule4PaymentNotTriggered")
 }

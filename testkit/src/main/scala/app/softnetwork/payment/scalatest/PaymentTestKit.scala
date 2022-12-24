@@ -62,7 +62,8 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
       case result: PaymentRedirection => Right(Left(result))
       case result: PaidIn             => Right(Right(result))
       case error: PayInFailed         => Left(error)
-      case _                          => Left(PayInFailed("unknown"))
+      case _ =>
+        Left(PayInFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 
@@ -95,7 +96,14 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
       case result: PaymentRedirection             => Right(Left(result))
       case result: FirstRecurringPaidIn           => Right(Right(result))
       case error: FirstRecurringCardPaymentFailed => Left(error)
-      case _ => Left(FirstRecurringCardPaymentFailed("unknown"))
+      case _ =>
+        Left(
+          FirstRecurringCardPaymentFailed(
+            "",
+            Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+            "unknown"
+          )
+        )
     }
   }
 
