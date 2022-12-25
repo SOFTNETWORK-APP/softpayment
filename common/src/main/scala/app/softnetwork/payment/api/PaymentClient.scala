@@ -3,7 +3,7 @@ package app.softnetwork.payment.api
 import akka.actor.typed.ActorSystem
 import akka.grpc.GrpcClientSettings
 import app.softnetwork.api.server.client.{GrpcClient, GrpcClientFactory}
-import app.softnetwork.payment.model.{PaymentAccount, RecurringPayment}
+import app.softnetwork.payment.model.{BankAccountOwner, PaymentAccount, RecurringPayment}
 
 import java.util.Date
 import scala.concurrent.Future
@@ -158,6 +158,11 @@ trait PaymentClient extends GrpcClient {
     grpcClient.cancelMandate(CancelMandateRequest(externalUuid)) map (_.succeeded)
   }
 
+  def loadBankAccountOwner(externalUuid: String): Future[BankAccountOwner] = {
+    grpcClient.loadBankAccountOwner(LoadBankAccountOwnerRequest(externalUuid)) map (response =>
+      BankAccountOwner(response.ownerName, response.ownerAddress)
+    )
+  }
 }
 
 object PaymentClient extends GrpcClientFactory[PaymentClient] {

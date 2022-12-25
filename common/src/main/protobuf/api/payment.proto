@@ -3,6 +3,7 @@ syntax = "proto3";
 import "scalapb/scalapb.proto";
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/timestamp.proto";
+import "model/payment/address.proto";
 import "model/payment/paymentUser.proto";
 
 package app.softnetwork.payment.api;
@@ -23,6 +24,7 @@ service PaymentServiceApi {
     rpc LoadDirectDebitTransaction (LoadDirectDebitTransactionRequest) returns (TransactionResponse) {}
     rpc RegisterRecurringPayment (RegisterRecurringPaymentRequest) returns (RegisterRecurringPaymentResponse) {}
     rpc CancelMandate (CancelMandateRequest) returns (CancelMandateResponse) {}
+    rpc LoadBankAccountOwner (LoadBankAccountOwnerRequest) returns (LoadBankAccountOwnerResponse) {}
 }
 
 message CreateOrUpdatePaymentAccountRequest {
@@ -149,4 +151,13 @@ message CancelMandateRequest {
 
 message CancelMandateResponse {
     bool succeeded = 1;
+}
+
+message LoadBankAccountOwnerRequest {
+    string externalUuid = 1;
+}
+
+message LoadBankAccountOwnerResponse {
+    string ownerName = 1;
+    app.softnetwork.payment.model.Address ownerAddress = 2;
 }

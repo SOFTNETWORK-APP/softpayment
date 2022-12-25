@@ -1,5 +1,7 @@
 package app.softnetwork.payment.model
 
+import java.util.Locale
+
 trait AddressDecorator { self: Address =>
 
   lazy val wrongAddress: Boolean =
@@ -18,6 +20,9 @@ trait AddressDecorator { self: Address =>
         address.postalCode.equals(postalCode)
     case _ => super.equals(obj)
   }
+
+  def countryName(language: String = "fr"): String =
+    new Locale(language, country.toUpperCase).getDisplayCountry
 }
 
 case class AddressView(addressLine: String, city: String, postalCode: String, country: String)

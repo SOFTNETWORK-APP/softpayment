@@ -3,12 +3,14 @@ package app.softnetwork.payment.api
 import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
+  BankAccountLoaded,
   CancelMandate,
   CancelPreAuthorization,
   CreateOrUpdatePaymentAccount,
   DirectDebit,
   DirectDebitFailed,
   DirectDebited,
+  LoadBankAccount,
   LoadDirectDebitTransaction,
   MandateCanceled,
   PaidIn,
@@ -300,6 +302,17 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
     !?(CancelMandate(externalUuid)) map {
       case MandateCanceled => CancelMandateResponse(true)
       case _               => CancelMandateResponse()
+    }
+  }
+
+  override def loadBankAccountOwner(
+    in: LoadBankAccountOwnerRequest
+  ): Future[LoadBankAccountOwnerResponse] = {
+    import in._
+    !?(LoadBankAccount(externalUuid)) map {
+      case r: BankAccountLoaded =>
+        LoadBankAccountOwnerResponse(r.bankAccount.ownerName, Some(r.bankAccount.ownerAddress))
+      case _ => LoadBankAccountOwnerResponse()
     }
   }
 }
