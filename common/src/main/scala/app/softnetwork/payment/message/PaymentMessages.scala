@@ -1,9 +1,14 @@
 package app.softnetwork.payment.message
 
 import app.softnetwork.payment.annotation.InternalApi
+import app.softnetwork.payment.message.PaymentEvents.{
+  ExternalEntityToPaymentEvent,
+  PaymentCommandEvent,
+  PaymentEventWithCommand
+}
 import app.softnetwork.payment.model._
 import app.softnetwork.persistence.message.{Command, CommandResult, EntityCommand, ErrorMessage}
-import org.softnetwork.akka.model.Schedule
+import app.softnetwork.scheduler.model.Schedule
 
 import java.util.Date
 
@@ -814,4 +819,22 @@ object PaymentMessages {
   ) extends PaymentError(s"NextRecurringPaymentFailed: $reason")
 
   case object Schedule4PaymentNotTriggered extends PaymentError("Schedule4PaymentNotTriggered")
+
+  trait ExternalEntityToPaymentEventDecorator extends PaymentEventWithCommand {
+    _: ExternalEntityToPaymentEvent =>
+    override def command: Option[PaymentCommandEvent] =
+      wrapped match {
+        case r: ExternalEntityToPaymentEvent.Wrapped.CreateOrUpdatePaymentAccount => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.PayInWithCardPreAuthorized   => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.Refund                       => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.PayOut                       => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.Transfer                     => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.DirectDebit                  => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.LoadDirectDebitTransaction   => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.RegisterRecurringPayment     => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.CancelPreAuthorization       => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.CancelMandate                => Some(r.value)
+        case _                                                                    => None
+      }
+  }
 }

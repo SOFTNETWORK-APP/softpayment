@@ -11,7 +11,7 @@ import app.softnetwork.persistence.query.{EventProcessorStream, JournalProvider}
 
 import scala.concurrent.Future
 
-trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentCommandEvent] {
+trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWithCommand] {
   _: JournalProvider with GenericPaymentHandler =>
 
   override lazy val tag: String = PaymentSettings.ExternalToPaymentAccountTag
@@ -33,181 +33,186 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentC
     * @return
     */
   override protected def processEvent(
-    event: PaymentCommandEvent,
+    event: PaymentEventWithCommand,
     persistenceId: PersistenceId,
     sequenceNr: Long
   ): Future[Done] = {
-    event match {
-      case evt: WrapPaymentCommandEvent => processEvent(evt.event, persistenceId, sequenceNr)
-      case evt: CreateOrUpdatePaymentAccountCommandEvent =>
-        val command = CreateOrUpdatePaymentAccount(evt.paymentAccount)
-        !?(command) map {
-          case PaymentAccountCreated =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case PaymentAccountUpdated =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+    event.command match {
+      case Some(commandEvent) =>
+        commandEvent match {
+          case evt: CreateOrUpdatePaymentAccountCommandEvent =>
+            val command = CreateOrUpdatePaymentAccount(evt.paymentAccount)
+            !?(command) map {
+              case PaymentAccountCreated =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case PaymentAccountUpdated =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: PayInWithCardPreAuthorizedCommandEvent =>
+            import evt._
+            val command = PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount)
+            !?(command) map {
+              case _: PaidInResult =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: RefundCommandEvent =>
+            import evt._
+            val command = Refund(
+              orderUuid,
+              payInTransactionId,
+              refundAmount,
+              currency,
+              reasonMessage,
+              initializedByClient
             )
-            Done
-        }
-      case evt: PayInWithCardPreAuthorizedCommandEvent =>
-        import evt._
-        val command = PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount)
-        !?(command) map {
-          case _: PaidInResult =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            !?(command) map {
+              case _: Refunded =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: PayOutCommandEvent =>
+            import evt._
+            val command = PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency)
+            !?(command) map {
+              case _: PaidOut =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: TransferCommandEvent =>
+            import evt._
+            val command = Transfer(
+              orderUuid,
+              debitedAccount,
+              creditedAccount,
+              debitedAmount,
+              feesAmount,
+              currency,
+              payOutRequired,
+              externalReference
             )
-            Done
-        }
-      case evt: RefundCommandEvent =>
-        import evt._
-        val command = Refund(
-          orderUuid,
-          payInTransactionId,
-          refundAmount,
-          currency,
-          reasonMessage,
-          initializedByClient
-        )
-        !?(command) map {
-          case _: Refunded =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            !?(command) map {
+              case _: Transferred =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: DirectDebitCommandEvent =>
+            import evt._
+            val command = DirectDebit(
+              creditedAccount,
+              debitedAmount,
+              feesAmount,
+              currency,
+              statementDescriptor,
+              externalReference
             )
-            Done
-        }
-      case evt: PayOutCommandEvent =>
-        import evt._
-        val command = PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency)
-        !?(command) map {
-          case _: PaidOut =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+            !?(command) map {
+              case _: DirectDebited =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: LoadDirectDebitTransactionCommandEvent =>
+            import evt._
+            val command = LoadDirectDebitTransaction(directDebitTransactionId)
+            !?(command) map {
+              case _: DirectDebited =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: RegisterRecurringPaymentCommandEvent =>
+            import evt._
+            val command = RegisterRecurringPayment(
+              debitedAccount,
+              firstDebitedAmount,
+              firstFeesAmount,
+              currency,
+              `type`,
+              startDate,
+              endDate,
+              frequency,
+              fixedNextAmount,
+              nextDebitedAmount,
+              nextFeesAmount
             )
-            Done
-        }
-      case evt: TransferCommandEvent =>
-        import evt._
-        val command = Transfer(
-          orderUuid,
-          debitedAccount,
-          creditedAccount,
-          debitedAmount,
-          feesAmount,
-          currency,
-          payOutRequired,
-          externalReference
-        )
-        !?(command) map {
-          case _: Transferred =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
+            !?(command) map {
+              case _: RecurringPaymentRegistered =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: CancelPreAuthorizationCommandEvent =>
+            import evt._
+            val command = CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId)
+            !?(command) map {
+              case _: PreAuthorizationCanceled =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
+          case evt: CancelMandateCommandEvent =>
+            import evt._
+            val command = CancelMandate(externalUuid)
+            !?(command) map {
+              case MandateCanceled =>
+                if (forTests) system.eventStream.tell(Publish(event))
+                Done
+              case other =>
+                logger.error(
+                  s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
+                )
+                Done
+            }
           case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
-            )
-            Done
+            logger.warn(s"$platformEventProcessorId does not support event [${other.getClass}]")
+            Future.successful(Done)
         }
-      case evt: DirectDebitCommandEvent =>
-        import evt._
-        val command = DirectDebit(
-          creditedAccount,
-          debitedAmount,
-          feesAmount,
-          currency,
-          statementDescriptor,
-          externalReference
-        )
-        !?(command) map {
-          case _: DirectDebited =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
-            )
-            Done
-        }
-      case evt: LoadDirectDebitTransactionCommandEvent =>
-        import evt._
-        val command = LoadDirectDebitTransaction(directDebitTransactionId)
-        !?(command) map {
-          case _: DirectDebited =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
-            )
-            Done
-        }
-      case evt: RegisterRecurringPaymentCommandEvent =>
-        import evt._
-        val command = RegisterRecurringPayment(
-          debitedAccount,
-          firstDebitedAmount,
-          firstFeesAmount,
-          currency,
-          `type`,
-          startDate,
-          endDate,
-          frequency,
-          fixedNextAmount,
-          nextDebitedAmount,
-          nextFeesAmount
-        )
-        !?(command) map {
-          case _: RecurringPaymentRegistered =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
-            )
-            Done
-        }
-      case evt: CancelPreAuthorizationCommandEvent =>
-        import evt._
-        val command = CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId)
-        !?(command) map {
-          case _: PreAuthorizationCanceled =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
-            )
-            Done
-        }
-      case evt: CancelMandateCommandEvent =>
-        import evt._
-        val command = CancelMandate(externalUuid)
-        !?(command) map {
-          case MandateCanceled =>
-            if (forTests) system.eventStream.tell(Publish(event))
-            Done
-          case other =>
-            logger.error(
-              s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
-            )
-            Done
-        }
-      case other =>
-        logger.warn(s"$platformEventProcessorId does not support event [${other.getClass}]")
+      case None =>
+        logger.warn(s"$platformEventProcessorId does not support event without command")
         Future.successful(Done)
     }
   }

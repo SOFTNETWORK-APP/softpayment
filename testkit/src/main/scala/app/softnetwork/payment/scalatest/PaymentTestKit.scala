@@ -21,7 +21,9 @@ import app.softnetwork.payment.persistence.query.{
 }
 import app.softnetwork.payment.persistence.typed.{GenericPaymentBehavior, MockPaymentBehavior}
 import app.softnetwork.payment.service.{GenericPaymentService, MockPaymentService}
-import app.softnetwork.persistence.query.InMemoryJournalProvider
+import app.softnetwork.persistence.launch.PersistentEntity
+import app.softnetwork.persistence.query.{EventProcessorStream, InMemoryJournalProvider}
+import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.scheduler.scalatest.SchedulerTestKit
 import app.softnetwork.session.scalatest.{SessionServiceRoute, SessionTestKit}
 import org.scalatest.Suite
@@ -49,7 +51,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
   override def scheduler2PaymentProcessorStream
     : ActorSystem[_] => Scheduler2PaymentProcessorStream = sys =>
     new Scheduler2PaymentProcessorStream with MockPaymentHandler with InMemoryJournalProvider {
-      override val tag: String = s"${MockPaymentBehavior.persistenceId}-scheduler"
+      override val tag: String = SchedulerSettings.tag(MockPaymentBehavior.persistenceId)
       override val forTests: Boolean = true
       override implicit def system: ActorSystem[_] = sys
     }
@@ -149,6 +151,16 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     }
   }
 
+  override def entities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
+    schedulerEntities(sys) ++ sessionEntities(sys) ++ paymentEntities(sys)
+
+  override def eventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
+    schedulerEventProcessorStreams(sys) ++
+    paymentEventProcessorStreams(sys)
+
+  /*override def initSystem: ActorSystem[_] => Unit = system => {
+    initSchedulerSystem(system)
+  }*/
 }
 
 trait PaymentRouteTestKit

@@ -10,7 +10,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
 }
 import app.softnetwork.persistence.query.JournalProvider
 import app.softnetwork.scheduler.persistence.query.Scheduler2EntityProcessorStream
-import org.softnetwork.akka.model.Schedule
+import app.softnetwork.scheduler.model.Schedule
 
 import scala.concurrent.Future
 
