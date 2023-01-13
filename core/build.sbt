@@ -5,7 +5,6 @@ organization := "app.softnetwork.payment"
 name := "payment-core"
 
 libraryDependencies ++= Seq(
-  "app.softnetwork.scheduler" %% "scheduler-core" % Versions.scheduler,
   "app.softnetwork.persistence" %% "persistence-kv" % Versions.genericPersistence,
   "app.softnetwork.session" %% "session-core" % Versions.session
 )

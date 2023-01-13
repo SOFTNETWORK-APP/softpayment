@@ -20,9 +20,13 @@ import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.serialization.asJson
 import app.softnetwork.time.{now => _, _}
 import org.slf4j.Logger
-import org.softnetwork.akka.message.SchedulerEvents.SchedulerEventWithCommand
+import app.softnetwork.scheduler.message.SchedulerEvents.{
+  ExternalEntityToSchedulerEvent,
+  ExternalSchedulerEvent,
+  SchedulerEventWithCommand
+}
 import app.softnetwork.scheduler.message.{AddSchedule, RemoveSchedule}
-import org.softnetwork.akka.model.Schedule
+import app.softnetwork.scheduler.model.Schedule
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
@@ -30,7 +34,12 @@ import scala.util.{Failure, Success}
 /** Created by smanciot on 22/04/2022.
   */
 trait GenericPaymentBehavior
-    extends TimeStampedBehavior[PaymentCommand, PaymentAccount, PaymentEvent, PaymentResult]
+    extends TimeStampedBehavior[
+      PaymentCommand,
+      PaymentAccount,
+      ExternalSchedulerEvent,
+      PaymentResult
+    ]
     with ManifestWrapper[PaymentAccount] { _: PaymentProvider =>
 
   override protected val manifestWrapper: ManifestW = ManifestW()
@@ -63,15 +72,12 @@ trait GenericPaymentBehavior
     * @return
     *   event tags
     */
-  override protected def tagEvent(entityId: String, event: PaymentEvent): Set[String] =
+  override protected def tagEvent(entityId: String, event: ExternalSchedulerEvent): Set[String] =
     event match {
       case _: BroadcastEvent => Set(s"${persistenceId.toLowerCase}-to-external")
       case _: CrudEvent      => Set(s"${persistenceId.toLowerCase}-to-elastic")
       case _: SchedulerEventWithCommand =>
-        Set(
-          s"$persistenceId-to-scheduler",
-          SchedulerSettings.SchedulerConfig.eventStreams.entityToSchedulerTag
-        )
+        Set(SchedulerSettings.SchedulerConfig.eventStreams.entityToSchedulerTag)
       case _ => Set(persistenceId)
     }
 
@@ -94,7 +100,7 @@ trait GenericPaymentBehavior
     timers: TimerScheduler[PaymentCommand]
   )(implicit
     context: ActorContext[PaymentCommand]
-  ): Effect[PaymentEvent, Option[PaymentAccount]] = {
+  ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     implicit val system: ActorSystem[_] = context.system
     implicit val log: Logger = context.log
     command match {
@@ -226,7 +232,7 @@ trait GenericPaymentBehavior
                     preRegisterCard(Some(userId), currency, user.externalUuid) match {
                       case Some(cardPreRegistration) =>
                         keyValueDao.addKeyValue(cardPreRegistration.id, entityId)
-                        val walletEvents: List[PaymentEvent] =
+                        val walletEvents: List[ExternalSchedulerEvent] =
                           if (registerWallet) {
                             broadcastEvent(
                               WalletRegisteredEvent.defaultInstance
@@ -1861,7 +1867,7 @@ trait GenericPaymentBehavior
                               updatedPaymentAccount =
                                 updatedPaymentAccount.resetBankAccountId(Some(bankAccountId))
 
-                              var events: List[PaymentEvent] = List.empty
+                              var events: List[ExternalSchedulerEvent] = List.empty
 
                               if (shouldCreateBankAccount) {
                                 updatedPaymentAccount = updatedPaymentAccount
@@ -2185,7 +2191,7 @@ trait GenericPaymentBehavior
             }) match {
               case Some(declaration) =>
                 import cmd._
-                var events: List[PaymentEvent] = List.empty
+                var events: List[ExternalSchedulerEvent] = List.empty
 
                 val lastUpdated = now()
 
@@ -2296,7 +2302,7 @@ trait GenericPaymentBehavior
                         declaration.status
                       }
                     }
-                    var events: List[PaymentEvent] = List.empty
+                    var events: List[ExternalSchedulerEvent] = List.empty
                     val lastUpdated = now()
                     var updatedDeclaration =
                       declaration.withStatus(internalStatus)
@@ -2367,7 +2373,7 @@ trait GenericPaymentBehavior
           case Some(paymentAccount) =>
             val lastUpdated = now()
 
-            var events: List[PaymentEvent] =
+            var events: List[ExternalSchedulerEvent] =
               broadcastEvent(
                 PaymentAccountStatusUpdatedEvent.defaultInstance
                   .withExternalUuid(paymentAccount.externalUuid)
@@ -2468,7 +2474,7 @@ trait GenericPaymentBehavior
                   var updatedPaymentAccount = paymentAccount
                     .copy(bankAccount = None)
                     .withLastUpdated(lastUpdated)
-                  var events: List[PaymentEvent] = {
+                  var events: List[ExternalSchedulerEvent] = {
                     broadcastEvent(
                       BankAccountDeletedEvent.defaultInstance
                         .withExternalUuid(paymentAccount.externalUuid)
@@ -2681,21 +2687,23 @@ trait GenericPaymentBehavior
                         nextFeesAmount = cmd.nextFeesAmount
                       )
                   import app.softnetwork.time._
-                  val nextDirectDebit: List[ScheduleForPaymentAdded] =
+                  val nextDirectDebit: List[ExternalEntityToSchedulerEvent] =
                     recurringPayment.nextPaymentDate.map(_.toDate) match {
                       case Some(value) =>
                         recurringPayment = recurringPayment.withNextRecurringPaymentDate(value)
                         List(
-                          ScheduleForPaymentAdded(
-                            AddSchedule(
-                              Schedule(
-                                persistenceId,
-                                entityId,
-                                s"$nextRecurringPayment#${recurringPayment.getId}",
-                                1,
-                                Some(false),
-                                Some(value),
-                                None
+                          ExternalEntityToSchedulerEvent(
+                            ExternalEntityToSchedulerEvent.Wrapped.AddSchedule(
+                              AddSchedule(
+                                Schedule(
+                                  persistenceId,
+                                  entityId,
+                                  s"$nextRecurringPayment#${recurringPayment.getId}",
+                                  1,
+                                  Some(false),
+                                  Some(value),
+                                  None
+                                )
                               )
                             )
                           )
@@ -2768,11 +2776,13 @@ trait GenericPaymentBehavior
                         ) ++ {
                           if (result.status.isEnded) { // cancel scheduled payIn for recurring card payment
                             List(
-                              ScheduleForPaymentRemoved(
-                                RemoveSchedule(
-                                  persistenceId,
-                                  entityId,
-                                  s"$nextRecurringPayment#${cmd.recurringPayInRegistrationId}"
+                              ExternalEntityToSchedulerEvent(
+                                ExternalEntityToSchedulerEvent.Wrapped.RemoveSchedule(
+                                  RemoveSchedule(
+                                    persistenceId,
+                                    entityId,
+                                    s"$nextRecurringPayment#${cmd.recurringPayInRegistrationId}"
+                                  )
                                 )
                               )
                             )
@@ -2820,7 +2830,7 @@ trait GenericPaymentBehavior
     feesAmount: Int,
     currency: String,
     reason: String
-  )(implicit context: ActorContext[_]): Effect[PaymentEvent, Option[PaymentAccount]] = {
+  )(implicit context: ActorContext[_]): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     Effect
       .persist(
         broadcastEvent(
@@ -2838,25 +2848,29 @@ trait GenericPaymentBehavior
         ) :+ {
           recurringPayment.nextRecurringPaymentDate match {
             case Some(value) =>
-              ScheduleForPaymentAdded(
-                AddSchedule(
-                  Schedule(
-                    persistenceId,
-                    entityId,
-                    s"$nextRecurringPayment#${recurringPayment.getId}",
-                    1,
-                    Some(false),
-                    Some(value),
-                    None
+              ExternalEntityToSchedulerEvent(
+                ExternalEntityToSchedulerEvent.Wrapped.AddSchedule(
+                  AddSchedule(
+                    Schedule(
+                      persistenceId,
+                      entityId,
+                      s"$nextRecurringPayment#${recurringPayment.getId}",
+                      1,
+                      Some(false),
+                      Some(value),
+                      None
+                    )
                   )
                 )
               )
             case _ =>
-              ScheduleForPaymentRemoved(
-                RemoveSchedule(
-                  persistenceId,
-                  entityId,
-                  s"$nextRecurringPayment#${recurringPayment.getId}"
+              ExternalEntityToSchedulerEvent(
+                ExternalEntityToSchedulerEvent.Wrapped.RemoveSchedule(
+                  RemoveSchedule(
+                    persistenceId,
+                    entityId,
+                    s"$nextRecurringPayment#${recurringPayment.getId}"
+                  )
                 )
               )
           }
@@ -2878,7 +2892,7 @@ trait GenericPaymentBehavior
     paymentAccount: PaymentAccount,
     creditedUserId: String,
     bankAccountId: String
-  )(implicit context: ActorContext[_]): Effect[PaymentEvent, Option[PaymentAccount]] = {
+  )(implicit context: ActorContext[_]): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     implicit val system: ActorSystem[_] = context.system
     mandate(creditedAccount, creditedUserId, bankAccountId) match {
       case Some(mandateResult) =>
@@ -2932,7 +2946,7 @@ trait GenericPaymentBehavior
     * @return
     *   new state
     */
-  override def handleEvent(state: Option[PaymentAccount], event: PaymentEvent)(implicit
+  override def handleEvent(state: Option[PaymentAccount], event: ExternalSchedulerEvent)(implicit
     context: ActorContext[_]
   ): Option[PaymentAccount] =
     event match {
@@ -2983,7 +2997,10 @@ trait GenericPaymentBehavior
     paymentAccount: PaymentAccount,
     recurringPayment: RecurringPayment,
     transaction: Transaction
-  )(implicit system: ActorSystem[_], log: Logger): Effect[PaymentEvent, Option[PaymentAccount]] = {
+  )(implicit
+    system: ActorSystem[_],
+    log: Logger
+  ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     keyValueDao.addKeyValue(
       transaction.id,
       entityId
@@ -3077,25 +3094,29 @@ trait GenericPaymentBehavior
               ) :+ {
                 updatedRecurringPayment.nextRecurringPaymentDate match {
                   case Some(value) =>
-                    ScheduleForPaymentAdded(
-                      AddSchedule(
-                        Schedule(
-                          persistenceId,
-                          entityId,
-                          s"$nextRecurringPayment#${recurringPayment.getId}",
-                          1,
-                          Some(false),
-                          Some(value),
-                          None
+                    ExternalEntityToSchedulerEvent(
+                      ExternalEntityToSchedulerEvent.Wrapped.AddSchedule(
+                        AddSchedule(
+                          Schedule(
+                            persistenceId,
+                            entityId,
+                            s"$nextRecurringPayment#${recurringPayment.getId}",
+                            1,
+                            Some(false),
+                            Some(value),
+                            None
+                          )
                         )
                       )
                     )
                   case _ =>
-                    ScheduleForPaymentRemoved(
-                      RemoveSchedule(
-                        persistenceId,
-                        entityId,
-                        s"$nextRecurringPayment#${recurringPayment.getId}"
+                    ExternalEntityToSchedulerEvent(
+                      ExternalEntityToSchedulerEvent.Wrapped.RemoveSchedule(
+                        RemoveSchedule(
+                          persistenceId,
+                          entityId,
+                          s"$nextRecurringPayment#${recurringPayment.getId}"
+                        )
                       )
                     )
                 }
@@ -3145,25 +3166,29 @@ trait GenericPaymentBehavior
               ) :+ {
                 recurringPayment.nextRecurringPaymentDate match {
                   case Some(value) =>
-                    ScheduleForPaymentAdded(
-                      AddSchedule(
-                        Schedule(
-                          persistenceId,
-                          entityId,
-                          s"$nextRecurringPayment#${recurringPayment.getId}",
-                          1,
-                          Some(false),
-                          Some(value),
-                          None
+                    ExternalEntityToSchedulerEvent(
+                      ExternalEntityToSchedulerEvent.Wrapped.AddSchedule(
+                        AddSchedule(
+                          Schedule(
+                            persistenceId,
+                            entityId,
+                            s"$nextRecurringPayment#${recurringPayment.getId}",
+                            1,
+                            Some(false),
+                            Some(value),
+                            None
+                          )
                         )
                       )
                     )
                   case _ =>
-                    ScheduleForPaymentRemoved(
-                      RemoveSchedule(
-                        persistenceId,
-                        entityId,
-                        s"$nextRecurringPayment#${recurringPayment.getId}"
+                    ExternalEntityToSchedulerEvent(
+                      ExternalEntityToSchedulerEvent.Wrapped.RemoveSchedule(
+                        RemoveSchedule(
+                          persistenceId,
+                          entityId,
+                          s"$nextRecurringPayment#${recurringPayment.getId}"
+                        )
                       )
                     )
                 }
@@ -3199,7 +3224,10 @@ trait GenericPaymentBehavior
     paymentAccount: PaymentAccount,
     registerCard: Boolean,
     transaction: Transaction
-  )(implicit system: ActorSystem[_], log: Logger): Effect[PaymentEvent, Option[PaymentAccount]] = {
+  )(implicit
+    system: ActorSystem[_],
+    log: Logger
+  ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     keyValueDao.addKeyValue(
       transaction.id,
       entityId
@@ -3225,7 +3253,7 @@ trait GenericPaymentBehavior
       case _ =>
         if (transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated) {
           log.debug("Order-{} paid in: {} -> {}", orderUuid, transaction.id, asJson(transaction))
-          val registerCardEvents: List[PaymentEvent] =
+          val registerCardEvents: List[ExternalSchedulerEvent] =
             if (registerCard) {
               transaction.cardId match {
                 case Some(cardId) =>
@@ -3307,7 +3335,10 @@ trait GenericPaymentBehavior
     paymentAccount: PaymentAccount,
     registerCard: Boolean,
     transaction: Transaction
-  )(implicit system: ActorSystem[_], log: Logger): Effect[PaymentEvent, Option[PaymentAccount]] = {
+  )(implicit
+    system: ActorSystem[_],
+    log: Logger
+  ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     keyValueDao.addKeyValue(
       transaction.id,
       entityId
@@ -3342,7 +3373,7 @@ trait GenericPaymentBehavior
             transaction.id,
             asJson(transaction)
           )
-          val registerCardEvents: List[PaymentEvent] =
+          val registerCardEvents: List[ExternalSchedulerEvent] =
             if (registerCard) {
               transaction.cardId match {
                 case Some(cardId) =>
@@ -3419,8 +3450,10 @@ trait GenericPaymentBehavior
     document: KycDocument,
     documentId: String,
     maybeStatus: Option[KycDocument.KycDocumentStatus] = None
-  )(implicit system: ActorSystem[_]): (KycDocumentValidationReport, List[PaymentEvent]) = {
-    var events: List[PaymentEvent] = List.empty
+  )(implicit
+    system: ActorSystem[_]
+  ): (KycDocumentValidationReport, List[ExternalSchedulerEvent]) = {
+    var events: List[ExternalSchedulerEvent] = List.empty
     val lastUpdated = now()
 
     val userId = paymentAccount.userId.getOrElse("")

@@ -5,7 +5,6 @@ import "google/protobuf/timestamp.proto";
 import "model/payment/card.proto";
 import "model/payment/document.proto";
 import "model/payment/paymentUser.proto";
-import "message/schedule.proto";
 
 package app.softnetwork.payment.message.PaymentEvents;
 
@@ -16,14 +15,15 @@ option (scalapb.options) = {
     import: "app.softnetwork.persistence.model._"
     import: "app.softnetwork.protobuf.ScalaPBTypeMappers._"
     import: "app.softnetwork.serialization._"
+    import: "app.softnetwork.payment.message.PaymentMessages._"
     import: "app.softnetwork.payment.model._"
     import: "app.softnetwork.payment.serialization._"
-    import: "org.softnetwork.akka.message.SchedulerEvents.SchedulerEventWithCommand"
-    preamble: "trait PaymentEvent extends Event"
-    preamble: "trait PaymentAccountEvent extends PaymentEvent"
-    preamble: "trait PaymentCommandEvent extends PaymentEvent"
-    preamble: "trait WrapPaymentCommandEvent extends PaymentCommandEvent {def event: PaymentCommandEvent}"
-    preamble: "trait PaymentToSchedulerEvent extends SchedulerEventWithCommand with PaymentEvent"
+    import: "app.softnetwork.scheduler.message.SchedulerEvents.ExternalSchedulerEvent"
+    preamble: "trait PaymentEvent extends ExternalSchedulerEvent"
+    preamble: "sealed trait PaymentAccountEvent extends PaymentEvent"
+    preamble: "sealed trait PaymentCommandEvent extends PaymentEvent"
+    preamble: "trait ExternalPaymentEvent extends PaymentEvent"
+    preamble: "trait PaymentEventWithCommand extends ExternalPaymentEvent {def command: Option[PaymentCommandEvent]}"
     preserve_unknown_fields: false
 };
 
@@ -153,6 +153,24 @@ message BankAccountDeletedEvent {
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.util.Date"];
 }
 
+message ExternalEntityToPaymentEvent{
+    option (scalapb.message).extends = "ProtobufEvent";
+    option (scalapb.message).extends = "PaymentEventWithCommand";
+    option (scalapb.message).extends = "ExternalEntityToPaymentEventDecorator";
+    oneof wrapped {
+        PayInWithCardPreAuthorizedCommandEvent payInWithCardPreAuthorized = 1;
+        RefundCommandEvent refund = 2;
+        PayOutCommandEvent payOut = 3;
+        TransferCommandEvent transfer = 4;
+        DirectDebitCommandEvent directDebit = 5;
+        CreateOrUpdatePaymentAccountCommandEvent createOrUpdatePaymentAccount = 6;
+        RegisterRecurringPaymentCommandEvent registerRecurringPayment = 7;
+        CancelPreAuthorizationCommandEvent cancelPreAuthorization = 8;
+        LoadDirectDebitTransactionCommandEvent loadDirectDebitTransaction = 9;
+        CancelMandateCommandEvent cancelMandate = 10;
+    }
+}
+
 message PayInWithCardPreAuthorizedCommandEvent{
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "PaymentCommandEvent";
@@ -211,18 +229,6 @@ message CreateOrUpdatePaymentAccountCommandEvent{
     required app.softnetwork.payment.model.PaymentAccount paymentAccount = 1;
 }
 
-message ScheduleForPaymentAdded {
-    option (scalapb.message).extends = "ProtobufEvent";
-    option (scalapb.message).extends = "PaymentToSchedulerEvent";
-    required app.softnetwork.scheduler.message.AddSchedule command = 1;
-}
-
-message ScheduleForPaymentRemoved {
-    option (scalapb.message).extends = "ProtobufEvent";
-    option (scalapb.message).extends = "PaymentToSchedulerEvent";
-    required app.softnetwork.scheduler.message.RemoveSchedule command = 1;
-}
-
 message RegisterRecurringPaymentCommandEvent {
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "PaymentCommandEvent";
@@ -241,7 +247,7 @@ message RegisterRecurringPaymentCommandEvent {
 
 message RecurringPaymentRegisteredEvent {
     option (scalapb.message).extends = "ProtobufEvent";
-    option (scalapb.message).extends = "PaymentCommandEvent";
+    option (scalapb.message).extends = "PaymentAccountEvent";
     option (scalapb.message).extends = "BroadcastEvent";
     required string externalUuid = 1;
     required app.softnetwork.payment.model.RecurringPayment recurringPayment = 2;

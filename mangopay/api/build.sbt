@@ -28,5 +28,6 @@ organization := "app.softnetwork.payment"
 name := "mangopay-api"
 
 libraryDependencies ++= Seq(
-  "app.softnetwork.persistence" %% "persistence-jdbc" % Versions.genericPersistence
+  "app.softnetwork.scheduler" %% "scheduler-api" % Versions.scheduler,
+  "app.softnetwork.persistence" %% "akka-persistence-jdbc" % Versions.genericPersistence
 )
