@@ -6,9 +6,11 @@ import akka.http.scaladsl.server.Route
 import app.softnetwork.payment.config.PaymentSettings.HooksRoute
 import app.softnetwork.payment.handlers.MangoPayPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
+  InvalidateRegularUser,
   KycDocumentStatusUpdated,
   MandateStatusUpdated,
   PaymentResult,
+  RegularUserInvalidated,
   RegularUserValidated,
   UboDeclarationStatusUpdated,
   UpdateKycDocumentStatus,
@@ -65,6 +67,22 @@ trait MangoPayPaymentService extends GenericPaymentService with MangoPayPaymentH
     case _ =>
       logger.warn(
         s"[Payment Hooks] Regular User has not been validated for $resourceId -> $eventType"
+      )
+      complete(HttpResponse(StatusCodes.OK))
+  }
+
+  def completeWithRegularUserInvalidationResult(
+    eventType: String,
+    resourceId: String
+  ): PaymentResult => Route = {
+    case RegularUserInvalidated =>
+      logger.info(
+        s"[Payment Hooks] Regular User has been invalidated for $resourceId -> $eventType"
+      )
+      complete(HttpResponse(StatusCodes.OK))
+    case _ =>
+      logger.warn(
+        s"[Payment Hooks] Regular User has not been invalidated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
   }
@@ -148,6 +166,10 @@ trait MangoPayPaymentService extends GenericPaymentService with MangoPayPaymentH
               case EventType.USER_KYC_REGULAR =>
                 run(ValidateRegularUser(resourceId)) completeWith {
                   completeWithRegularUserValidationResult(eventType, resourceId)
+                }
+              case EventType.USER_KYC_LIGHT =>
+                run(InvalidateRegularUser(resourceId)) completeWith {
+                  completeWithRegularUserInvalidationResult(eventType, resourceId)
                 }
               case EventType.MANDATE_FAILED =>
                 run(

@@ -572,6 +572,16 @@ object PaymentMessages {
     lazy val key: String = userId
   }
 
+  /** hook command
+    *
+    * @param userId
+    *   - user id
+    */
+  @InternalApi
+  private[payment] case class InvalidateRegularUser(userId: String) extends PaymentCommandWithKey {
+    lazy val key: String = userId
+  }
+
   @InternalApi
   private[payment] case class CreateOrUpdatePaymentAccount(paymentAccount: PaymentAccount)
       extends PaymentCommandWithKey {
@@ -667,6 +677,8 @@ object PaymentMessages {
   case object UboDeclarationStatusUpdated extends PaymentResult
 
   case object RegularUserValidated extends PaymentResult
+
+  case object RegularUserInvalidated extends PaymentResult
 
   case class BankAccountLoaded(bankAccount: BankAccount) extends PaymentResult
 

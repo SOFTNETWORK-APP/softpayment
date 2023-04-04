@@ -11,15 +11,12 @@ import app.softnetwork.payment.persistence.query.{
 }
 import app.softnetwork.payment.persistence.typed.{GenericPaymentBehavior, MangoPayPaymentBehavior}
 import app.softnetwork.payment.service.{GenericPaymentService, MangoPayPaymentService}
-import app.softnetwork.persistence.jdbc.query.JdbcSchema.SchemaType
 import app.softnetwork.persistence.jdbc.query.{JdbcJournalProvider, JdbcSchema, JdbcSchemaProvider}
 import app.softnetwork.scheduler.config.SchedulerSettings
 
 import scala.concurrent.Future
 
 trait MangoPayApi extends PaymentApplication with JdbcSchemaProvider {
-
-  def internalSchemaType: SchemaType = this.schemaType
 
   override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
     MangoPayPaymentBehavior
@@ -31,7 +28,7 @@ trait MangoPayApi extends PaymentApplication with JdbcSchemaProvider {
       with JdbcJournalProvider
       with JdbcSchemaProvider {
       override implicit def system: ActorSystem[_] = sys
-      override def schemaType: JdbcSchema.SchemaType = internalSchemaType
+      override def schemaType: JdbcSchema.SchemaType = MangoPayApi.this.schemaType
     }
 
   override def scheduler2PaymentProcessorStream
@@ -42,7 +39,7 @@ trait MangoPayApi extends PaymentApplication with JdbcSchemaProvider {
       with JdbcSchemaProvider {
       override val tag: String = SchedulerSettings.tag(MangoPayPaymentBehavior.persistenceId)
       override implicit def system: ActorSystem[_] = sys
-      override def schemaType: JdbcSchema.SchemaType = internalSchemaType
+      override def schemaType: JdbcSchema.SchemaType = MangoPayApi.this.schemaType
     }
 
   override def paymentService: ActorSystem[_] => GenericPaymentService = sys =>

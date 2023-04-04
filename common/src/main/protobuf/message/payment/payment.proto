@@ -118,6 +118,15 @@ message RegularUserValidatedEvent{
     required string userId = 3;
 }
 
+message RegularUserInvalidatedEvent{
+    option (scalapb.message).extends = "ProtobufEvent";
+    option (scalapb.message).extends = "PaymentAccountEvent";
+    option (scalapb.message).extends = "BroadcastEvent";
+    required string externalUuid = 1;
+    required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.util.Date"];
+    required string userId = 3;
+}
+
 message PaymentAccountStatusUpdatedEvent {
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "PaymentAccountEvent";

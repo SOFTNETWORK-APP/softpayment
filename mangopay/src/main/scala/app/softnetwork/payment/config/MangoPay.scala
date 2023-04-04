@@ -69,6 +69,7 @@ object MangoPay extends StrictLogging {
         createOrUpdateHook(mangoPayApi, EventType.UBO_DECLARATION_VALIDATED, hooks)
         createOrUpdateHook(mangoPayApi, EventType.UBO_DECLARATION_INCOMPLETE, hooks)
         createOrUpdateHook(mangoPayApi, EventType.USER_KYC_REGULAR, hooks)
+        createOrUpdateHook(mangoPayApi, EventType.USER_KYC_LIGHT, hooks)
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_FAILED, hooks)
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_SUBMITTED, hooks)
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_CREATED, hooks)

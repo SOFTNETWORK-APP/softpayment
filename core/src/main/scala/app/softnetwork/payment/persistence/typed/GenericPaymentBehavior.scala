@@ -2439,6 +2439,42 @@ trait GenericPaymentBehavior
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
 
+      case cmd: InvalidateRegularUser =>
+        import cmd._
+        state match {
+          case Some(paymentAccount) =>
+            val lastUpdated = now()
+
+            var events: List[ExternalSchedulerEvent] =
+              broadcastEvent(
+                PaymentAccountStatusUpdatedEvent.defaultInstance
+                  .withExternalUuid(paymentAccount.externalUuid)
+                  .withLastUpdated(lastUpdated)
+                  .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO)
+              ) ++
+                broadcastEvent(
+                  RegularUserInvalidatedEvent.defaultInstance
+                    .withExternalUuid(paymentAccount.externalUuid)
+                    .withLastUpdated(lastUpdated)
+                    .withUserId(userId)
+                )
+
+            var updatedPaymentAccount = paymentAccount
+              .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO)
+              .withLastUpdated(lastUpdated)
+
+            Effect
+              .persist(
+                events :+
+                  PaymentAccountUpsertedEvent.defaultInstance
+                    .withDocument(updatedPaymentAccount)
+                    .withLastUpdated(lastUpdated)
+              )
+              .thenRun(_ => RegularUserInvalidated ~> replyTo)
+
+          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+        }
+
       case _: LoadBankAccount =>
         state match {
           case Some(paymentAccount) =>

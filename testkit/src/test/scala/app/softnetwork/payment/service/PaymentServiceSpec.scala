@@ -553,6 +553,18 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
       }
     }
 
+    "invalidate regular user" in {
+      val paymentAccount = loadPaymentAccount()
+      assert(paymentAccount.paymentAccountStatus.isCompteOk)
+      val userId = paymentAccount.legalUser.flatMap(_.legalRepresentative.userId).getOrElse("")
+      Get(
+        s"/$RootPath/$PaymentPath/$HooksRoute?EventType=USER_KYC_LIGHT&RessourceId=$userId"
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        assert(loadPaymentAccount().paymentAccountStatus.isDocumentsKo)
+      }
+    }
+
     "delete bank account" in {
       withCookies(
         Delete(s"/$RootPath/$PaymentPath/$BankRoute")
