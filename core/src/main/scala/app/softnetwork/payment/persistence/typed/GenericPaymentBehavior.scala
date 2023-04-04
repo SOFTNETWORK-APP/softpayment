@@ -2452,12 +2452,12 @@ trait GenericPaymentBehavior
                   .withLastUpdated(lastUpdated)
                   .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO)
               ) ++
-                broadcastEvent(
-                  RegularUserInvalidatedEvent.defaultInstance
-                    .withExternalUuid(paymentAccount.externalUuid)
-                    .withLastUpdated(lastUpdated)
-                    .withUserId(userId)
-                )
+              broadcastEvent(
+                RegularUserInvalidatedEvent.defaultInstance
+                  .withExternalUuid(paymentAccount.externalUuid)
+                  .withLastUpdated(lastUpdated)
+                  .withUserId(userId)
+              )
 
             var updatedPaymentAccount = paymentAccount
               .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO)
@@ -2466,9 +2466,9 @@ trait GenericPaymentBehavior
             Effect
               .persist(
                 events :+
-                  PaymentAccountUpsertedEvent.defaultInstance
-                    .withDocument(updatedPaymentAccount)
-                    .withLastUpdated(lastUpdated)
+                PaymentAccountUpsertedEvent.defaultInstance
+                  .withDocument(updatedPaymentAccount)
+                  .withLastUpdated(lastUpdated)
               )
               .thenRun(_ => RegularUserInvalidated ~> replyTo)
 

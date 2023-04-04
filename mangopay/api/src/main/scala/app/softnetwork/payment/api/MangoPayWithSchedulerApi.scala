@@ -19,7 +19,8 @@ trait MangoPayWithSchedulerApi extends MangoPayApi with SchedulerApi {
         with SchedulerHandler
         with JdbcJournalProvider
         with JdbcSchemaProvider {
-        override lazy val schemaType: JdbcSchema.SchemaType = MangoPayWithSchedulerApi.this.schemaType
+        override lazy val schemaType: JdbcSchema.SchemaType =
+          MangoPayWithSchedulerApi.this.schemaType
         override implicit def system: ActorSystem[_] = sys
       }
 
