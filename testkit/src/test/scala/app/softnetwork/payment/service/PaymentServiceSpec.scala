@@ -108,7 +108,7 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
         Post(
           s"/$RootPath/$PaymentPath/$BankRoute",
           BankAccountCommand(
-            BankAccount(None, ownerName, ownerAddress, iban, ""),
+            BankAccount(None, ownerName, ownerAddress, iban, "WRONG"),
             naturalUser,
             None
           )

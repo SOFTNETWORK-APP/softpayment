@@ -4,6 +4,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.kv.handlers.GenericKeyValueDao
+import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.config.PaymentSettings.{AkkaNodeRole, PayInStatementDescriptor}
 import app.softnetwork.payment.handlers.{GenericPaymentDao, PaymentKvDao}
 import app.softnetwork.payment.message.PaymentEvents._
@@ -1716,14 +1717,47 @@ trait GenericPaymentBehavior
 
               val lastUpdated = now()
 
+              val shouldUpdateIban =
+                !paymentAccount.bankAccount.exists(_.checkIfSameIban(bankAccount.iban))
+
+              val iban = {
+                if (!shouldUpdateIban) {
+                  paymentAccount.bankAccount match {
+                    case Some(previous) => previous.iban
+                    case _              => bankAccount.iban
+                  }
+                } else {
+                  bankAccount.iban
+                }
+              }
+
+              val shouldUpdateBic =
+                shouldUpdateIban || !paymentAccount.bankAccount.exists(
+                  _.checkIfSameBic(bankAccount.bic)
+                )
+
+              val bic = {
+                if (!shouldUpdateBic) {
+                  paymentAccount.bankAccount match {
+                    case Some(previous) => previous.bic
+                    case _              => bankAccount.bic
+                  }
+                } else {
+                  bankAccount.bic
+                }
+              }
+
               var updatedPaymentAccount =
                 paymentAccount
                   .withUser(updatedUser)
                   .withBankAccount(
-                    bankAccount.copy(
-                      mandateId = paymentAccount.bankAccount.flatMap(_.mandateId),
-                      mandateStatus = paymentAccount.bankAccount.flatMap(_.mandateStatus)
-                    )
+                    bankAccount
+                      .copy(
+                        mandateId = paymentAccount.bankAccount.flatMap(_.mandateId),
+                        mandateStatus = paymentAccount.bankAccount.flatMap(_.mandateStatus)
+                      )
+                      .withIban(iban)
+                      .withBic(bic)
                   )
                   .withLastUpdated(lastUpdated)
 
@@ -1797,8 +1831,8 @@ trait GenericPaymentBehavior
                       .map(_.ownerName)
                       .getOrElse("") != bankAccount.ownerName ||
                     !paymentAccount.getBankAccount.ownerAddress.equals(bankAccount.ownerAddress) ||
-                    !paymentAccount.bankAccount.exists(_.checkIfSameIban(bankAccount.iban)) ||
-                    !paymentAccount.bankAccount.exists(_.checkIfSameBic(bankAccount.bic)) /*||
+                    shouldUpdateIban ||
+                    shouldUpdateBic /*||
                       shouldUpdateUser*/
                   )
 
@@ -2004,7 +2038,9 @@ trait GenericPaymentBehavior
 
                               val encodedPaymentAccount =
                                 updatedPaymentAccount.copy(
-                                  bankAccount = updatedPaymentAccount.bankAccount.map(_.encode())
+                                  bankAccount = updatedPaymentAccount.bankAccount.map(
+                                    _.encode(shouldUpdateBic, shouldUpdateIban)
+                                  )
                                 )
 
                               Effect.persist(
@@ -2489,7 +2525,10 @@ trait GenericPaymentBehavior
 
       case _: DeleteBankAccount =>
         state match {
-          case Some(paymentAccount) =>
+          case Some(_) if PaymentSettings.DisableBankAccountDeletion =>
+            Effect.none.thenRun(_ => BankAccountDeletionDisabled ~> replyTo)
+
+          case Some(paymentAccount) if !PaymentSettings.DisableBankAccountDeletion =>
             if (
               paymentAccount.mandateActivated && (
 //              paymentAccount.transactions.exists(t => t.`type`.isDirectDebit) ||

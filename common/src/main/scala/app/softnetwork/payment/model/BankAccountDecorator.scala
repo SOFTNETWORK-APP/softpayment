@@ -9,7 +9,7 @@ import scala.util.matching.Regex
 trait BankAccountDecorator { self: BankAccount =>
   lazy val wrongIban: Boolean = !IBANValidator.getInstance.isValid(iban)
 
-  lazy val wrongBic: Boolean = !BicValidator.check(bic)
+  lazy val wrongBic: Boolean = bic.trim.nonEmpty && !BicValidator.check(bic)
 
   lazy val wrongOwnerName: Boolean = !NameValidator.check(ownerName)
 
@@ -17,12 +17,30 @@ trait BankAccountDecorator { self: BankAccount =>
 
   def validate(): Boolean = !wrongIban && !wrongBic && !wrongOwnerName && !wrongOwnerAddress
 
-  def encode(): BankAccount = {
-    if (!encoded) {
+  def encode(shouldUpdateBic: Boolean = true, shouldUpdateIban: Boolean = true): BankAccount = {
+    if (shouldUpdateBic || shouldUpdateIban) {
       this
-        .withBic(sha256(bic))
-        .withIban(sha256(iban))
+        .encodeBic(shouldUpdateBic)
+        .encodeIban(shouldUpdateIban)
         .withEncoded(true)
+    } else {
+      this.withEncoded(true)
+    }
+  }
+
+  private[payment] def encodeBic(shouldUpdateBic: Boolean): BankAccount = {
+    if (shouldUpdateBic) {
+      this
+        .withBic(if (bic.trim.nonEmpty) sha256(bic) else bic)
+    } else {
+      this
+    }
+  }
+
+  private[payment] def encodeIban(shouldUpdateIban: Boolean): BankAccount = {
+    if (shouldUpdateIban) {
+      this
+        .withIban(sha256(iban))
     } else {
       this
     }
@@ -37,11 +55,12 @@ trait BankAccountDecorator { self: BankAccount =>
   }
 
   def checkIfSameBic(newBic: String): Boolean = {
-    if (encoded) {
-      bic == sha256(newBic)
-    } else {
-      bic == newBic
-    }
+    newBic.trim.isEmpty ||
+    (if (encoded) {
+       bic == sha256(newBic)
+     } else {
+       bic == newBic
+     })
   }
 
   lazy val tag: String = externalUuid

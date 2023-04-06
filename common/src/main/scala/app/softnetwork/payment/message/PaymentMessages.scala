@@ -793,6 +793,8 @@ object PaymentMessages {
 
   case object BankAccountNotDeleted extends PaymentError("BankAccountNotDeleted")
 
+  case object BankAccountDeletionDisabled extends PaymentError("BankAccountDeletionDisabled")
+
   case object TransactionNotFound extends PaymentError("TransactionNotFound")
 
   case object IllegalTransactionStatus extends PaymentError("IllegalTransactionStatus")

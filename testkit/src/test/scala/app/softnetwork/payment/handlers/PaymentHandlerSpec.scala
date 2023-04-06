@@ -135,7 +135,7 @@ class PaymentHandlerSpec
       !?(
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(None, ownerName, ownerAddress, iban, "")
+          BankAccount(None, ownerName, ownerAddress, iban, "WRONG")
         )
       ) await {
         case WrongBic =>
@@ -143,11 +143,11 @@ class PaymentHandlerSpec
       }
     }
 
-    "create bank account with natural user" in {
+    "create bank account with natural user and empty bic" in {
       !?(
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(None, ownerName, ownerAddress, iban, bic),
+          BankAccount(None, ownerName, ownerAddress, iban, ""),
           Some(User.NaturalUser(naturalUser.withExternalUuid(sellerUuid).withProfile("seller")))
         )
       ) await {
@@ -575,6 +575,24 @@ class PaymentHandlerSpec
         case r: BankAccountCreatedOrUpdated =>
           assert(
             !r.userTypeUpdated && !r.kycUpdated && !r.documentsUpdated && !r.userUpdated && r.bankAccountUpdated
+          )
+        case other => fail(other.toString)
+      }
+      // update bank account with empty bic
+      !?(
+        CreateOrUpdateBankAccount(
+          computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+          updatedBankAccount.withBic(""),
+          Some(User.LegalUser(updatedLegalUser)),
+          Some(true)
+        )
+      ) await {
+        case r: BankAccountCreatedOrUpdated =>
+          assert(
+            !r.userTypeUpdated && !r.kycUpdated && !r.documentsUpdated && !r.userUpdated && !r.bankAccountUpdated
+          )
+          assert(
+            r.paymentAccount.bankAccount.map(_.bic).getOrElse("").nonEmpty
           )
         case other => fail(other.toString)
       }
