@@ -151,6 +151,14 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     }
   }
 
+  def invalidateRegularUser(userId: String)(implicit system: ActorSystem[_]): Future[Boolean] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    MockPaymentHandler !? InvalidateRegularUser(userId) map {
+      case RegularUserInvalidated => true
+      case _                      => false
+    }
+  }
+
   override def entities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
     schedulerEntities(sys) ++ sessionEntities(sys) ++ paymentEntities(sys)
 
