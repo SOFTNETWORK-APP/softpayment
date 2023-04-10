@@ -27,7 +27,7 @@ import app.softnetwork.payment.model.PaymentUser.PaymentUserType
 
 import scala.util.{Failure, Success, Try}
 import app.softnetwork.persistence._
-import app.softnetwork.serialization._
+import app.softnetwork.serialization.asJson
 import app.softnetwork.time.{epochSecondToDate, epochSecondToLocalDate, DateExtensions}
 
 import java.time.format.DateTimeFormatter
@@ -169,7 +169,7 @@ trait MangoPayProvider extends PaymentProvider {
       .withCumulatedDebitedAmount(currentState.getCumulatedDebitedAmount.getAmount)
       .withCumulatedFeesAmount(currentState.getCumulatedFeesAmount.getAmount)
       .copy(
-        lastPayInTransactionId = Option(currentState.getLastPayinId)
+        lastPayInTransactionId = Option(currentState.getLastPayinId).getOrElse("")
       )
   }
 
@@ -187,7 +187,7 @@ trait MangoPayProvider extends PaymentProvider {
         Try(sdf.parse(birthday)) match {
           case Success(s) =>
             val user = new UserNatural
-            user.setId(userId)
+            user.setId(userId.getOrElse(""))
             user.setFirstName(firstName)
             user.setLastName(lastName)
             user.setBirthday(s.toEpochSecond)
@@ -208,7 +208,7 @@ trait MangoPayProvider extends PaymentProvider {
             (if (userId.getOrElse("").trim.isEmpty)
                None
              else
-               Try(MangoPay().getUserApi.getNatural(userId)) match {
+               Try(MangoPay().getUserApi.getNatural(userId.getOrElse(""))) match {
                  case Success(u) => Option(u)
                  case Failure(f) =>
                    mlog.error(f.getMessage, f)
@@ -252,7 +252,7 @@ trait MangoPayProvider extends PaymentProvider {
         Try(sdf.parse(legalRepresentative.birthday)) match {
           case Success(s) =>
             val user = new UserLegal
-            user.setId(legalRepresentative.userId)
+            user.setId(legalRepresentative.userId.getOrElse(""))
             val headquarters = new MangoPayAddress
             headquarters.setAddressLine1(headQuartersAddress.addressLine)
             headquarters.setCity(headQuartersAddress.city)
@@ -293,10 +293,10 @@ trait MangoPayProvider extends PaymentProvider {
                 user.setTermsAndConditionsAccepted(true)
             }
             user.setTag(legalRepresentative.externalUuid)
-            (if (legalRepresentative.userId.trim.isEmpty)
+            (if (legalRepresentative.userId.isEmpty)
                None
              else
-               Try(MangoPay().getUserApi.getLegal(legalRepresentative.userId)) match {
+               Try(MangoPay().getUserApi.getLegal(legalRepresentative.userId.getOrElse(""))) match {
                  case Success(u) => Option(u)
                  case Failure(f) =>
                    mlog.error(f.getMessage, f)
@@ -400,7 +400,9 @@ trait MangoPayProvider extends PaymentProvider {
         bankAccount.setActive(true)
         val details = new BankAccountDetailsIBAN
         details.setIban(iban)
-        details.setBic(bic)
+        if (bic.trim.nonEmpty) {
+          details.setBic(bic)
+        }
         bankAccount.setDetails(details)
         bankAccount.setOwnerName(ownerName)
         val address = new MangoPayAddress
@@ -681,7 +683,7 @@ trait MangoPayProvider extends PaymentProvider {
                   case other => other
                 },
                 amount = debitedAmount,
-                cardId = cardId,
+                cardId = if (cardId.trim.isEmpty) None else Some(cardId),
                 fees = 0,
                 resultCode = Option(result.getResultCode).getOrElse(""),
                 resultMessage = Option(result.getResultMessage).getOrElse(""),
@@ -754,7 +756,7 @@ trait MangoPayProvider extends PaymentProvider {
               case other => other
             },
             amount = result.getDebitedFunds.getAmount,
-            cardId = result.getCardId,
+            cardId = Option(result.getCardId),
             fees = 0,
             resultCode = Option(result.getResultCode).getOrElse(""),
             resultMessage = Option(result.getResultMessage).getOrElse(""),
@@ -828,7 +830,7 @@ trait MangoPayProvider extends PaymentProvider {
                     case other => other
                   },
                   amount = debitedAmount,
-                  cardId = "",
+                  cardId = None,
                   fees = 0,
                   resultCode = Option(result.getResultCode).getOrElse(""),
                   resultMessage = Option(result.getResultMessage).getOrElse(""),
@@ -983,7 +985,7 @@ trait MangoPayProvider extends PaymentProvider {
                   case other => other
                 },
                 amount = debitedAmount,
-                cardId = cardId,
+                cardId = Option(cardId),
                 fees = 0,
                 resultCode = Option(result.getResultCode).getOrElse(""),
                 resultMessage = Option(result.getResultMessage).getOrElse(""),
@@ -1116,7 +1118,7 @@ trait MangoPayProvider extends PaymentProvider {
                     resultCode = Option(r.getType).getOrElse(""),
                     resultMessage = Option(r.getApiMessage).getOrElse(""),
                     reasonMessage = Option(reasonMessage),
-                    authorId = Some(authorId)
+                    authorId = authorId
                   )
                 )
               case _ =>
@@ -1179,7 +1181,7 @@ trait MangoPayProvider extends PaymentProvider {
                   creditedUserId = Option(result.getCreditedUserId),
                   creditedWalletId = Some(creditedWalletId),
                   debitedWalletId = Option(result.getDebitedWalletId),
-                  orderUuid = orderUuid,
+                  orderUuid = orderUuid.getOrElse(""),
                   externalReference = externalReference
                 )
                 .withPaymentType(Transaction.PaymentType.BANK_WIRE)
@@ -1200,7 +1202,7 @@ trait MangoPayProvider extends PaymentProvider {
                     fees = feesAmount,
                     resultCode = Option(r.getType).getOrElse(""),
                     resultMessage = Option(r.getApiMessage).getOrElse(""),
-                    authorId = Some(authorId),
+                    authorId = authorId,
                     creditedUserId = Some(creditedUserId),
                     creditedWalletId = Some(creditedWalletId),
                     debitedWalletId = Some(debitedWalletId)
@@ -1297,7 +1299,7 @@ trait MangoPayProvider extends PaymentProvider {
                     fees = feesAmount,
                     resultCode = Option(r.getType).getOrElse(""),
                     resultMessage = Option(r.getApiMessage).getOrElse(""),
-                    authorId = Some(authorId),
+                    authorId = authorId,
                     creditedUserId = Some(creditedUserId),
                     debitedWalletId = Some(debitedWalletId)
                   )
@@ -1954,7 +1956,7 @@ trait MangoPayProvider extends PaymentProvider {
     Try(sdf.parse(birthday)) match {
       case Success(s) =>
         val ubo = new Ubo
-        ubo.setId(id)
+        ubo.setId(id.getOrElse(""))
         ubo.setFirstName(firstName)
         ubo.setLastName(lastName)
         ubo.setNationality(CountryIso.valueOf(nationality))
@@ -1974,14 +1976,14 @@ trait MangoPayProvider extends PaymentProvider {
         ubo.setActive(active)
 
         {
-          if (id.trim.isEmpty) {
+          if (id.isEmpty) {
             Try(MangoPay().getUboDeclarationApi.createUbo(userId, uboDeclarationId, ubo))
           } else {
             Try(MangoPay().getUboDeclarationApi.updateUbo(userId, uboDeclarationId, ubo))
           }
         } match {
           case Success(s2) =>
-            Some(ultimateBeneficialOwner.copy(id = s2.getId))
+            Some(ultimateBeneficialOwner.copy(id = Option(s2.getId)))
           case Failure(f) =>
             mlog.error(f.getMessage, f)
             None
@@ -2183,7 +2185,7 @@ trait MangoPayProvider extends PaymentProvider {
         case Some(s) => recurringPaymentUpdate.setCardId(s)
         case _       =>
       }
-      recurringPaymentUpdate.setCardId(cardId)
+      recurringPaymentUpdate.setCardId(cardId.getOrElse(""))
       status match {
         case Some(s) => recurringPaymentUpdate.setStatus(s.name)
         case _       =>
@@ -2300,7 +2302,8 @@ trait MangoPayProvider extends PaymentProvider {
                   case other => other
                 },
                 amount = debitedAmount,
-                cardId = result.getPaymentDetails.asInstanceOf[PayInPaymentDetailsCard].getCardId,
+                cardId =
+                  Option(result.getPaymentDetails.asInstanceOf[PayInPaymentDetailsCard].getCardId),
                 fees = feesAmount,
                 resultCode = Option(result.getResultCode).getOrElse(""),
                 resultMessage = Option(result.getResultMessage).getOrElse(""),
@@ -2311,7 +2314,7 @@ trait MangoPayProvider extends PaymentProvider {
                 ),
                 authorId = result.getAuthorId,
                 creditedWalletId = Option(result.getCreditedWalletId),
-                recurringPayInRegistrationId = recurringPayInRegistrationId
+                recurringPayInRegistrationId = Option(recurringPayInRegistrationId)
               )
             )
           case Failure(f) =>
@@ -2352,13 +2355,14 @@ trait MangoPayProvider extends PaymentProvider {
                   case other => other
                 },
                 amount = debitedAmount,
-                cardId = result.getPaymentDetails.asInstanceOf[PayInPaymentDetailsCard].getCardId,
+                cardId =
+                  Option(result.getPaymentDetails.asInstanceOf[PayInPaymentDetailsCard].getCardId),
                 fees = feesAmount,
                 resultCode = Option(result.getResultCode).getOrElse(""),
                 resultMessage = Option(result.getResultMessage).getOrElse(""),
                 authorId = result.getAuthorId,
                 creditedWalletId = Option(result.getCreditedWalletId),
-                recurringPayInRegistrationId = recurringPayInRegistrationId
+                recurringPayInRegistrationId = Option(recurringPayInRegistrationId)
               )
             )
           case Failure(f) =>

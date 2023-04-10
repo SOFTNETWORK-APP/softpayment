@@ -491,6 +491,17 @@ class PaymentHandlerSpec
               sellerBankAccountId = paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
 //              assert(sellerBankAccountId != previousBankAccountId)
               uboDeclarationId = paymentAccount.getLegalUser.uboDeclaration.map(_.id).getOrElse("")
+              client.loadLegalUserDetails(
+                computeExternalUuidWithProfile(sellerUuid, Some("seller"))
+              ) complete () match {
+                case Success(value) =>
+                  assert(value.legalUserType.isBusiness)
+                  assert(value.legalName == legalUser.legalName)
+                  assert(value.siret == legalUser.siret)
+                  assert(value.legalRepresentativeAddress.isDefined)
+                  assert(value.headQuartersAddress.isDefined)
+                case Failure(f) => fail(f.getMessage)
+              }
             case other => fail(other.toString)
           }
         case other => fail(other.toString)
@@ -1175,7 +1186,9 @@ class PaymentHandlerSpec
     }
 
     "delete bank account" in {
-      !?(DeleteBankAccount(computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
+      !?(
+        DeleteBankAccount(computeExternalUuidWithProfile(sellerUuid, Some("seller")), Some(true))
+      ) await {
         case BankAccountDeleted =>
           !?(LoadBankAccount(computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
             case BankAccountNotFound =>

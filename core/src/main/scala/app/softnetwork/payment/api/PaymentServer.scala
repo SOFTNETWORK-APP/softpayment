@@ -12,6 +12,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
   DirectDebited,
   LoadBankAccount,
   LoadDirectDebitTransaction,
+  LoadPaymentAccount,
   MandateCanceled,
   PaidIn,
   PaidOut,
@@ -20,6 +21,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
   PayOut,
   PayOutFailed,
   PaymentAccountCreated,
+  PaymentAccountLoaded,
   PaymentAccountUpdated,
   PaymentCommand,
   PaymentError,
@@ -313,6 +315,24 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
       case r: BankAccountLoaded =>
         LoadBankAccountOwnerResponse(r.bankAccount.ownerName, Some(r.bankAccount.ownerAddress))
       case _ => LoadBankAccountOwnerResponse()
+    }
+  }
+
+  override def loadLegalUser(
+    in: LoadLegalUserRequest
+  ): Future[LoadLegalUserResponse] = {
+    import in._
+    !?(LoadPaymentAccount(externalUuid)) map {
+      case r: PaymentAccountLoaded if r.paymentAccount.user.isLegalUser =>
+        val legalUser = r.paymentAccount.getLegalUser
+        LoadLegalUserResponse(
+          legalUser.legalUserType,
+          legalUser.legalName,
+          legalUser.siret,
+          Some(legalUser.legalRepresentativeAddress),
+          Some(legalUser.headQuartersAddress)
+        )
+      case _ => LoadLegalUserResponse()
     }
   }
 }

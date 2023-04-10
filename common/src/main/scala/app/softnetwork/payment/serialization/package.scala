@@ -3,7 +3,7 @@ package app.softnetwork.payment
 import app.softnetwork.payment.model._
 import app.softnetwork.protobuf.ScalaPBSerializers
 import ScalaPBSerializers.GeneratedEnumSerializer
-import app.softnetwork.payment.api.TransactionStatus
+import app.softnetwork.payment.api.{LegalUserType, TransactionStatus}
 import org.json4s.Formats
 import app.softnetwork.serialization._
 
@@ -62,6 +62,26 @@ package object serialization {
         Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED
       case TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON =>
         Transaction.TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON
+    }
+  }
+
+  implicit def LegalUserTypeToLegalResponseUserType(
+    legalUserType: LegalUser.LegalUserType
+  ): LegalUserType = {
+    legalUserType match {
+      case LegalUser.LegalUserType.BUSINESS     => LegalUserType.BUSINESS
+      case LegalUser.LegalUserType.SOLETRADER   => LegalUserType.SOLETRADER
+      case LegalUser.LegalUserType.ORGANIZATION => LegalUserType.ORGANIZATION
+    }
+  }
+
+  implicit def LegalResponseUserTypeToLegalUserType(
+    legalUserType: LegalUserType
+  ): LegalUser.LegalUserType = {
+    legalUserType match {
+      case LegalUserType.BUSINESS     => LegalUser.LegalUserType.BUSINESS
+      case LegalUserType.SOLETRADER   => LegalUser.LegalUserType.SOLETRADER
+      case LegalUserType.ORGANIZATION => LegalUser.LegalUserType.ORGANIZATION
     }
   }
 }

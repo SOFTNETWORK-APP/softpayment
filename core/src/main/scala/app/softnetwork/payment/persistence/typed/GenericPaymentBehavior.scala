@@ -2523,12 +2523,12 @@ trait GenericPaymentBehavior
           case _ => Effect.none.thenRun(_ => BankAccountNotFound ~> replyTo)
         }
 
-      case _: DeleteBankAccount =>
+      case cmd: DeleteBankAccount =>
         state match {
-          case Some(_) if PaymentSettings.DisableBankAccountDeletion =>
+          case Some(_) if PaymentSettings.DisableBankAccountDeletion && !cmd.force.getOrElse(false) =>
             Effect.none.thenRun(_ => BankAccountDeletionDisabled ~> replyTo)
 
-          case Some(paymentAccount) if !PaymentSettings.DisableBankAccountDeletion =>
+          case Some(paymentAccount) =>
             if (
               paymentAccount.mandateActivated && (
 //              paymentAccount.transactions.exists(t => t.`type`.isDirectDebit) ||

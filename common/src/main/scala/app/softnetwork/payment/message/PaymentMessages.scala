@@ -463,7 +463,7 @@ object PaymentMessages {
     val key: String = creditedAccount
   }
 
-  case class DeleteBankAccount(creditedAccount: String) extends PaymentCommandWithKey {
+  case class DeleteBankAccount(creditedAccount: String, force: Option[Boolean]) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 

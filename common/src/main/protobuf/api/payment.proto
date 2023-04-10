@@ -25,6 +25,7 @@ service PaymentServiceApi {
     rpc RegisterRecurringPayment (RegisterRecurringPaymentRequest) returns (RegisterRecurringPaymentResponse) {}
     rpc CancelMandate (CancelMandateRequest) returns (CancelMandateResponse) {}
     rpc LoadBankAccountOwner (LoadBankAccountOwnerRequest) returns (LoadBankAccountOwnerResponse) {}
+    rpc LoadLegalUser(LoadLegalUserRequest) returns (LoadLegalUserResponse) {}
 }
 
 message CreateOrUpdatePaymentAccountRequest {
@@ -160,4 +161,22 @@ message LoadBankAccountOwnerRequest {
 message LoadBankAccountOwnerResponse {
     string ownerName = 1;
     app.softnetwork.payment.model.Address ownerAddress = 2;
+}
+
+enum LegalUserType {
+    SOLETRADER = 0;
+    BUSINESS = 1;
+    ORGANIZATION = 2;
+}
+
+message LoadLegalUserRequest {
+    string externalUuid = 1;
+}
+
+message LoadLegalUserResponse {
+    LegalUserType legalUserType = 1;
+    string legalName = 2;
+    string siret = 3;
+    app.softnetwork.payment.model.Address legalRepresentativeAddress = 4;
+    app.softnetwork.payment.model.Address headQuartersAddress = 5;
 }

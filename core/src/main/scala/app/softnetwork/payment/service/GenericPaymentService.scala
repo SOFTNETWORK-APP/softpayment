@@ -513,7 +513,7 @@ trait GenericPaymentService
             }
           } ~
           delete {
-            run(DeleteBankAccount(externalUuidWithProfile(session))) completeWith {
+            run(DeleteBankAccount(externalUuidWithProfile(session), Some(false))) completeWith {
               case _: BankAccountDeleted.type => complete(HttpResponse(StatusCodes.OK))
               case r: BankAccountNotFound.type =>
                 complete(HttpResponse(StatusCodes.NotFound, entity = r))

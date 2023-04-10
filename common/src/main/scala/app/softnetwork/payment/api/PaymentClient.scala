@@ -3,7 +3,13 @@ package app.softnetwork.payment.api
 import akka.actor.typed.ActorSystem
 import akka.grpc.GrpcClientSettings
 import app.softnetwork.api.server.client.{GrpcClient, GrpcClientFactory}
-import app.softnetwork.payment.model.{BankAccountOwner, PaymentAccount, RecurringPayment}
+import app.softnetwork.payment.model.{
+  BankAccountOwner,
+  LegalUserDetails,
+  PaymentAccount,
+  RecurringPayment
+}
+import app.softnetwork.payment.serialization._
 
 import java.util.Date
 import scala.concurrent.Future
@@ -161,6 +167,19 @@ trait PaymentClient extends GrpcClient {
   def loadBankAccountOwner(externalUuid: String): Future[BankAccountOwner] = {
     grpcClient.loadBankAccountOwner(LoadBankAccountOwnerRequest(externalUuid)) map (response =>
       BankAccountOwner(response.ownerName, response.ownerAddress)
+    )
+  }
+
+  def loadLegalUserDetails(externalUuid: String): Future[LegalUserDetails] = {
+    grpcClient.loadLegalUser(LoadLegalUserRequest(externalUuid)) map (
+      response =>
+        LegalUserDetails(
+          response.legalUserType,
+          response.legalName,
+          response.siret,
+          response.legalRepresentativeAddress,
+          response.headQuartersAddress
+        )
     )
   }
 }

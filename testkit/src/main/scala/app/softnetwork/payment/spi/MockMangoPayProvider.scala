@@ -5,7 +5,6 @@ import app.softnetwork.payment.model.PaymentUser.PaymentUserType
 import app.softnetwork.payment.model.RecurringPayment.RecurringCardPaymentState
 import app.softnetwork.payment.model.{RecurringPayment, _}
 import app.softnetwork.persistence._
-import app.softnetwork.serialization._
 import app.softnetwork.time.DateExtensions
 import com.mangopay.core.enumerations.{TransactionStatus => MangoPayTransactionStatus, _}
 import com.mangopay.core.{Address => MangoPayAddress, _}
@@ -99,7 +98,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
         Try(sdf.parse(legalRepresentative.birthday)) match {
           case Success(s) =>
             val user = new UserLegal
-            user.setId(legalRepresentative.userId)
+            user.setId(legalRepresentative.userId.getOrElse(""))
             val headquarters = new MangoPayAddress
             headquarters.setAddressLine1(headQuartersAddress.addressLine)
             headquarters.setCity(headQuartersAddress.city)
@@ -140,7 +139,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
                 user.setTermsAndConditionsAccepted(true)
             }
             user.setTag(legalRepresentative.externalUuid)
-            if (legalRepresentative.userId.trim.isEmpty) {
+            if (legalRepresentative.userId.isEmpty) {
               LegalUsers.values.find(_.getTag == legalRepresentative.externalUuid) match {
                 case Some(u) =>
                   user.setId(u.getId)
@@ -211,7 +210,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
               fees = feesAmount,
               resultCode = payOut.getResultCode,
               resultMessage = payOut.getResultMessage,
-              authorId = Some(authorId),
+              authorId = authorId,
               creditedUserId = Some(creditedUserId),
               debitedWalletId = Some(debitedWalletId)
             )
@@ -233,7 +232,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
         bankAccount.setActive(true)
         val details = new BankAccountDetailsIBAN
         details.setIban(iban)
-        details.setBic(bic)
+        if (bic.trim.nonEmpty) {
+          details.setBic(bic)
+        }
         bankAccount.setDetails(details)
         bankAccount.setOwnerName(ownerName)
         val address = new MangoPayAddress
@@ -311,7 +312,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             resultCode = refund.getResultCode,
             resultMessage = refund.getResultMessage,
             reasonMessage = Option(reasonMessage),
-            authorId = Some(authorId)
+            authorId = authorId
           )
         )
       case _ => None
@@ -356,11 +357,11 @@ trait MockMangoPayProvider extends MangoPayProvider {
               fees = feesAmount,
               resultCode = transfer.getResultCode,
               resultMessage = transfer.getResultMessage,
-              authorId = Some(authorId),
+              authorId = authorId,
               creditedUserId = Some(creditedUserId),
               creditedWalletId = Some(creditedWalletId),
               debitedWalletId = Some(debitedWalletId),
-              orderUuid = orderUuid,
+              orderUuid = orderUuid.getOrElse(""),
               externalReference = externalReference
             )
             .withPaymentType(Transaction.PaymentType.BANK_WIRE)
@@ -657,7 +658,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
             status = cardPreAuthorization.getStatus,
             amount = debitedAmount,
-            cardId = cardId,
+            cardId = Option(cardId),
             fees = 0,
             resultCode = cardPreAuthorization.getResultCode,
             resultMessage = cardPreAuthorization.getResultMessage,
@@ -693,7 +694,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
             status = result.getStatus,
             amount = result.getDebitedFunds.getAmount,
-            cardId = result.getCardId,
+            cardId = Option(result.getCardId),
             fees = 0,
             resultCode = Option(result.getResultCode).getOrElse(""),
             resultMessage = Option(result.getResultMessage).getOrElse(""),
@@ -751,11 +752,11 @@ trait MockMangoPayProvider extends MangoPayProvider {
               `type` = Transaction.TransactionType.PAYIN,
               status = payIn.getStatus,
               amount = debitedAmount,
-              cardId = "",
+              cardId = None,
               fees = 0,
               resultCode = Option(payIn.getResultCode).getOrElse(""),
               resultMessage = Option(payIn.getResultMessage).getOrElse(""),
-              redirectUrl = "",
+              redirectUrl = None,
               authorId = payIn.getAuthorId,
               creditedWalletId = Option(payIn.getCreditedWalletId),
               preAuthorizationId = Some(cardPreAuthorizedTransactionId)
@@ -849,7 +850,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             resultMessage = payIn.getResultMessage,
             redirectUrl =
               if (debitedAmount > 5000) Option(executionDetails.getSecureModeRedirectUrl) else None,
-            authorId = Some(authorId),
+            authorId = authorId,
             creditedWalletId = Some(creditedWalletId)
           )
         )
@@ -1072,7 +1073,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
               resultCode = payIn.getResultCode,
               resultMessage = payIn.getResultMessage,
               redirectUrl = None,
-              authorId = Some(authorId),
+              authorId = authorId,
               creditedUserId = Some(creditedUserId),
               creditedWalletId = Some(creditedWalletId),
               mandateId = Some(mandateId),
@@ -1394,7 +1395,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             import recurringPaymentTransaction._
             val recurringPayInCIT: RecurringPayInCIT = new RecurringPayInCIT
             recurringPayInCIT.setRecurringPayInRegistrationId(recurringPayInRegistrationId)
-            recurringPayInCIT.setIpAddress(firstRecurringPaymentTransaction.ipAddress)
+            recurringPayInCIT.setIpAddress(firstRecurringPaymentTransaction.ipAddress.getOrElse(""))
             val debitedFunds = new Money
             debitedFunds.setAmount(debitedAmount)
             debitedFunds.setCurrency(CurrencyIso.valueOf(currency))
@@ -1468,9 +1469,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
                 redirectUrl =
                   if (debitedAmount > 5000) Option(executionDetails.getSecureModeRedirectUrl)
                   else None,
-                authorId = Some(registration.getAuthorId),
+                authorId = registration.getAuthorId,
                 creditedWalletId = Some(registration.getCreditedWalletId),
-                recurringPayInRegistrationId = recurringPayInRegistrationId
+                recurringPayInRegistrationId = Option(recurringPayInRegistrationId)
               )
             )
           case _ =>
@@ -1542,9 +1543,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
                 resultCode = payIn.getResultCode,
                 resultMessage = payIn.getResultMessage,
                 redirectUrl = None,
-                authorId = Some(registration.getAuthorId),
+                authorId = registration.getAuthorId,
                 creditedWalletId = Some(registration.getCreditedWalletId),
-                recurringPayInRegistrationId = recurringPayInRegistrationId
+                recurringPayInRegistrationId = Option(recurringPayInRegistrationId)
               )
             )
         }
