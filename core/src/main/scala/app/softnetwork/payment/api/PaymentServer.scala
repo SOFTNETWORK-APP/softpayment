@@ -332,6 +332,15 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
           Some(legalUser.legalRepresentativeAddress),
           Some(legalUser.headQuartersAddress)
         )
+      case r: PaymentAccountLoaded if r.paymentAccount.bankAccount.isDefined =>
+        val bankAccount = r.paymentAccount.getBankAccount
+        LoadLegalUserResponse(
+          LegalUserType.SOLETRADER,
+          bankAccount.ownerName,
+          "",
+          Some(bankAccount.ownerAddress),
+          None
+        )
       case _ => LoadLegalUserResponse()
     }
   }
