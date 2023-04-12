@@ -7,10 +7,12 @@ import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.PaymentAccount.User
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentTestKit
-import app.softnetwork.time.{now => _, _}
+import app.softnetwork.time._
 import app.softnetwork.persistence.now
 import org.scalatest.wordspec.AnyWordSpecLike
 
+import java.time.LocalDate
+import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
 class PaymentHandlerSpec
@@ -1040,7 +1042,7 @@ class PaymentHandlerSpec
               assert(recurringPayment.getNextDebitedAmount == 1000)
               assert(recurringPayment.getNextFeesAmount == 100)
               assert(recurringPayment.getNumberOfRecurringPayments == 0)
-              assert(recurringPayment.getNextRecurringPaymentDate.isEqual(now()))
+              assert(LocalDate.now().isEqual(recurringPayment.getNextRecurringPaymentDate))
             case other => fail(other.toString)
           }
         case other => fail(other.toString)
@@ -1063,7 +1065,7 @@ class PaymentHandlerSpec
           val recurringPayment = result.recurringPayment
           assert(recurringPayment.getCumulatedDebitedAmount == 1000)
           assert(recurringPayment.getCumulatedFeesAmount == 100)
-          assert(recurringPayment.getLastRecurringPaymentDate.isEqual(now()))
+          assert(LocalDate.now().isEqual(recurringPayment.getLastRecurringPaymentDate))
           assert(recurringPayment.lastRecurringPaymentTransactionId.isDefined)
           assert(recurringPayment.getNumberOfRecurringPayments == 1)
           assert(recurringPayment.nextRecurringPaymentDate.isEmpty)
@@ -1077,7 +1079,7 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           `type` = RecurringPayment.RecurringPaymentType.CARD,
           frequency = Some(RecurringPayment.RecurringPaymentFrequency.DAILY),
-          endDate = Some(now().plusDays(1)),
+          endDate = Some(LocalDate.now().plusDays(1)),
           fixedNextAmount = Some(true),
           nextDebitedAmount = Some(1000),
           nextFeesAmount = Some(100)
@@ -1102,7 +1104,7 @@ class PaymentHandlerSpec
               assert(recurringPayment.getNextFeesAmount == 100)
               assert(recurringPayment.getNumberOfRecurringPayments == 0)
               assert(recurringPayment.getCardStatus.isCreated)
-              assert(recurringPayment.getNextRecurringPaymentDate.isEqual(now()))
+              assert(LocalDate.now().isEqual(recurringPayment.getNextRecurringPaymentDate))
             case other => fail(other.toString)
           }
         case other => fail(other.toString)
@@ -1134,7 +1136,9 @@ class PaymentHandlerSpec
               assert(recurringPayment.getNextFeesAmount == 100)
               assert(recurringPayment.getNumberOfRecurringPayments == 1)
               assert(recurringPayment.getCardStatus.isInProgress)
-              assert(recurringPayment.getNextRecurringPaymentDate.isEqual(now().plusDays(1)))
+              assert(
+                LocalDate.now().plusDays(1).isEqual(recurringPayment.getNextRecurringPaymentDate)
+              )
             case other => fail(other.toString)
           }
         case other => fail(other.toString)

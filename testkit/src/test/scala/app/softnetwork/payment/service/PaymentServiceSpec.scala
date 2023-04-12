@@ -8,11 +8,13 @@ import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentRouteTestKit
-import app.softnetwork.time.{now => _, _}
+import app.softnetwork.time._
 import app.softnetwork.persistence.now
 import org.scalatest.wordspec.AnyWordSpecLike
 
 import java.net.URLEncoder
+import java.time.LocalDate
+import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
 class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
@@ -445,7 +447,11 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
           assert(recurringPayment.nextDebitedAmount.contains(1000))
           assert(recurringPayment.nextFeesAmount.contains(100))
           assert(recurringPayment.numberOfRecurringPayments.getOrElse(0) == 0)
-          assert(recurringPayment.nextRecurringPaymentDate.exists(_.isEqual(now())))
+          assert(
+            recurringPayment.nextRecurringPaymentDate.exists(
+              LocalDate.now().isEqual(_)
+            )
+          )
         }
       }
     }
@@ -464,7 +470,11 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
         val recurringPayment = responseAs[RecurringPaymentView]
         assert(recurringPayment.cumulatedDebitedAmount.contains(1000))
         assert(recurringPayment.cumulatedFeesAmount.contains(100))
-        assert(recurringPayment.lastRecurringPaymentDate.exists(_.isEqual(now())))
+        assert(
+          recurringPayment.lastRecurringPaymentDate.exists(
+            LocalDate.now().isEqual(_)
+          )
+        )
         assert(recurringPayment.lastRecurringPaymentTransactionId.isDefined)
         assert(recurringPayment.numberOfRecurringPayments.contains(1))
         assert(recurringPayment.nextRecurringPaymentDate.isEmpty)
@@ -480,7 +490,7 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
             "",
             `type` = RecurringPayment.RecurringPaymentType.CARD,
             frequency = Some(RecurringPayment.RecurringPaymentFrequency.DAILY),
-            endDate = Some(now().plusDays(1)),
+            endDate = Some(LocalDate.now().plusDays(1)),
             fixedNextAmount = Some(true),
             nextDebitedAmount = Some(1000),
             nextFeesAmount = Some(100)
@@ -504,7 +514,9 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
           assert(recurringPayment.nextDebitedAmount.contains(1000))
           assert(recurringPayment.nextFeesAmount.contains(100))
           assert(recurringPayment.numberOfRecurringPayments.getOrElse(0) == 0)
-          assert(recurringPayment.nextRecurringPaymentDate.exists(_.isEqual(now())))
+          assert(
+            recurringPayment.nextRecurringPaymentDate.exists(LocalDate.now().isEqual(_))
+          )
         }
       }
     }
@@ -537,7 +549,11 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
           assert(recurringPayment.numberOfRecurringPayments.getOrElse(0) == 1)
           assert(recurringPayment.cumulatedDebitedAmount.contains(0))
           assert(recurringPayment.cumulatedFeesAmount.contains(0))
-          assert(recurringPayment.nextRecurringPaymentDate.exists(_.isEqual(now().plusDays(1))))
+          assert(
+            recurringPayment.nextRecurringPaymentDate.exists(
+              _.equals(LocalDate.now().plusDays(1).toDate)
+            )
+          )
         }
       }
     }

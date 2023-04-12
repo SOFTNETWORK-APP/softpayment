@@ -19,7 +19,7 @@ import app.softnetwork.persistence.message.{BroadcastEvent, CrudEvent}
 import app.softnetwork.persistence.typed._
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.serialization.asJson
-import app.softnetwork.time.{now => _, _}
+import app.softnetwork.time._
 import org.slf4j.Logger
 import app.softnetwork.scheduler.message.SchedulerEvents.{
   ExternalEntityToSchedulerEvent,
@@ -29,6 +29,7 @@ import app.softnetwork.scheduler.message.SchedulerEvents.{
 import app.softnetwork.scheduler.message.{AddSchedule, RemoveSchedule}
 import app.softnetwork.scheduler.model.Schedule
 
+import java.time.LocalDate
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
@@ -1283,10 +1284,11 @@ trait GenericPaymentBehavior
               case Some(transaction) =>
                 paymentAccount.walletId match {
                   case Some(creditedWalletId) =>
+                    val transactionDate: LocalDate = transaction.createdDate
                     directDebitTransaction(
                       transaction.creditedWalletId.getOrElse(creditedWalletId),
                       transaction.id,
-                      transaction.createdDate.minusDays(1)
+                      transactionDate.minusDays(1)
                     ) match {
                       case Some(t) =>
                         val lastUpdated = now()
@@ -2525,7 +2527,8 @@ trait GenericPaymentBehavior
 
       case cmd: DeleteBankAccount =>
         state match {
-          case Some(_) if PaymentSettings.DisableBankAccountDeletion && !cmd.force.getOrElse(false) =>
+          case Some(_)
+              if PaymentSettings.DisableBankAccountDeletion && !cmd.force.getOrElse(false) =>
             Effect.none.thenRun(_ => BankAccountDeletionDisabled ~> replyTo)
 
           case Some(paymentAccount) =>

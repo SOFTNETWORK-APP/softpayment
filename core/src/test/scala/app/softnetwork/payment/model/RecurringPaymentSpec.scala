@@ -45,11 +45,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.DAILY)
-          .withStartDate(now().minusDays(1))
+          .withStartDate(LocalDate.now().minusDays(1))
           .withEndDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().minusDays(1)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().minusDays(1)))
         case _ => fail()
       }
     }
@@ -57,7 +57,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.DAILY)
-          .withEndDate(now().plusDays(1))
+          .withEndDate(LocalDate.now().plusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(now()))
@@ -68,11 +68,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.DAILY)
-          .withStartDate(now().plusDays(1))
-          .withEndDate(now().plusDays(1))
+          .withStartDate(LocalDate.now().plusDays(1))
+          .withEndDate(LocalDate.now().plusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().plusDays(1)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().plusDays(1)))
         case _ => fail()
       }
     }
@@ -80,11 +80,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.DAILY)
-          .withEndDate(now().plusDays(1))
+          .withEndDate(LocalDate.now().plusDays(1))
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().plusDays(1)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().plusDays(1)))
         case _ => fail()
       }
     }
@@ -93,7 +93,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.DAILY)
           .withEndDate(now())
-          .withLastRecurringPaymentDate(now().minusDays(1))
+          .withLastRecurringPaymentDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(now()))
@@ -115,7 +115,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.DAILY)
-          .withEndDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
         case _       =>
@@ -147,7 +147,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.WEEKLY)
-          .withEndDate(now().plusWeeks(1))
+          .withEndDate(LocalDate.now().plusWeeks(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(now()))
@@ -158,11 +158,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.WEEKLY)
-          .withEndDate(now().plusWeeks(1))
+          .withEndDate(LocalDate.now().plusWeeks(1))
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().plusWeeks(1)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().plusWeeks(1)))
         case _ => fail()
       }
     }
@@ -170,11 +170,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.WEEKLY)
-          .withEndDate(now().plusWeeks(1))
-          .withLastRecurringPaymentDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().plusWeeks(1))
+          .withLastRecurringPaymentDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().minusDays(1).plusWeeks(1)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().minusDays(1).plusWeeks(1)))
         case _ => fail()
       }
     }
@@ -203,7 +203,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.WEEKLY)
-          .withEndDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
         case _       =>
@@ -235,7 +235,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.MONTHLY)
-          .withEndDate(now().plusMonths(1))
+          .withEndDate(LocalDate.now().plusMonths(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(now()))
@@ -246,11 +246,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.MONTHLY)
-          .withEndDate(now().plusMonths(1))
+          .withEndDate(LocalDate.now().plusMonths(1))
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().plusMonths(1)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().plusMonths(1)))
         case _ => fail()
       }
     }
@@ -258,11 +258,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.MONTHLY)
-          .withEndDate(now().plusMonths(1))
-          .withLastRecurringPaymentDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().plusMonths(1))
+          .withLastRecurringPaymentDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().minusDays(1).plusMonths(1)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().minusDays(1).plusMonths(1)))
         case _ => fail()
       }
     }
@@ -293,7 +293,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.MONTHLY)
-          .withEndDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
         case _       =>
@@ -325,7 +325,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.QUARTERLY)
-          .withEndDate(now().plusMonths(3))
+          .withEndDate(LocalDate.now().plusMonths(3))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(now()))
@@ -336,11 +336,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.QUARTERLY)
-          .withEndDate(now().plusMonths(3))
+          .withEndDate(LocalDate.now().plusMonths(3))
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().plusMonths(3)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().plusMonths(3)))
         case _ => fail()
       }
     }
@@ -348,11 +348,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.QUARTERLY)
-          .withEndDate(now().plusMonths(3))
-          .withLastRecurringPaymentDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().plusMonths(3))
+          .withLastRecurringPaymentDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().minusDays(1).plusMonths(3)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().minusDays(1).plusMonths(3)))
         case _ => fail()
       }
     }
@@ -383,7 +383,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.QUARTERLY)
-          .withEndDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
         case _       =>
@@ -415,7 +415,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIANNUAL)
-          .withEndDate(now().plusMonths(6))
+          .withEndDate(LocalDate.now().plusMonths(6))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(now()))
@@ -426,11 +426,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIANNUAL)
-          .withEndDate(now().plusMonths(6))
+          .withEndDate(LocalDate.now().plusMonths(6))
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().plusMonths(6)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().plusMonths(6)))
         case _ => fail()
       }
     }
@@ -438,11 +438,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIANNUAL)
-          .withEndDate(now().plusMonths(6))
-          .withLastRecurringPaymentDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().plusMonths(6))
+          .withLastRecurringPaymentDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().minusDays(1).plusMonths(6)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().minusDays(1).plusMonths(6)))
         case _ => fail()
       }
     }
@@ -473,7 +473,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIANNUAL)
-          .withEndDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
         case _       =>
@@ -505,7 +505,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.ANNUAL)
-          .withEndDate(now().plusMonths(12))
+          .withEndDate(LocalDate.now().plusMonths(12))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(now()))
@@ -516,11 +516,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.ANNUAL)
-          .withEndDate(now().plusMonths(12))
+          .withEndDate(LocalDate.now().plusMonths(12))
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().plusMonths(12)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().plusMonths(12)))
         case _ => fail()
       }
     }
@@ -528,11 +528,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.ANNUAL)
-          .withEndDate(now().plusMonths(12))
-          .withLastRecurringPaymentDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().plusMonths(12))
+          .withLastRecurringPaymentDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().minusDays(1).plusMonths(12)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().minusDays(1).plusMonths(12)))
         case _ => fail()
       }
     }
@@ -565,7 +565,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.ANNUAL)
-          .withEndDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
         case _       =>
@@ -597,7 +597,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIMONTHLY)
-          .withEndDate(now().plusMonths(2))
+          .withEndDate(LocalDate.now().plusMonths(2))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
           assert(nextPaymentDate.isEqual(now()))
@@ -608,11 +608,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIMONTHLY)
-          .withEndDate(now().plusMonths(2))
+          .withEndDate(LocalDate.now().plusMonths(2))
           .withLastRecurringPaymentDate(now())
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().plusMonths(2)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().plusMonths(2)))
         case _ => fail()
       }
     }
@@ -620,11 +620,11 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIMONTHLY)
-          .withEndDate(now().plusMonths(2))
-          .withLastRecurringPaymentDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().plusMonths(2))
+          .withLastRecurringPaymentDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(nextPaymentDate) =>
-          assert(nextPaymentDate.isEqual(now().minusDays(1).plusMonths(2)))
+          assert(nextPaymentDate.isEqual(LocalDate.now().minusDays(1).plusMonths(2)))
         case _ => fail()
       }
     }
@@ -655,7 +655,7 @@ class RecurringPaymentSpec extends AnyWordSpec with Matchers {
       val recurringPayment =
         RecurringPayment.defaultInstance
           .withFrequency(RecurringPayment.RecurringPaymentFrequency.BIMONTHLY)
-          .withEndDate(now().minusDays(1))
+          .withEndDate(LocalDate.now().minusDays(1))
       recurringPayment.nextPaymentDate match {
         case Some(_) => fail()
         case _       =>

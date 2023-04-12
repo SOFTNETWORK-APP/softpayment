@@ -1,17 +1,20 @@
 package app.softnetwork.payment.model
 
-import app.softnetwork.time.{now => _, _}
-
+import app.softnetwork.time._
 import app.softnetwork.persistence.now
 
 import java.time.LocalDate
+import java.util.Date
+
+import scala.language.implicitConversions
 
 trait RecurringPaymentDecorator { _: RecurringPayment =>
   lazy val nextPaymentDate: Option[LocalDate] = {
     if (`type`.isCard && getCardStatus.isEnded) {
       None
     } else {
-      val today: LocalDate = startDate.getOrElse(now()).toLocalDate
+      val d: Date = startDate.getOrElse(now())
+      val today: LocalDate = d
       val maybePreviousPayment: Option[LocalDate] = lastRecurringPaymentDate match {
         case Some(value) => Some(value)
         case _           => None
