@@ -224,7 +224,8 @@ trait GenericPaymentService
                           registrationData,
                           registerCard,
                           if (browserInfo.isDefined) Some(ipAddress) else None,
-                          browserInfo
+                          browserInfo,
+                          printReceipt
                         )
                       ) completeWith {
                         case r: CardPreAuthorized =>
@@ -266,7 +267,8 @@ trait GenericPaymentService
                             if (browserInfo.isDefined) Some(ipAddress) else None,
                             browserInfo,
                             statementDescriptor,
-                            paymentType
+                            paymentType,
+                            printReceipt
                           )
                         ) completeWith {
                           case r: PaidIn =>
@@ -343,39 +345,43 @@ trait GenericPaymentService
 
   lazy val payInFor3ds: Route = pathPrefix(SecureModeRoute / PayInRoute) {
     pathPrefix(Segment) { orderUuid =>
-      parameters("transactionId", "registerCard".as[Boolean]) { (transactionId, registerCard) =>
-        run(PayInFor3DS(orderUuid, transactionId, registerCard)) completeWith {
-          case r: PaidIn =>
-            complete(
-              HttpResponse(
-                StatusCodes.OK,
-                entity = r
+      parameters("transactionId", "registerCard".as[Boolean], "printReceipt".as[Boolean]) {
+        (transactionId, registerCard, printReceipt) =>
+          run(PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt)) completeWith {
+            case r: PaidIn =>
+              complete(
+                HttpResponse(
+                  StatusCodes.OK,
+                  entity = r
+                )
               )
-            )
-          case r: PaymentRedirection =>
-            complete(
-              HttpResponse(
-                StatusCodes.OK,
-                entity = r
+            case r: PaymentRedirection =>
+              complete(
+                HttpResponse(
+                  StatusCodes.OK,
+                  entity = r
+                )
               )
-            )
-          case r: PayInFailed => complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
-          case r: TransactionNotFound.type =>
-            complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-          case r: PaymentAccountNotFound.type =>
-            complete(HttpResponse(StatusCodes.NotFound, entity = r))
-          case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-          case _               => complete(HttpResponse(StatusCodes.BadRequest))
-        }
+            case r: PayInFailed =>
+              complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
+            case r: TransactionNotFound.type =>
+              complete(HttpResponse(StatusCodes.BadRequest, entity = r))
+            case r: PaymentAccountNotFound.type =>
+              complete(HttpResponse(StatusCodes.NotFound, entity = r))
+            case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
+            case _               => complete(HttpResponse(StatusCodes.BadRequest))
+          }
       }
     }
   }
 
   lazy val preAuthorizeCardFor3ds: Route = pathPrefix(SecureModeRoute / PreAuthorizeCardRoute) {
     pathPrefix(Segment) { orderUuid =>
-      parameters("preAuthorizationId", "registerCard".as[Boolean]) {
-        (preAuthorizationId, registerCard) =>
-          run(PreAuthorizeCardFor3DS(orderUuid, preAuthorizationId, registerCard)) completeWith {
+      parameters("preAuthorizationId", "registerCard".as[Boolean], "printReceipt".as[Boolean]) {
+        (preAuthorizationId, registerCard, printReceipt) =>
+          run(
+            PreAuthorizeCardFor3DS(orderUuid, preAuthorizationId, registerCard, printReceipt)
+          ) completeWith {
             case _: CardPreAuthorized =>
               complete(
                 HttpResponse(

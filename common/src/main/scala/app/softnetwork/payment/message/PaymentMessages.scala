@@ -55,6 +55,8 @@ object PaymentMessages {
     *   - screen height
     * @param paymentType
     *   - payment type
+    * @param printReceipt
+    *   - whether or not the client asks to print a receipt
     */
   case class Payment(
     orderUuid: String,
@@ -69,7 +71,8 @@ object PaymentMessages {
     screenWidth: Option[Int] = None,
     screenHeight: Option[Int] = None,
     statementDescriptor: Option[String] = None,
-    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD
+    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
+    printReceipt: Boolean = false
   )
 
   /** Flow [PreRegisterCard -> ] PreAuthorizeCard [ -> PreAuthorizeCardFor3DS]
@@ -92,6 +95,8 @@ object PaymentMessages {
     *   - ip address
     * @param browserInfo
     *   - browser info
+    * @param printReceipt
+    *   - whether or not the client asks to print a receipt
     */
   case class PreAuthorizeCard(
     orderUuid: String,
@@ -102,7 +107,8 @@ object PaymentMessages {
     registrationData: Option[String] = None,
     registerCard: Boolean = false,
     ipAddress: Option[String] = None,
-    browserInfo: Option[BrowserInfo] = None
+    browserInfo: Option[BrowserInfo] = None,
+    printReceipt: Boolean = false
   ) extends PaymentCommandWithKey {
     val key: String = debitedAccount
   }
@@ -115,12 +121,15 @@ object PaymentMessages {
     *   - pre authorization transaction id
     * @param registerCard
     *   - whether the card should be registered or not
+    * @param printReceipt
+    *   - whether or not the client asks to print a receipt
     */
   @InternalApi
   private[payment] case class PreAuthorizeCardFor3DS(
     orderUuid: String,
     preAuthorizationId: String,
-    registerCard: Boolean = true
+    registerCard: Boolean = true,
+    printReceipt: Boolean = false
   ) extends PaymentCommandWithKey {
     lazy val key: String = preAuthorizationId
   }
@@ -172,6 +181,8 @@ object PaymentMessages {
     *   - browser info
     * @param paymentType
     *   - payment type
+    * @param printReceipt
+    *   - whether or not the client asks to print a receipt
     */
   case class PayIn(
     orderUuid: String,
@@ -185,7 +196,8 @@ object PaymentMessages {
     ipAddress: Option[String] = None,
     browserInfo: Option[BrowserInfo] = None,
     statementDescriptor: Option[String] = None,
-    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD
+    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
+    printReceipt: Boolean = false
   ) extends PaymentCommandWithKey {
     val key: String = debitedAccount
   }
@@ -198,12 +210,15 @@ object PaymentMessages {
     *   - payIn transaction id
     * @param registerCard
     *   - the card should be registered or not
+    * @param printReceipt
+    *   - whether or not the client asks to print a receipt
     */
   @InternalApi
   private[payment] case class PayInFor3DS(
     orderUuid: String,
     transactionId: String,
-    registerCard: Boolean
+    registerCard: Boolean,
+    printReceipt: Boolean = false
   ) extends PaymentCommandWithKey {
     lazy val key: String = transactionId
   }
@@ -463,7 +478,8 @@ object PaymentMessages {
     val key: String = creditedAccount
   }
 
-  case class DeleteBankAccount(creditedAccount: String, force: Option[Boolean]) extends PaymentCommandWithKey {
+  case class DeleteBankAccount(creditedAccount: String, force: Option[Boolean])
+      extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 

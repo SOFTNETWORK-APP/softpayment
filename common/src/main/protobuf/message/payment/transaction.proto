@@ -34,6 +34,7 @@ message CardPreAuthorizedEvent {
     required int32 debitedAmount = 4;
     required string transactionId = 5;
     required string cardId = 6;
+    optional bool printReceipt = 7;
 }
 
 message CardPreAuthorizationFailedEvent {
@@ -55,6 +56,7 @@ message PaidInEvent {
     required string transactionId = 6;
     required string cardId = 7;
     required app.softnetwork.payment.model.Transaction.PaymentType paymentType = 8;
+    optional bool printReceipt = 9;
 }
 
 message PayInFailedEvent {

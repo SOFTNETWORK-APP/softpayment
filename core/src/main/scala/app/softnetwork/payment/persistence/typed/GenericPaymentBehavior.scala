@@ -345,6 +345,8 @@ trait GenericPaymentBehavior
                           .withAuthorId(userId)
                           .withDebitedAmount(debitedAmount)
                           .withOrderUuid(orderUuid)
+                          .withRegisterCard(registerCard)
+                          .withPrintReceipt(printReceipt)
                           .copy(
                             ipAddress = ipAddress,
                             browserInfo = browserInfo
@@ -358,6 +360,7 @@ trait GenericPaymentBehavior
                           replyTo,
                           paymentAccount,
                           registerCard,
+                          printReceipt,
                           transaction
                         )
                       case _ => // pre authorization failed
@@ -385,6 +388,7 @@ trait GenericPaymentBehavior
                   replyTo,
                   paymentAccount,
                   registerCard,
+                  printReceipt,
                   transaction
                 )
               case _ => Effect.none.thenRun(_ => CardNotPreAuthorized ~> replyTo)
@@ -452,6 +456,7 @@ trait GenericPaymentBehavior
                                   replyTo,
                                   paymentAccount,
                                   registerCard = false,
+                                  printReceipt = false,
                                   transaction
                                 )
                               case _ =>
@@ -511,6 +516,8 @@ trait GenericPaymentBehavior
                                           .withStatementDescriptor(
                                             statementDescriptor.getOrElse(PayInStatementDescriptor)
                                           )
+                                          .withRegisterCard(registerCard)
+                                          .withPrintReceipt(printReceipt)
                                           .copy(
                                             ipAddress = ipAddress,
                                             browserInfo = browserInfo
@@ -524,6 +531,7 @@ trait GenericPaymentBehavior
                                           replyTo,
                                           paymentAccount,
                                           registerCard,
+                                          printReceipt,
                                           transaction
                                         )
                                       case _ =>
@@ -592,7 +600,15 @@ trait GenericPaymentBehavior
           case Some(paymentAccount) =>
             loadPayIn(orderUuid, transactionId, None) match {
               case Some(transaction) =>
-                handlePayIn(entityId, orderUuid, replyTo, paymentAccount, registerCard, transaction)
+                handlePayIn(
+                  entityId,
+                  orderUuid,
+                  replyTo,
+                  paymentAccount,
+                  registerCard,
+                  printReceipt,
+                  transaction
+                )
               case _ => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
             }
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
@@ -2483,7 +2499,7 @@ trait GenericPaymentBehavior
           case Some(paymentAccount) =>
             val lastUpdated = now()
 
-            var events: List[ExternalSchedulerEvent] =
+            val events: List[ExternalSchedulerEvent] =
               broadcastEvent(
                 PaymentAccountStatusUpdatedEvent.defaultInstance
                   .withExternalUuid(paymentAccount.externalUuid)
@@ -2497,7 +2513,7 @@ trait GenericPaymentBehavior
                   .withUserId(userId)
               )
 
-            var updatedPaymentAccount = paymentAccount
+            val updatedPaymentAccount = paymentAccount
               .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO)
               .withLastUpdated(lastUpdated)
 
@@ -3301,6 +3317,7 @@ trait GenericPaymentBehavior
     replyTo: Option[ActorRef[PaymentResult]],
     paymentAccount: PaymentAccount,
     registerCard: Boolean,
+    printReceipt: Boolean,
     transaction: Transaction
   )(implicit
     system: ActorSystem[_],
@@ -3374,6 +3391,7 @@ trait GenericPaymentBehavior
                   .withLastUpdated(lastUpdated)
                   .withCardId(transaction.cardId.getOrElse(""))
                   .withPaymentType(transaction.paymentType)
+                  .withPrintReceipt(printReceipt)
               ) :+
               PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
@@ -3412,6 +3430,7 @@ trait GenericPaymentBehavior
     replyTo: Option[ActorRef[PaymentResult]],
     paymentAccount: PaymentAccount,
     registerCard: Boolean,
+    printReceipt: Boolean,
     transaction: Transaction
   )(implicit
     system: ActorSystem[_],
@@ -3493,6 +3512,7 @@ trait GenericPaymentBehavior
                   .withDebitedAccount(paymentAccount.externalUuid)
                   .withDebitedAmount(transaction.amount)
                   .withLastUpdated(lastUpdated)
+                  .withPrintReceipt(printReceipt)
               ) :+
               PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)

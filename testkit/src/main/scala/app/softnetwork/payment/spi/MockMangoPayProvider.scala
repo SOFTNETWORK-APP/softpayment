@@ -637,7 +637,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
         cardPreAuthorization.setExecutionType(PreAuthorizationExecutionType.DIRECT)
         cardPreAuthorization.setSecureMode(SecureMode.DEFAULT)
         cardPreAuthorization.setSecureModeReturnUrl(
-          s"$preAuthorizeCardFor3DS/$orderUuid?registerCard=${registerCard.getOrElse(false)}"
+          s"$preAuthorizeCardFor3DS/$orderUuid?registerCard=${registerCard
+            .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
         )
 
         cardPreAuthorization.setId(generateUUID())
@@ -823,7 +824,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
         // Secured Mode is activated from €100.
         executionDetails.setSecureMode(SecureMode.DEFAULT)
         executionDetails.setSecureModeReturnUrl(
-          s"$payInFor3DS/$orderUuid?registerCard=${registerCard.getOrElse(false)}"
+          s"$payInFor3DS/$orderUuid?registerCard=${registerCard
+            .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
         )
         payIn.setExecutionDetails(executionDetails)
 

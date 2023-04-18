@@ -50,7 +50,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
             "EUR",
             Some(cardPreRegistration.id),
             Some(cardPreRegistration.preregistrationData),
-            registerCard = true
+            registerCard = true,
+            printReceipt = true
           )
         )
       ) ~> routes ~> check {
@@ -64,12 +65,13 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
           .map(a => (a(0), a(1)))
           .toMap
         preAuthorizationId = params.getOrElse("preAuthorizationId", "")
+        assert(params.getOrElse("printReceipt", "") == "true")
       }
     }
 
     "card pre authorization with 3ds" in {
       Get(
-        s"/$RootPath/$PaymentPath/$SecureModeRoute/$PreAuthorizeCardRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerCard=true"
+        s"/$RootPath/$PaymentPath/$SecureModeRoute/$PreAuthorizeCardRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerCard=true&printReceipt=true"
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val paymentAccount = loadPaymentAccount()
@@ -367,7 +369,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
             "EUR",
             Some(cardPreRegistration.id),
             Some(cardPreRegistration.preregistrationData),
-            registerCard = true
+            registerCard = true,
+            printReceipt = true
           )
         )
       ) ~> routes ~> check {
@@ -381,8 +384,12 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
           .map(a => (a(0), a(1)))
           .toMap
         val transactionId = params.getOrElse("transactionId", "")
+        val registerCard = params.getOrElse("registerCard", "")
+        assert(registerCard == "true")
+        val printReceipt = params.getOrElse("printReceipt", "")
+        assert(printReceipt == "true")
         Get(
-          s"/$RootPath/$PaymentPath/$SecureModeRoute/$PayInRoute/$orderUuid?transactionId=$transactionId&registerCard=true"
+          s"/$RootPath/$PaymentPath/$SecureModeRoute/$PayInRoute/$orderUuid?transactionId=$transactionId&registerCard=$registerCard&printReceipt=$printReceipt"
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
