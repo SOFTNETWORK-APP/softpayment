@@ -56,11 +56,16 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
       override implicit def system: ActorSystem[_] = sys
     }
 
-  def payInFor3DS(orderUuid: String, transactionId: String, registerCard: Boolean)(implicit
+  def payInFor3DS(
+    orderUuid: String,
+    transactionId: String,
+    registerCard: Boolean,
+    printReceipt: Boolean
+  )(implicit
     system: ActorSystem[_]
   ): Future[Either[PayInFailed, Either[PaymentRedirection, PaidIn]]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    MockPaymentHandler !? PayInFor3DS(orderUuid, transactionId, registerCard) map {
+    MockPaymentHandler !? PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt) map {
       case result: PaymentRedirection => Right(Left(result))
       case result: PaidIn             => Right(Right(result))
       case error: PayInFailed         => Left(error)
@@ -72,12 +77,18 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
   def preAuthorizeCardFor3DS(
     orderUuid: String,
     preAuthorizationId: String,
-    registerCard: Boolean = true
+    registerCard: Boolean = true,
+    printReceipt: Boolean = false
   )(implicit
     system: ActorSystem[_]
   ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    MockPaymentHandler !? PreAuthorizeCardFor3DS(orderUuid, preAuthorizationId, registerCard) map {
+    MockPaymentHandler !? PreAuthorizeCardFor3DS(
+      orderUuid,
+      preAuthorizationId,
+      registerCard,
+      printReceipt
+    ) map {
       case result: PaymentRedirection        => Right(Left(result))
       case result: CardPreAuthorized         => Right(Right(result))
       case error: CardPreAuthorizationFailed => Left(error)

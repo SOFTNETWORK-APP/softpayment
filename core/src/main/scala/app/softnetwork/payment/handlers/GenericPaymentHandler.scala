@@ -80,7 +80,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
     ipAddress: Option[String] = None,
     browserInfo: Option[BrowserInfo] = None,
     statementDescriptor: Option[String] = None,
-    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD
+    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
+    printReceipt: Boolean = false
   )(implicit
     system: ActorSystem[_]
   ): Future[Either[PayInFailed, Either[PaymentRedirection, PaidIn]]] = {
@@ -98,7 +99,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
         ipAddress,
         browserInfo,
         statementDescriptor,
-        paymentType
+        paymentType,
+        printReceipt
       )
     ) map {
       case result: PaymentRedirection => Right(Left(result))
@@ -118,7 +120,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
     registrationData: Option[String] = None,
     registerCard: Boolean = false,
     ipAddress: Option[String] = None,
-    browserInfo: Option[BrowserInfo] = None
+    browserInfo: Option[BrowserInfo] = None,
+    printReceipt: Boolean = false
   )(implicit
     system: ActorSystem[_]
   ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
@@ -133,7 +136,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
         registrationData,
         registerCard,
         ipAddress,
-        browserInfo
+        browserInfo,
+        printReceipt
       )
     ) map {
       case result: PaymentRedirection        => Right(Left(result))
