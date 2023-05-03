@@ -8,7 +8,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
   Schedule4PaymentTriggered,
   TriggerSchedule4Payment
 }
-import app.softnetwork.persistence.query.JournalProvider
+import app.softnetwork.persistence.query.{JournalProvider, OffsetProvider}
 import app.softnetwork.scheduler.persistence.query.Scheduler2EntityProcessorStream
 import app.softnetwork.scheduler.model.Schedule
 
@@ -16,7 +16,7 @@ import scala.concurrent.Future
 
 trait Scheduler2PaymentProcessorStream
     extends Scheduler2EntityProcessorStream[PaymentCommand, PaymentResult] {
-  _: GenericPaymentHandler with JournalProvider =>
+  _: GenericPaymentHandler with JournalProvider with OffsetProvider =>
 
   /** @param schedule
     *   - the schedule to trigger

@@ -7,12 +7,12 @@ import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentEvents._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.persistence.query.{EventProcessorStream, JournalProvider}
+import app.softnetwork.persistence.query.{EventProcessorStream, JournalProvider, OffsetProvider}
 
 import scala.concurrent.Future
 
 trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWithCommand] {
-  _: JournalProvider with GenericPaymentHandler =>
+  _: JournalProvider with OffsetProvider with GenericPaymentHandler =>
 
   override lazy val tag: String = PaymentSettings.ExternalToPaymentAccountTag
 
@@ -50,7 +50,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -63,7 +63,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -83,7 +83,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -96,7 +96,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -118,7 +118,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -138,7 +138,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -151,7 +151,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -176,7 +176,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -189,7 +189,7 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
@@ -202,17 +202,17 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
                 if (forTests) system.eventStream.tell(Publish(event))
                 Done
               case other =>
-                logger.error(
+                log.error(
                   s"$platformEventProcessorId - command $command returns unexpectedly ${other.getClass}"
                 )
                 Done
             }
           case other =>
-            logger.warn(s"$platformEventProcessorId does not support event [${other.getClass}]")
+            log.warn(s"$platformEventProcessorId does not support event [${other.getClass}]")
             Future.successful(Done)
         }
       case None =>
-        logger.warn(s"$platformEventProcessorId does not support event without command")
+        log.warn(s"$platformEventProcessorId does not support event without command")
         Future.successful(Done)
     }
   }

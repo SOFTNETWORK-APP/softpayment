@@ -171,15 +171,14 @@ trait PaymentClient extends GrpcClient {
   }
 
   def loadLegalUserDetails(externalUuid: String): Future[LegalUserDetails] = {
-    grpcClient.loadLegalUser(LoadLegalUserRequest(externalUuid)) map (
-      response =>
-        LegalUserDetails(
-          response.legalUserType,
-          response.legalName,
-          response.siret,
-          response.legalRepresentativeAddress,
-          response.headQuartersAddress
-        )
+    grpcClient.loadLegalUser(LoadLegalUserRequest(externalUuid)) map (response =>
+      LegalUserDetails(
+        response.legalUserType,
+        response.legalName,
+        response.siret,
+        response.legalRepresentativeAddress,
+        response.headQuartersAddress
+      )
     )
   }
 }

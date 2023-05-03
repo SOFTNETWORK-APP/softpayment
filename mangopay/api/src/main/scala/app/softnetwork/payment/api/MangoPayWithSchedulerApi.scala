@@ -2,12 +2,13 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
-import app.softnetwork.persistence.jdbc.query.{JdbcJournalProvider, JdbcSchema, JdbcSchemaProvider}
+import app.softnetwork.persistence.jdbc.query.{JdbcJournalProvider, JdbcOffsetProvider}
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
 import app.softnetwork.scheduler.api.{SchedulerApi, SchedulerServiceApiHandler}
 import app.softnetwork.scheduler.handlers.SchedulerHandler
 import app.softnetwork.scheduler.persistence.query.Entity2SchedulerProcessorStream
+import com.typesafe.config.Config
 
 import scala.concurrent.Future
 
@@ -18,9 +19,8 @@ trait MangoPayWithSchedulerApi extends MangoPayApi with SchedulerApi {
       new Entity2SchedulerProcessorStream()
         with SchedulerHandler
         with JdbcJournalProvider
-        with JdbcSchemaProvider {
-        override lazy val schemaType: JdbcSchema.SchemaType =
-          MangoPayWithSchedulerApi.this.schemaType
+        with JdbcOffsetProvider {
+        override def config: Config = MangoPayWithSchedulerApi.this.config
         override implicit def system: ActorSystem[_] = sys
       }
 

@@ -22,11 +22,16 @@ import app.softnetwork.payment.persistence.query.{
 import app.softnetwork.payment.persistence.typed.{GenericPaymentBehavior, MockPaymentBehavior}
 import app.softnetwork.payment.service.{GenericPaymentService, MockPaymentService}
 import app.softnetwork.persistence.launch.PersistentEntity
-import app.softnetwork.persistence.query.{EventProcessorStream, InMemoryJournalProvider}
+import app.softnetwork.persistence.query.{
+  EventProcessorStream,
+  InMemoryJournalProvider,
+  InMemoryOffsetProvider
+}
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.scheduler.scalatest.SchedulerTestKit
 import app.softnetwork.session.scalatest.{SessionServiceRoute, SessionTestKit}
 import org.scalatest.Suite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Paths
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -43,14 +48,22 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
 
   override def paymentCommandProcessorStream
     : ActorSystem[_] => GenericPaymentCommandProcessorStream = sys =>
-    new GenericPaymentCommandProcessorStream with MockPaymentHandler with InMemoryJournalProvider {
+    new GenericPaymentCommandProcessorStream
+      with MockPaymentHandler
+      with InMemoryJournalProvider
+      with InMemoryOffsetProvider {
+      lazy val log: Logger = LoggerFactory getLogger getClass.getName
       override val forTests: Boolean = true
       override implicit def system: ActorSystem[_] = sys
     }
 
   override def scheduler2PaymentProcessorStream
     : ActorSystem[_] => Scheduler2PaymentProcessorStream = sys =>
-    new Scheduler2PaymentProcessorStream with MockPaymentHandler with InMemoryJournalProvider {
+    new Scheduler2PaymentProcessorStream
+      with MockPaymentHandler
+      with InMemoryJournalProvider
+      with InMemoryOffsetProvider {
+      lazy val log: Logger = LoggerFactory getLogger getClass.getName
       override val tag: String = SchedulerSettings.tag(MockPaymentBehavior.persistenceId)
       override val forTests: Boolean = true
       override implicit def system: ActorSystem[_] = sys

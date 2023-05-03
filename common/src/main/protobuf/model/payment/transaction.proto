@@ -53,8 +53,8 @@ message Transaction {
     option (scalapb.message).extends = "TransactionDecorator";
     option (scalapb.message).companion_extends = "TransactionCompanion";
 //    required string uuid = 1;
-    required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.util.Date"];
-    required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.util.Date"];
+    required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.time.Instant"];
+    required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.time.Instant"];
     required string id = 4;
     required string orderUuid = 5; // should be optional
     required TransactionNature nature = 6;

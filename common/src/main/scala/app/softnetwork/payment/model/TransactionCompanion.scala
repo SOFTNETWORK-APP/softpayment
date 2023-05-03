@@ -1,5 +1,6 @@
 package app.softnetwork.payment.model
 
+import java.time.Instant
 import app.softnetwork.persistence._
 
 /** Created by smanciot on 18/08/2018.
@@ -7,8 +8,8 @@ import app.softnetwork.persistence._
 trait TransactionCompanion {
   def apply(): Transaction = {
     Transaction.defaultInstance.copy(
-      createdDate = now(),
-      lastUpdated = now()
+      createdDate = Instant.now(),
+      lastUpdated = Instant.now()
     )
   }
 }

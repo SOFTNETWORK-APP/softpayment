@@ -11,6 +11,7 @@ import app.softnetwork.payment.scalatest.PaymentRouteTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.net.URLEncoder
 import java.time.LocalDate
@@ -18,6 +19,8 @@ import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
 class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
+
+  lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
   import app.softnetwork.serialization._
 
@@ -75,7 +78,7 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val paymentAccount = loadPaymentAccount()
-        logger.info(serialization.write(paymentAccount))
+        log.info(serialization.write(paymentAccount))
         assert(paymentAccount.cards.nonEmpty)
       }
     }
@@ -263,7 +266,7 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
           legalUser.withLegalUserType(LegalUser.LegalUserType.BUSINESS),
           Some(true)
         )
-      logger.info(serialization.write(bank))
+      log.info(serialization.write(bank))
       withCookies(
         Post(s"/$RootPath/$PaymentPath/$BankRoute", bank)
       ) ~> routes ~> check {

@@ -10,6 +10,7 @@ import app.softnetwork.payment.scalatest.PaymentTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.time.LocalDate
 import scala.language.implicitConversions
@@ -20,6 +21,8 @@ class PaymentHandlerSpec
     with AnyWordSpecLike
     with PaymentGrpcServer
     with PaymentTestKit {
+
+  lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
   implicit lazy val system: ActorSystem[_] = typedSystem()
 
@@ -1180,7 +1183,7 @@ class PaymentHandlerSpec
                 LoadPaymentAccount(computeExternalUuidWithProfile(externalUuid, Some(profile)))
               ) await {
                 case result: PaymentAccountLoaded =>
-                  logger.info(result.paymentAccount.toProtoString)
+                  log.info(result.paymentAccount.toProtoString)
                 case other => fail(other.toString)
               }
             case other => fail(other.toString)

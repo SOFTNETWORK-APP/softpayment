@@ -5,10 +5,9 @@ import akka.http.scaladsl.server.Route
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.payment.service.GenericPaymentService
-import app.softnetwork.persistence.query.SchemaProvider
 import org.json4s.Formats
 
-trait PaymentRoutes extends ApiRoutes with PaymentGuardian { _: SchemaProvider =>
+trait PaymentRoutes extends ApiRoutes with PaymentGuardian {
 
   override implicit def formats: Formats = paymentFormats
 

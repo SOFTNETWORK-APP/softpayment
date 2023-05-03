@@ -20,6 +20,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
 }
 import app.softnetwork.payment.model.{BankAccount, KycDocument, UboDeclaration}
 import com.mangopay.core.enumerations.EventType
+import org.slf4j.{Logger, LoggerFactory}
 
 trait MangoPayPaymentService extends GenericPaymentService with MangoPayPaymentHandler {
 
@@ -223,6 +224,7 @@ trait MangoPayPaymentService extends GenericPaymentService with MangoPayPaymentH
 object MangoPayPaymentService {
   def apply(_system: ActorSystem[_]): MangoPayPaymentService = {
     new MangoPayPaymentService {
+      lazy val log: Logger = LoggerFactory getLogger getClass.getName
       override implicit def system: ActorSystem[_] = _system
     }
   }

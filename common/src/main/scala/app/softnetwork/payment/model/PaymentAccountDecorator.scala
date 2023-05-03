@@ -2,6 +2,8 @@ package app.softnetwork.payment.model
 
 import app.softnetwork.persistence._
 
+import java.time.Instant
+
 trait PaymentAccountDecorator { self: PaymentAccount =>
 
   lazy val maybeUser: Option[PaymentUser] = {
@@ -111,8 +113,8 @@ trait PaymentAccountDecorator { self: PaymentAccount =>
 }
 
 case class PaymentAccountView(
-  createdDate: java.util.Date,
-  lastUpdated: java.util.Date,
+  createdDate: Instant,
+  lastUpdated: Instant,
   naturalUser: Option[PaymentUserView] = None,
   legalUser: Option[LegalUserView] = None,
   cards: Seq[CardView] = Seq.empty,

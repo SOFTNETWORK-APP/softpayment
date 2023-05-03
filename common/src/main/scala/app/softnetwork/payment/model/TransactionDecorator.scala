@@ -1,5 +1,7 @@
 package app.softnetwork.payment.model
 
+import java.time.Instant
+
 trait TransactionDecorator { self: Transaction =>
   lazy val uuid: String = self.id
 
@@ -7,8 +9,8 @@ trait TransactionDecorator { self: Transaction =>
 }
 
 case class TransactionView(
-  createdDate: java.util.Date,
-  lastUpdated: java.util.Date,
+  createdDate: Instant,
+  lastUpdated: Instant,
   id: String,
   orderUuid: String,
   nature: Transaction.TransactionNature,

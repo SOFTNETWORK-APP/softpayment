@@ -2,6 +2,7 @@ package app.softnetwork.payment.persistence.typed
 
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
+import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.kv.handlers.GenericKeyValueDao
 import app.softnetwork.payment.config.PaymentSettings
@@ -30,6 +31,7 @@ import app.softnetwork.scheduler.message.{AddSchedule, RemoveSchedule}
 import app.softnetwork.scheduler.model.Schedule
 
 import java.time.LocalDate
+import java.util.Date
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success}
 
@@ -60,7 +62,7 @@ trait GenericPaymentBehavior
 
   override def init(system: ActorSystem[_], maybeRole: Option[String] = None)(implicit
     c: ClassTag[PaymentCommand]
-  ): Unit = {
+  ): ActorRef[ShardingEnvelope[PaymentCommand]] = {
     PaymentKvBehavior.init(system, maybeRole)
     super.init(system, maybeRole)
   }
@@ -1300,7 +1302,7 @@ trait GenericPaymentBehavior
               case Some(transaction) =>
                 paymentAccount.walletId match {
                   case Some(creditedWalletId) =>
-                    val transactionDate: LocalDate = transaction.createdDate
+                    val transactionDate: LocalDate = Date.from(transaction.createdDate)
                     directDebitTransaction(
                       transaction.creditedWalletId.getOrElse(creditedWalletId),
                       transaction.id,

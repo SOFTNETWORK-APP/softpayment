@@ -114,8 +114,8 @@ message PaymentAccount {
     option (scalapb.message).extends = "Timestamped";
     option (scalapb.message).extends = "PaymentAccountDecorator";
     required string uuid = 1;
-    required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.util.Date"];
-    required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.util.Date"];
+    required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.time.Instant"];
+    required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.time.Instant"];
     oneof user {
         PaymentUser naturalUser = 4;
         LegalUser legalUser = 5;
