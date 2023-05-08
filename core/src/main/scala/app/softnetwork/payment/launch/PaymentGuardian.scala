@@ -9,10 +9,11 @@ import app.softnetwork.payment.persistence.query.{
 import app.softnetwork.payment.persistence.typed.GenericPaymentBehavior
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
+import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.persistence.typed.Singleton
 import app.softnetwork.session.launch.SessionGuardian
 
-trait PaymentGuardian extends SessionGuardian {
+trait PaymentGuardian extends SessionGuardian { _: SchemaProvider =>
 
   import app.softnetwork.persistence.launch.PersistenceGuardian._
 
