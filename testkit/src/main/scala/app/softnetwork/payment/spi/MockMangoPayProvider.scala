@@ -613,7 +613,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _        => false
     }
 
-  /** @param maybePreAuthorizationTransaction
+  /** @param preAuthorizationTransaction
     *   - pre authorization transaction
     * @param idempotency
     *   - whether to use an idempotency key for this request or not
@@ -621,57 +621,55 @@ trait MockMangoPayProvider extends MangoPayProvider {
     *   re authorization transaction result
     */
   override def preAuthorizeCard(
-    maybePreAuthorizationTransaction: Option[PreAuthorizationTransaction],
+    preAuthorizationTransaction: PreAuthorizationTransaction,
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
-    maybePreAuthorizationTransaction match {
-      case Some(preAuthorizationTransaction) =>
-        import preAuthorizationTransaction._
-        val cardPreAuthorization = new CardPreAuthorization()
-        cardPreAuthorization.setTag(orderUuid)
-        cardPreAuthorization.setAuthorId(authorId)
-        cardPreAuthorization.setCardId(cardId)
-        cardPreAuthorization.setDebitedFunds(new Money)
-        cardPreAuthorization.getDebitedFunds.setAmount(debitedAmount)
-        cardPreAuthorization.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
-        cardPreAuthorization.setExecutionType(PreAuthorizationExecutionType.DIRECT)
-        cardPreAuthorization.setSecureMode(SecureMode.DEFAULT)
-        cardPreAuthorization.setSecureModeReturnUrl(
-          s"$preAuthorizeCardFor3DS/$orderUuid?registerCard=${registerCard
-            .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
-        )
+    import preAuthorizationTransaction._
+    val cardPreAuthorization = new CardPreAuthorization()
+    cardPreAuthorization.setTag(orderUuid)
+    cardPreAuthorization.setAuthorId(authorId)
+    cardPreAuthorization.setCardId(cardId)
+    cardPreAuthorization.setDebitedFunds(new Money)
+    cardPreAuthorization.getDebitedFunds.setAmount(debitedAmount)
+    cardPreAuthorization.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
+    cardPreAuthorization.setRemainingFunds(cardPreAuthorization.getDebitedFunds)
+    cardPreAuthorization.setExecutionType(PreAuthorizationExecutionType.DIRECT)
+    cardPreAuthorization.setSecureMode(SecureMode.DEFAULT)
+    cardPreAuthorization.setSecureModeReturnUrl(
+      s"$preAuthorizeCardFor3DS/$orderUuid?registerCard=${registerCard
+        .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
+    )
 
-        cardPreAuthorization.setId(generateUUID())
-        cardPreAuthorization.setStatus(PreAuthorizationStatus.CREATED)
-        cardPreAuthorization.setResultCode(OK)
-        cardPreAuthorization.setResultMessage(CREATED)
-        cardPreAuthorization.setSecureModeRedirectUrl(
-          s"${cardPreAuthorization.getSecureModeReturnUrl}&preAuthorizationId=${cardPreAuthorization.getId}"
-        )
-        CardPreAuthorizations =
-          CardPreAuthorizations.updated(cardPreAuthorization.getId, cardPreAuthorization)
+    cardPreAuthorization.setId(generateUUID())
+    cardPreAuthorization.setStatus(PreAuthorizationStatus.CREATED)
+    cardPreAuthorization.setResultCode(OK)
+    cardPreAuthorization.setResultMessage(CREATED)
+    cardPreAuthorization.setSecureModeRedirectUrl(
+      s"${cardPreAuthorization.getSecureModeReturnUrl}&preAuthorizationId=${cardPreAuthorization.getId}"
+    )
+    cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
+    CardPreAuthorizations =
+      CardPreAuthorizations.updated(cardPreAuthorization.getId, cardPreAuthorization)
 
-        Some(
-          Transaction().copy(
-            id = cardPreAuthorization.getId,
-            orderUuid = orderUuid,
-            nature = Transaction.TransactionNature.REGULAR,
-            `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
-            status = cardPreAuthorization.getStatus,
-            amount = debitedAmount,
-            cardId = Option(cardId),
-            fees = 0,
-            resultCode = cardPreAuthorization.getResultCode,
-            resultMessage = cardPreAuthorization.getResultMessage,
-            redirectUrl =
-              if (debitedAmount > 5000) Option(cardPreAuthorization.getSecureModeRedirectUrl)
-              else None,
-            authorId = cardPreAuthorization.getAuthorId,
-            paymentType = Transaction.PaymentType.CARD
-          )
-        )
-      case _ => None
-    }
+    Some(
+      Transaction().copy(
+        id = cardPreAuthorization.getId,
+        orderUuid = orderUuid,
+        nature = Transaction.TransactionNature.REGULAR,
+        `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
+        status = cardPreAuthorization.getStatus,
+        amount = debitedAmount,
+        cardId = Option(cardId),
+        fees = 0,
+        resultCode = cardPreAuthorization.getResultCode,
+        resultMessage = cardPreAuthorization.getResultMessage,
+        redirectUrl =
+          if (debitedAmount > 5000) Option(cardPreAuthorization.getSecureModeRedirectUrl)
+          else None,
+        authorId = cardPreAuthorization.getAuthorId,
+        paymentType = Transaction.PaymentType.CARD
+      )
+    )
   }
 
   /** @param orderUuid
@@ -702,14 +700,17 @@ trait MockMangoPayProvider extends MangoPayProvider {
             redirectUrl = None /*Option( // for 3D Secure
               result.getSecureModeRedirectUrl
             )*/,
-            authorId = result.getAuthorId
+            authorId = result.getAuthorId,
+            preAuthorizationCanceled = Option(result.getPaymentStatus == PaymentStatus.CANCELED),
+            preAuthorizationValidated = Option(result.getPaymentStatus == PaymentStatus.VALIDATED),
+            preAuthorizationExpired = Option(result.getPaymentStatus == PaymentStatus.EXPIRED)
           )
         )
       case _ => None
     }
   }
 
-  /** @param maybePayInWithCardPreAuthorizedTransaction
+  /** @param payInWithCardPreAuthorizedTransaction
     *   - card pre authorized pay in transaction
     * @param idempotency
     *   - whether to use an idempotency key for this request or not
@@ -717,55 +718,52 @@ trait MockMangoPayProvider extends MangoPayProvider {
     *   pay in with card pre authorized transaction result
     */
   override def payInWithCardPreAuthorized(
-    maybePayInWithCardPreAuthorizedTransaction: Option[PayInWithCardPreAuthorizedTransaction],
+    payInWithCardPreAuthorizedTransaction: PayInWithCardPreAuthorizedTransaction,
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
-    maybePayInWithCardPreAuthorizedTransaction match {
-      case Some(payInWithCardPreAuthorizedTransaction) =>
-        import payInWithCardPreAuthorizedTransaction._
-        val payIn = new PayIn()
-        payIn.setTag(orderUuid)
-        payIn.setCreditedWalletId(creditedWalletId)
-        payIn.setAuthorId(authorId)
-        payIn.setDebitedFunds(new Money)
-        payIn.getDebitedFunds.setAmount(debitedAmount)
-        payIn.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
-        payIn.setExecutionType(PayInExecutionType.DIRECT)
-        payIn.setFees(new Money)
-        payIn.getFees.setAmount(0) // fees are only set during transfer or payOut
-        payIn.getFees.setCurrency(CurrencyIso.valueOf(currency))
-        payIn.setPaymentType(PayInPaymentType.PREAUTHORIZED)
-        val paymentDetails = new PayInPaymentDetailsPreAuthorized
-        paymentDetails.setPreauthorizationId(cardPreAuthorizedTransactionId)
-        payIn.setPaymentDetails(paymentDetails)
+    import payInWithCardPreAuthorizedTransaction._
+    val payIn = new PayIn()
+    payIn.setTag(orderUuid)
+    payIn.setCreditedWalletId(creditedWalletId)
+    payIn.setAuthorId(authorId)
+    payIn.setDebitedFunds(new Money)
+    payIn.getDebitedFunds.setAmount(debitedAmount)
+    payIn.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
+    payIn.setExecutionType(PayInExecutionType.DIRECT)
+    payIn.setFees(new Money)
+    payIn.getFees.setAmount(0) // fees are only set during transfer or payOut
+    payIn.getFees.setCurrency(CurrencyIso.valueOf(currency))
+    payIn.setPaymentType(PayInPaymentType.PREAUTHORIZED)
+    val paymentDetails = new PayInPaymentDetailsPreAuthorized
+    paymentDetails.setPreauthorizationId(cardPreAuthorizedTransactionId)
+    payIn.setPaymentDetails(paymentDetails)
 
-        payIn.setId(generateUUID())
-        payIn.setStatus(MangoPayTransactionStatus.SUCCEEDED)
-        payIn.setResultCode(OK)
-        payIn.setResultMessage(SUCCEEDED)
-        PayIns = PayIns.updated(payIn.getId, payIn)
-        Some(
-          Transaction()
-            .copy(
-              id = payIn.getId,
-              orderUuid = orderUuid,
-              nature = Transaction.TransactionNature.REGULAR,
-              `type` = Transaction.TransactionType.PAYIN,
-              status = payIn.getStatus,
-              amount = debitedAmount,
-              cardId = None,
-              fees = 0,
-              resultCode = Option(payIn.getResultCode).getOrElse(""),
-              resultMessage = Option(payIn.getResultMessage).getOrElse(""),
-              redirectUrl = None,
-              authorId = payIn.getAuthorId,
-              creditedWalletId = Option(payIn.getCreditedWalletId),
-              preAuthorizationId = Some(cardPreAuthorizedTransactionId)
-            )
-            .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
+    payIn.setId(generateUUID())
+    payIn.setStatus(MangoPayTransactionStatus.SUCCEEDED)
+    payIn.setResultCode(OK)
+    payIn.setResultMessage(SUCCEEDED)
+    PayIns = PayIns.updated(payIn.getId, payIn)
+    Some(
+      Transaction()
+        .copy(
+          id = payIn.getId,
+          orderUuid = orderUuid,
+          nature = Transaction.TransactionNature.REGULAR,
+          `type` = Transaction.TransactionType.PAYIN,
+          status = payIn.getStatus,
+          amount = debitedAmount,
+          cardId = None,
+          fees = 0,
+          resultCode = Option(payIn.getResultCode).getOrElse(""),
+          resultMessage = Option(payIn.getResultMessage).getOrElse(""),
+          redirectUrl = None,
+          authorId = payIn.getAuthorId,
+          creditedWalletId = Option(payIn.getCreditedWalletId)
         )
-      case None => None
-    }
+        .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
+        .withPreAuthorizationId(cardPreAuthorizedTransactionId)
+        .withPreAuthorizationDebitedAmount(preAuthorizationDebitedAmount)
+    )
   }
 
   /** @param orderUuid
@@ -773,7 +771,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @param cardPreAuthorizedTransactionId
     *   - card pre authorized transaction id
     * @return
-    *   pre authorization cancellation transaction
+    *   whether pre authorization transaction has been cancelled or not
     */
   override def cancelPreAuthorization(
     orderUuid: String,
@@ -782,6 +780,26 @@ trait MockMangoPayProvider extends MangoPayProvider {
     CardPreAuthorizations.get(cardPreAuthorizedTransactionId) match {
       case Some(result) =>
         result.setPaymentStatus(PaymentStatus.CANCELED)
+        CardPreAuthorizations = CardPreAuthorizations.updated(result.getId, result)
+        true
+      case _ => false
+    }
+  }
+
+  /** @param orderUuid
+    *   - order unique id
+    * @param cardPreAuthorizedTransactionId
+    *   - card pre authorized transaction id
+    * @return
+    *   whether pre authorization transaction has been cancelled or not
+    */
+  override def validatePreAuthorization(
+    orderUuid: String,
+    cardPreAuthorizedTransactionId: String
+  ): Boolean = {
+    CardPreAuthorizations.get(cardPreAuthorizedTransactionId) match {
+      case Some(result) if result.getPaymentStatus == PaymentStatus.WAITING =>
+        result.setPaymentStatus(PaymentStatus.VALIDATED)
         CardPreAuthorizations = CardPreAuthorizations.updated(result.getId, result)
         true
       case _ => false

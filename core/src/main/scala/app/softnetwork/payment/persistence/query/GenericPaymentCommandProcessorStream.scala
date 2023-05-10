@@ -57,7 +57,8 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
             }
           case evt: PayInWithCardPreAuthorizedCommandEvent =>
             import evt._
-            val command = PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount)
+            val command =
+              PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount)
             !?(command) map {
               case _: PaidInResult =>
                 if (forTests) system.eventStream.tell(Publish(event))

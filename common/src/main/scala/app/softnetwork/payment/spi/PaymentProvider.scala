@@ -128,7 +128,7 @@ private[payment] trait PaymentProvider {
     */
   def disableCard(cardId: String): Option[Card]
 
-  /** @param maybePreAuthorizationTransaction
+  /** @param preAuthorizationTransaction
     *   - pre authorization transaction
     * @param idempotency
     *   - whether to use an idempotency key for this request or not
@@ -136,7 +136,7 @@ private[payment] trait PaymentProvider {
     *   pre authorization transaction result
     */
   def preAuthorizeCard(
-    maybePreAuthorizationTransaction: Option[PreAuthorizationTransaction],
+    preAuthorizationTransaction: PreAuthorizationTransaction,
     idempotency: Option[Boolean] = None
   ): Option[Transaction]
 
@@ -152,7 +152,7 @@ private[payment] trait PaymentProvider {
     cardPreAuthorizedTransactionId: String
   ): Option[Transaction]
 
-  /** @param maybePayInWithCardPreAuthorizedTransaction
+  /** @param payInWithCardPreAuthorizedTransaction
     *   - card pre authorized pay in transaction
     * @param idempotency
     *   - whether to use an idempotency key for this request or not
@@ -160,7 +160,7 @@ private[payment] trait PaymentProvider {
     *   pay in with card pre authorized transaction result
     */
   def payInWithCardPreAuthorized(
-    maybePayInWithCardPreAuthorizedTransaction: Option[PayInWithCardPreAuthorizedTransaction],
+    payInWithCardPreAuthorizedTransaction: PayInWithCardPreAuthorizedTransaction,
     idempotency: Option[Boolean] = None
   ): Option[Transaction]
 
@@ -169,9 +169,18 @@ private[payment] trait PaymentProvider {
     * @param cardPreAuthorizedTransactionId
     *   - card pre authorized transaction id
     * @return
-    *   pre authorization cancellation transaction
+    *   whether pre authorization transaction has been cancelled or not
     */
   def cancelPreAuthorization(orderUuid: String, cardPreAuthorizedTransactionId: String): Boolean
+
+  /** @param orderUuid
+    *   - order unique id
+    * @param cardPreAuthorizedTransactionId
+    *   - card pre authorized transaction id
+    * @return
+    *   whether pre authorization transaction has been validated or not
+    */
+  def validatePreAuthorization(orderUuid: String, cardPreAuthorizedTransactionId: String): Boolean
 
   /** @param maybePayInTransaction
     *   - pay in transaction

@@ -147,11 +147,15 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
     }
   }
 
-  def payInWithCardPreAuthorized(preAuthorizationId: String, creditedAccount: String)(implicit
+  def payInWithCardPreAuthorized(
+    preAuthorizationId: String,
+    creditedAccount: String,
+    debitedAmount: Option[Int]
+  )(implicit
     system: ActorSystem[_]
   ): Future[Either[PayInFailed, PaidIn]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    !?(PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount)) map {
+    !?(PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount)) map {
       case result: PaidIn     => Right(result)
       case error: PayInFailed => Left(error)
       case _ =>

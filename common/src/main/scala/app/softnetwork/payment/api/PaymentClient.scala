@@ -28,10 +28,11 @@ trait PaymentClient extends GrpcClient {
 
   def payInWithCardPreAuthorized(
     preAuthorizationId: String,
-    creditedAccount: String
+    creditedAccount: String,
+    debitedAmount: Option[Int]
   ): Future[TransactionResponse] = {
     grpcClient.payInWithCardPreAuthorized(
-      PayInWithCardPreAuthorizedRequest(preAuthorizationId, creditedAccount)
+      PayInWithCardPreAuthorizedRequest(preAuthorizationId, creditedAccount, debitedAmount)
     )
   }
 

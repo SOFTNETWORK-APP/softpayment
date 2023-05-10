@@ -144,6 +144,16 @@ object PaymentMessages {
     lazy val key: String = cardPreAuthorizedTransactionId
   }
 
+  /** @param orderUuid
+    *   - order unique id
+    * @param cardPreAuthorizedTransactionId
+    *   - card pre authorized transaction id
+    */
+  case class ValidatePreAuthorization(orderUuid: String, cardPreAuthorizedTransactionId: String)
+      extends PaymentCommandWithKey {
+    lazy val key: String = cardPreAuthorizedTransactionId
+  }
+
   /** Flow [PreRegisterCard -> ] PreAuthorizeCard [ -> PreAuthorizeCardFor3DS] ->
     * PayInWithCardPreAuthorized
     *
@@ -151,9 +161,15 @@ object PaymentMessages {
     *   - pre authorization transaction id
     * @param creditedAccount
     *   - account to credit
+    * @param debitedAmount
+    *   - amount to be debited from the account that made the pre-authorization (if not specified it
+    *     will be the amount specified during the pre-authorization)
     */
-  case class PayInWithCardPreAuthorized(preAuthorizationId: String, creditedAccount: String)
-      extends PaymentCommandWithKey {
+  case class PayInWithCardPreAuthorized(
+    preAuthorizationId: String,
+    creditedAccount: String,
+    debitedAmount: Option[Int]
+  ) extends PaymentCommandWithKey {
     lazy val key: String = preAuthorizationId
   }
 
@@ -653,6 +669,8 @@ object PaymentMessages {
 
   case class PreAuthorizationCanceled(preAuthorizationCanceled: Boolean) extends PaymentResult
 
+  case class PreAuthorizationValidated(preAuthorizationValidated: Boolean) extends PaymentResult
+
   case class Schedule4PaymentTriggered(schedule: Schedule) extends PaymentResult
 
   case class PaymentAccountLoaded(paymentAccount: PaymentAccount) extends PaymentResult
@@ -849,6 +867,8 @@ object PaymentMessages {
   ) extends PaymentError(s"NextRecurringPaymentFailed: $reason")
 
   case object Schedule4PaymentNotTriggered extends PaymentError("Schedule4PaymentNotTriggered")
+
+  case class PayInWithCardPreAuthorizedFailed(error: String) extends PaymentError(error)
 
   trait ExternalEntityToPaymentEventDecorator extends PaymentEventWithCommand {
     _: ExternalEntityToPaymentEvent =>

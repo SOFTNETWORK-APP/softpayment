@@ -791,11 +791,35 @@ class PaymentHandlerSpec
           preAuthorizationId = transactionId
           client.payInWithCardPreAuthorized(
             preAuthorizationId,
-            computeExternalUuidWithProfile(sellerUuid, Some("seller"))
+            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+            Some(110)
+          ) complete () match {
+            case Success(result) =>
+              assert(result.transactionId.isEmpty)
+              assert(result.error.getOrElse("") == "DebitedAmountAbovePreAuthorizationAmount")
+            case Failure(f) => fail(f.getMessage)
+          }
+          client.payInWithCardPreAuthorized(
+            preAuthorizationId,
+            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+            Some(90)
           ) complete () match {
             case Success(result) =>
               assert(result.transactionId.isDefined)
               assert(result.error.isEmpty)
+              !?(
+                LoadPaymentAccount(computeExternalUuidWithProfile(customerUuid, Some("customer")))
+              ) await {
+                case r: PaymentAccountLoaded =>
+                  val paymentAccount = r.paymentAccount
+                  assert(
+                    paymentAccount.transactions
+                      .find(_.id == preAuthorizationId)
+                      .flatMap(_.preAuthorizationValidated)
+                      .getOrElse(false)
+                  )
+                case other => fail(other.getClass.toString)
+              }
               client.payOut(
                 orderUuid,
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),

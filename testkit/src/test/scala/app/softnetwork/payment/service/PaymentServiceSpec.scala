@@ -338,7 +338,8 @@ class PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
         preAuthorizationId = responseAs[CardPreAuthorized].transactionId
         client.payInWithCardPreAuthorized(
           preAuthorizationId,
-          computeExternalUuidWithProfile(sellerUuid, Some("seller"))
+          computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+          None
         ) complete () match {
           case Success(result) =>
             assert(result.transactionId.isDefined)

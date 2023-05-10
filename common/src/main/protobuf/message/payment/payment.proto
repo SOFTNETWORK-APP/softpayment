@@ -185,6 +185,7 @@ message PayInWithCardPreAuthorizedCommandEvent{
     option (scalapb.message).extends = "PaymentCommandEvent";
     required string preAuthorizationId = 1;
     required string creditedAccount = 2;
+    optional int32 debitedAmount = 3;
 }
 
 message RefundCommandEvent{

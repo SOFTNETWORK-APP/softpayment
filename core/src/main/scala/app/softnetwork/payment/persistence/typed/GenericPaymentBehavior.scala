@@ -341,19 +341,17 @@ trait GenericPaymentBehavior
                 }) match {
                   case Some(cardId) =>
                     preAuthorizeCard(
-                      Some(
-                        PreAuthorizationTransaction.defaultInstance
-                          .withCardId(cardId)
-                          .withAuthorId(userId)
-                          .withDebitedAmount(debitedAmount)
-                          .withOrderUuid(orderUuid)
-                          .withRegisterCard(registerCard)
-                          .withPrintReceipt(printReceipt)
-                          .copy(
-                            ipAddress = ipAddress,
-                            browserInfo = browserInfo
-                          )
-                      )
+                      PreAuthorizationTransaction.defaultInstance
+                        .withCardId(cardId)
+                        .withAuthorId(userId)
+                        .withDebitedAmount(debitedAmount)
+                        .withOrderUuid(orderUuid)
+                        .withRegisterCard(registerCard)
+                        .withPrintReceipt(printReceipt)
+                        .copy(
+                          ipAddress = ipAddress,
+                          browserInfo = browserInfo
+                        )
                     ) match {
                       case Some(transaction) =>
                         handleCardPreAuthorization(
@@ -403,17 +401,27 @@ trait GenericPaymentBehavior
         state match {
           case Some(paymentAccount) =>
             paymentAccount.transactions.find(_.id == cardPreAuthorizedTransactionId) match {
-              case Some(_) =>
+              case Some(preAuthorizationTransaction) =>
                 val preAuthorizationCanceled =
                   cancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId)
+                val updatedPaymentAccount = paymentAccount.withTransactions(
+                  paymentAccount.transactions.filterNot(_.id == cardPreAuthorizedTransactionId) :+
+                  preAuthorizationTransaction.withPreAuthorizationCanceled(preAuthorizationCanceled)
+                )
+                val lastUpdated = now()
                 Effect
                   .persist(
-                    PreAuthorizationCanceledEvent.defaultInstance
-                      .withLastUpdated(now())
-                      .withOrderUuid(orderUuid)
-                      .withDebitedAccount(paymentAccount.externalUuid)
-                      .withCardPreAuthorizedTransactionId(cardPreAuthorizedTransactionId)
-                      .withPreAuthorizationCanceled(preAuthorizationCanceled)
+                    List(
+                      PaymentAccountUpsertedEvent.defaultInstance
+                        .withDocument(updatedPaymentAccount)
+                        .withLastUpdated(lastUpdated),
+                      PreAuthorizationCanceledEvent.defaultInstance
+                        .withLastUpdated(lastUpdated)
+                        .withOrderUuid(orderUuid)
+                        .withDebitedAccount(paymentAccount.externalUuid)
+                        .withCardPreAuthorizedTransactionId(cardPreAuthorizedTransactionId)
+                        .withPreAuthorizationCanceled(preAuthorizationCanceled)
+                    )
                   )
                   .thenRun(_ => PreAuthorizationCanceled(preAuthorizationCanceled) ~> replyTo)
               case _ => // should never be the case
@@ -426,13 +434,57 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
-            paymentAccount.transactions.find(_.id == preAuthorizationId) match {
-              case None => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
-              case Some(transaction)
-                  if Seq(
+            val maybeTransaction = paymentAccount.transactions.find(_.id == preAuthorizationId)
+            maybeTransaction match {
+              case None =>
+                handlePayInWithCardPreauthorizedFailure(
+                  "",
+                  replyTo,
+                  "PreAuthorizationTransactionNotFound"
+                )
+              case Some(preAuthorizationTransaction)
+                  if !Seq(
                     Transaction.TransactionStatus.TRANSACTION_CREATED,
                     Transaction.TransactionStatus.TRANSACTION_SUCCEEDED
-                  ).contains(transaction.status) =>
+                  ).contains(
+                    preAuthorizationTransaction.status
+                  ) =>
+                handlePayInWithCardPreauthorizedFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "IllegalPreAuthorizationTransactionStatus"
+                )
+              case Some(preAuthorizationTransaction)
+                  if preAuthorizationTransaction.preAuthorizationCanceled.getOrElse(false) =>
+                handlePayInWithCardPreauthorizedFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "PreAuthorizationCanceled"
+                )
+              case Some(preAuthorizationTransaction)
+                  if preAuthorizationTransaction.preAuthorizationValidated.getOrElse(false) =>
+                handlePayInWithCardPreauthorizedFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "PreAuthorizationValidated"
+                )
+              case Some(preAuthorizationTransaction)
+                  if preAuthorizationTransaction.preAuthorizationExpired.getOrElse(false) =>
+                handlePayInWithCardPreauthorizedFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "PreAuthorizationExpired"
+                )
+              case Some(preAuthorizationTransaction)
+                  if debitedAmount.getOrElse(
+                    preAuthorizationTransaction.amount
+                  ) > preAuthorizationTransaction.amount =>
+                handlePayInWithCardPreauthorizedFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "DebitedAmountAbovePreAuthorizationAmount"
+                )
+              case Some(preAuthorizationTransaction) =>
                 // load credited payment account
                 paymentDao.loadPaymentAccount(creditedAccount) complete () match {
                   case Success(s) =>
@@ -441,15 +493,18 @@ trait GenericPaymentBehavior
                         creditedPaymentAccount.walletId match {
                           case Some(creditedWalletId) =>
                             payInWithCardPreAuthorized(
-                              Some(
-                                PayInWithCardPreAuthorizedTransaction.defaultInstance
-                                  .withCardPreAuthorizedTransactionId(preAuthorizationId)
-                                  .withAuthorId(transaction.authorId)
-                                  .withDebitedAmount(transaction.amount)
-                                  .withCurrency(transaction.currency)
-                                  .withOrderUuid(transaction.orderUuid)
-                                  .withCreditedWalletId(creditedWalletId)
-                              )
+                              PayInWithCardPreAuthorizedTransaction.defaultInstance
+                                .withCardPreAuthorizedTransactionId(preAuthorizationId)
+                                .withAuthorId(preAuthorizationTransaction.authorId)
+                                .withDebitedAmount(
+                                  debitedAmount.getOrElse(preAuthorizationTransaction.amount)
+                                )
+                                .withCurrency(preAuthorizationTransaction.currency)
+                                .withOrderUuid(preAuthorizationTransaction.orderUuid)
+                                .withCreditedWalletId(creditedWalletId)
+                                .withPreAuthorizationDebitedAmount(
+                                  preAuthorizationTransaction.amount
+                                )
                             ) match {
                               case Some(transaction) =>
                                 handlePayIn(
@@ -462,23 +517,40 @@ trait GenericPaymentBehavior
                                   transaction
                                 )
                               case _ =>
-                                Effect.none.thenRun(_ =>
-                                  PayInFailed(
-                                    "",
-                                    Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-                                    "unknown"
-                                  ) ~> replyTo
+                                handlePayInWithCardPreauthorizedFailure(
+                                  preAuthorizationTransaction.orderUuid,
+                                  replyTo,
+                                  "TransactionNotSpecified"
                                 )
                             }
-                          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+                          case _ =>
+                            handlePayInWithCardPreauthorizedFailure(
+                              preAuthorizationTransaction.orderUuid,
+                              replyTo,
+                              "CreditedWalletNotFound"
+                            )
                         }
-                      case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+                      case _ =>
+                        handlePayInWithCardPreauthorizedFailure(
+                          preAuthorizationTransaction.orderUuid,
+                          replyTo,
+                          "CreditedPaymentAccountNotFound"
+                        )
                     }
-                  case Failure(_) => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+                  case Failure(_) =>
+                    handlePayInWithCardPreauthorizedFailure(
+                      preAuthorizationTransaction.orderUuid,
+                      replyTo,
+                      "CreditedPaymentAccountNotFound"
+                    )
                 }
-              case _ => Effect.none.thenRun(_ => IllegalTransactionStatus ~> replyTo)
             }
-          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+          case _ =>
+            handlePayInWithCardPreauthorizedFailure(
+              "",
+              replyTo,
+              "PaymentAccountNotFound"
+            )
         }
 
       case cmd: PayIn =>
@@ -2917,6 +2989,21 @@ trait GenericPaymentBehavior
     }
   }
 
+  private def handlePayInWithCardPreauthorizedFailure(
+    orderUuid: String,
+    replyTo: Option[ActorRef[PaymentResult]],
+    reason: String
+  )(implicit context: ActorContext[_]): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
+
+    Effect
+      .persist(
+        broadcastEvent(
+          PayInFailedEvent.defaultInstance.withOrderUuid(orderUuid).withResultMessage(reason)
+        )
+      )
+      .thenRun(_ => PayInWithCardPreAuthorizedFailed(reason) ~> replyTo)
+  }
+
   private def handleNextRecurringPaymentFailure(
     entityId: String,
     replyTo: Option[ActorRef[PaymentResult]],
@@ -3381,6 +3468,28 @@ trait GenericPaymentBehavior
             } else {
               List.empty
             }
+          updatedPaymentAccount = transaction.preAuthorizationId match {
+            case Some(preAuthorizationId) =>
+              transaction.preAuthorizationDebitedAmount match {
+                case Some(preAuthorizationDebitedAmount)
+                    if transaction.amount < preAuthorizationDebitedAmount =>
+                  // validation required
+                  val updatedTransaction = updatedPaymentAccount.transactions
+                    .find(_.id == preAuthorizationId)
+                    .map(
+                      _.copy(preAuthorizationValidated =
+                        Some(validatePreAuthorization(transaction.orderUuid, preAuthorizationId))
+                      )
+                    )
+                  updatedPaymentAccount.withTransactions(
+                    updatedPaymentAccount.transactions.filterNot(_.id == preAuthorizationId) ++ Seq(
+                      updatedTransaction
+                    ).flatten
+                  )
+                case _ => updatedPaymentAccount
+              }
+            case _ => updatedPaymentAccount
+          }
           Effect
             .persist(
               registerCardEvents ++

@@ -66,7 +66,7 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
     in: PayInWithCardPreAuthorizedRequest
   ): Future[TransactionResponse] = {
     import in._
-    !?(PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount)) map {
+    !?(PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount)) map {
       case r: PaidIn =>
         TransactionResponse(
           transactionId = Some(r.transactionId),

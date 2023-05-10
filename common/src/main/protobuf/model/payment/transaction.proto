@@ -77,6 +77,10 @@ message Transaction {
     required PaymentType paymentType = 23 [default = CARD];
     optional string recurringPayInRegistrationId = 24;
     optional string externalReference = 25;
+    optional bool preAuthorizationValidated = 26;
+    optional bool preAuthorizationCanceled = 27;
+    optional bool preAuthorizationExpired = 28;
+    optional int32 preAuthorizationDebitedAmount = 29;
 }
 
 message BrowserInfo {
@@ -178,6 +182,7 @@ message PayInWithCardPreAuthorizedTransaction {
     required string creditedWalletId = 4;
     required string authorId = 5;
     required string cardPreAuthorizedTransactionId = 6;
+    required int32 preAuthorizationDebitedAmount = 7;
 }
 
 message CardPreRegistration{

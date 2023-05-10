@@ -39,6 +39,7 @@ message CreateOrUpdatePaymentAccountResponse {
 message PayInWithCardPreAuthorizedRequest {
     string preAuthorizationId = 1;
     string creditedAccount = 2;
+    google.protobuf.Int32Value debitedAmount = 3;
 }
 
 enum TransactionStatus{
