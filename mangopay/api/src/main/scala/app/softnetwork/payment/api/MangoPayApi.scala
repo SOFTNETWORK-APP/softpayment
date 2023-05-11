@@ -12,13 +12,13 @@ import app.softnetwork.payment.persistence.query.{
 import app.softnetwork.payment.persistence.typed.{GenericPaymentBehavior, MangoPayPaymentBehavior}
 import app.softnetwork.payment.service.{GenericPaymentService, MangoPayPaymentService}
 import app.softnetwork.persistence.jdbc.query.{JdbcJournalProvider, JdbcOffsetProvider}
-import app.softnetwork.persistence.jdbc.schema.JdbcSchemaProvider
+import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.scheduler.config.SchedulerSettings
 import com.typesafe.config.Config
 
 import scala.concurrent.Future
 
-trait MangoPayApi extends PaymentApplication with JdbcSchemaProvider {
+trait MangoPayApi extends PaymentApplication { _: SchemaProvider =>
 
   override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
     MangoPayPaymentBehavior
