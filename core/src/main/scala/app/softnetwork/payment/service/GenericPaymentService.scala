@@ -15,9 +15,8 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import app.softnetwork.persistence.message.ErrorMessage
-import app.softnetwork.persistence.service.Service
 import app.softnetwork.session.service.SessionService
-import com.softwaremill.session.CsrfDirectives.randomTokenCsrfProtection
+import com.softwaremill.session.CsrfDirectives.hmacTokenCsrfProtection
 import com.softwaremill.session.CsrfOptions.checkHeader
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
@@ -29,17 +28,14 @@ import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
 
 import java.io.ByteArrayOutputStream
-import java.util.TimeZone
-import scala.concurrent.{Await, Future}
-import scala.reflect.ClassTag
+import scala.concurrent.Await
 
 trait GenericPaymentService
-    extends SessionService
-    with Directives
+    extends Directives
     with DefaultComplete
     with Json4sSupport
     with StrictLogging
-    with Service[PaymentCommand, PaymentResult] { _: GenericPaymentHandler =>
+    with BasicPaymentService { _: GenericPaymentHandler =>
 
   implicit def serialization: Serialization.type = jackson.Serialization
 
@@ -47,10 +43,7 @@ trait GenericPaymentService
 
   import Session._
 
-  def run(command: PaymentCommandWithKey)(implicit
-    tTag: ClassTag[PaymentCommand]
-  ): Future[PaymentResult] =
-    super.run(command.key, command)
+  def sessionService: SessionService
 
   val route: Route = {
     pathPrefix(PaymentSettings.PaymentPath) {
@@ -70,9 +63,9 @@ trait GenericPaymentService
 
   lazy val card: Route = pathPrefix(CardRoute) {
     // check anti CSRF token
-    randomTokenCsrfProtection(checkHeader) {
+    hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      _requiredSession(ec) { session =>
+      sessionService.requiredSession { session =>
         pathEnd {
           get {
             run(LoadCards(externalUuidWithProfile(session))) completeWith {
@@ -84,7 +77,7 @@ trait GenericPaymentService
                   )
                 )
               case r: CardsNotLoaded.type =>
-                complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
+                complete(HttpResponse(StatusCodes.BadRequest, entity = r))
               case r: PaymentAccountNotFound.type =>
                 complete(HttpResponse(StatusCodes.NotFound, entity = r))
               case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
@@ -141,9 +134,9 @@ trait GenericPaymentService
 
   lazy val payment: Route = {
     // check anti CSRF token
-    randomTokenCsrfProtection(checkHeader) {
+    hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      _requiredSession(ec) { session =>
+      sessionService.requiredSession { session =>
         get {
           pathEnd {
             run(LoadPaymentAccount(externalUuidWithProfile(session))) completeWith {
@@ -164,55 +157,12 @@ trait GenericPaymentService
                   entity(as[Payment]) { payment =>
                     import payment._
                     val browserInfo =
-                      if (
-                        language.isDefined &&
-                        acceptHeader.isDefined &&
-                        userAgent.isDefined &&
-                        colorDepth.isDefined &&
-                        screenWidth.isDefined &&
-                        screenHeight.isDefined
-                      ) {
-                        Some(
-                          BrowserInfo.defaultInstance.copy(
-                            colorDepth = colorDepth.get,
-                            screenWidth = screenWidth.get,
-                            screenHeight = screenHeight.get,
-                            acceptHeader = acceptHeader.get.value(),
-                            javaEnabled = javaEnabled,
-                            javascriptEnabled = javascriptEnabled,
-                            language = "fr-FR" /*language.get.value().replace('_', '-')*/,
-                            timeZoneOffset = "+" + (TimeZone
-                              .getTimeZone("Europe/Paris")
-                              .getRawOffset / (60 * 1000)),
-                            userAgent = userAgent.get.value()
-                          )
-                        )
-                      } else {
-                        var missingParameters: Set[String] = Set.empty
-                        if (colorDepth.isEmpty)
-                          missingParameters += "colorDepth"
-                        if (screenWidth.isEmpty)
-                          missingParameters += "screenWidth"
-                        if (screenHeight.isEmpty)
-                          missingParameters += "screenHeight"
-                        if (missingParameters.nonEmpty)
-                          logger.warn(
-                            s"Missing parameters ${missingParameters.mkString(", ")} will be mandatory"
-                          )
-
-                        var missingHeaders: Set[String] = Set.empty
-                        if (language.isEmpty)
-                          missingHeaders += "Accept-Language"
-                        if (acceptHeader.isEmpty)
-                          missingHeaders += "Accept"
-                        if (userAgent.isEmpty)
-                          missingHeaders += "User-Agent"
-                        if (missingHeaders.nonEmpty)
-                          logger.warn(
-                            s"Missing Http headers ${missingHeaders.mkString(", ")} will be mandatory"
-                          )
-                        None
-                      }
+                      extractBrowserInfo(
+                        language.map(_.value()),
+                        acceptHeader.map(_.value()),
+                        userAgent.map(_.value()),
+                        payment
+                      )
                     pathPrefix(PreAuthorizeCardRoute) {
                       run(
                         PreAuthorizeCard(
@@ -238,7 +188,7 @@ trait GenericPaymentService
                         case r: PaymentRedirection =>
                           complete(
                             HttpResponse(
-                              StatusCodes.OK,
+                              StatusCodes.Accepted,
                               entity = r
                             )
                           )
@@ -281,7 +231,7 @@ trait GenericPaymentService
                           case r: PaymentRedirection =>
                             complete(
                               HttpResponse(
-                                StatusCodes.OK,
+                                StatusCodes.Accepted,
                                 entity = r
                               )
                             )
@@ -317,7 +267,7 @@ trait GenericPaymentService
                           case r: PaymentRedirection =>
                             complete(
                               HttpResponse(
-                                StatusCodes.OK,
+                                StatusCodes.Accepted,
                                 entity = r
                               )
                             )
@@ -358,7 +308,7 @@ trait GenericPaymentService
             case r: PaymentRedirection =>
               complete(
                 HttpResponse(
-                  StatusCodes.OK,
+                  StatusCodes.Accepted,
                   entity = r
                 )
               )
@@ -391,7 +341,7 @@ trait GenericPaymentService
             case r: PaymentRedirection =>
               complete(
                 HttpResponse(
-                  StatusCodes.OK,
+                  StatusCodes.Accepted,
                   entity = r
                 )
               )
@@ -420,7 +370,7 @@ trait GenericPaymentService
           case r: PaymentRedirection =>
             complete(
               HttpResponse(
-                StatusCodes.OK,
+                StatusCodes.Accepted,
                 entity = r
               )
             )
@@ -444,9 +394,9 @@ trait GenericPaymentService
 
   lazy val bank: Route = pathPrefix(BankRoute) {
     // check anti CSRF token
-    randomTokenCsrfProtection(checkHeader) {
+    hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      _requiredSession(ec) { session =>
+      sessionService.requiredSession { session =>
         pathEnd {
           get {
             run(LoadBankAccount(externalUuidWithProfile(session))) completeWith {
@@ -536,9 +486,9 @@ trait GenericPaymentService
 
   lazy val declaration: Route = pathPrefix(DeclarationRoute) {
     // check anti CSRF token
-    randomTokenCsrfProtection(checkHeader) {
+    hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      _requiredSession(ec) { session =>
+      sessionService.requiredSession { session =>
         pathEnd {
           get {
             run(GetUboDeclaration(externalUuidWithProfile(session))) completeWith {
@@ -591,9 +541,9 @@ trait GenericPaymentService
             complete(HttpResponse(StatusCodes.BadRequest))
           case Some(kycDocumentType) =>
             // check anti CSRF token
-            randomTokenCsrfProtection(checkHeader) {
+            hmacTokenCsrfProtection(checkHeader) {
               // check if a session exists
-              _requiredSession(ec) { session =>
+              sessionService.requiredSession { session =>
                 pathEnd {
                   get {
                     run(
@@ -658,9 +608,9 @@ trait GenericPaymentService
         }
       } ~
       // check anti CSRF token
-      randomTokenCsrfProtection(checkHeader) {
+      hmacTokenCsrfProtection(checkHeader) {
         // check if a session exists
-        _requiredSession(ec) { session =>
+        sessionService.requiredSession { session =>
           post {
             run(CreateMandate(externalUuidWithProfile(session))) completeWith {
               case r: MandateConfirmationRequired =>
@@ -687,9 +637,9 @@ trait GenericPaymentService
 
   lazy val recurringPayment: Route = pathPrefix(RecurringPaymentRoute) {
     // check anti CSRF token
-    randomTokenCsrfProtection(checkHeader) {
+    hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      _requiredSession(ec) { session =>
+      sessionService.requiredSession { session =>
         get {
           pathPrefix(Segment) { recurringPaymentRegistrationId =>
             run(
@@ -752,6 +702,4 @@ trait GenericPaymentService
     }
   }
 
-  protected[payment] def externalUuidWithProfile(session: Session): String =
-    computeExternalUuidWithProfile(session.id, session.profile)
 }

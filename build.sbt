@@ -31,11 +31,11 @@ ThisBuild / organization := "app.softnetwork"
 
 name := "payment"
 
-ThisBuild / version := "0.3.1"
+ThisBuild / version := "0.3.2"
 
 ThisBuild / scalaVersion := "2.12.15"
 
-ThisBuild / scalacOptions ++= Seq("-deprecation", "-feature", "-target:jvm-1.8")
+ThisBuild / scalacOptions ++= Seq("-deprecation", "-feature", "-target:jvm-1.8", "-Ypartial-unification")
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-Xlint")
 

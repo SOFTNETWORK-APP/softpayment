@@ -55,7 +55,6 @@ message BankAccount {
     optional string mandateId = 12;
     optional MandateStatus mandateStatus = 13;
     optional MandateScheme mandateScheme = 14 [default = MANDATE_SEPA];
-    extensions 100 to max;
 }
 
 message PaymentUser {
@@ -78,7 +77,6 @@ message PaymentUser {
     optional string profile = 10;
     optional PaymentUserType paymentUserType = 11;
 //    optional string secondaryWalletId = 12;
-    extensions 100 to max;
 }
 
 message LegalUser {
@@ -97,7 +95,6 @@ message LegalUser {
     required Address headQuartersAddress = 6;
     optional UboDeclaration uboDeclaration = 7;
     optional google.protobuf.Timestamp lastAcceptedTermsOfPSP = 8 [(scalapb.field).type = "java.util.Date"];
-    extensions 100 to max;
 }
 
 /**
@@ -126,7 +123,6 @@ message PaymentAccount {
     required PaymentAccountStatus paymentAccountStatus = 9 [default = DOCUMENTS_KO];
     repeated Transaction transactions = 10;
     repeated RecurringPayment recurryingPayments = 11;
-    extensions 100 to max;
 }
 
 message MandateResult{

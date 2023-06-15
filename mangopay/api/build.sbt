@@ -1,7 +1,7 @@
 import app.softnetwork.sbt.build.Versions
 import com.typesafe.sbt.packager.docker._
 
-Compile / mainClass := Some("app.softnetwork.payment.api.MangoPayPostgresLauncher")
+Compile / mainClass := Some("app.softnetwork.payment.api.MangoPayEndpointsPostgresLauncher")
 
 dockerBaseImage := "openjdk:8"
 

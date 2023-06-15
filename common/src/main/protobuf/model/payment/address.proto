@@ -22,5 +22,4 @@ message Address {
     required string city = 2;
     required string postalCode = 3;
     required string country = 4 [default = "FR"];
-    extensions 100 to max;
 }

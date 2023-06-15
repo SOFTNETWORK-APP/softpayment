@@ -6,19 +6,13 @@ import akka.http.scaladsl.server.{Directives, Route}
 import akka.http.scaladsl.server.directives.Credentials
 import app.softnetwork.api.server.DefaultComplete
 import app.softnetwork.session.service.SessionService
-import com.softwaremill.session.CsrfDirectives.{randomTokenCsrfProtection, setNewCsrfToken}
+import com.softwaremill.session.CsrfDirectives.{hmacTokenCsrfProtection, setNewCsrfToken}
 import com.softwaremill.session.CsrfOptions.checkHeader
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 import org.json4s.Formats
 import org.softnetwork.session.model.Session
 
-import scala.concurrent.ExecutionContext
-
-trait BasicServiceRoute
-    extends SessionService
-    with Directives
-    with DefaultComplete
-    with Json4sSupport {
+trait BasicServiceRoute extends Directives with DefaultComplete with Json4sSupport {
 
   import app.softnetwork.persistence.generateUUID
   import app.softnetwork.serialization._
@@ -27,7 +21,7 @@ trait BasicServiceRoute
 
   implicit def formats: Formats = commonFormats
 
-  implicit lazy val ec: ExecutionContext = system.executionContext
+  def sessionService: SessionService
 
   val route: Route = {
     pathPrefix("auth") {
@@ -38,9 +32,9 @@ trait BasicServiceRoute
   lazy val basic: Route = path("basic") {
     get {
       // check anti CSRF token
-      randomTokenCsrfProtection(checkHeader) {
+      hmacTokenCsrfProtection(checkHeader) {
         // check if a session exists
-        _requiredSession(ec) { session =>
+        sessionService.requiredSession { session =>
           complete(HttpResponse(StatusCodes.OK, entity = session.id))
         }
       }
@@ -48,7 +42,7 @@ trait BasicServiceRoute
       authenticateBasic("Basic Realm", BasicAuthAuthenticator) { identifier =>
         // create a new session
         val session = Session(generateUUID(identifier))
-        sessionToDirective(session)(ec) {
+        sessionService.setSession(session) {
           // create a new anti csrf token
           setNewCsrfToken(checkHeader) {
             complete(HttpResponse(StatusCodes.OK, entity = session.id))
@@ -57,11 +51,11 @@ trait BasicServiceRoute
       }
     } ~ delete {
       // check anti CSRF token
-      randomTokenCsrfProtection(checkHeader) {
+      hmacTokenCsrfProtection(checkHeader) {
         // check if a session exists
-        _requiredSession(ec) { _ =>
+        sessionService.requiredSession { _ =>
           // invalidate session
-          _invalidateSession(ec) {
+          sessionService.invalidateSession {
             complete(HttpResponse(StatusCodes.OK))
           }
         }
@@ -79,9 +73,9 @@ trait BasicServiceRoute
 }
 
 object BasicServiceRoute {
-  def apply(_system: ActorSystem[_]): BasicServiceRoute = {
+  def apply(_system: ActorSystem[_], _sessionService: SessionService): BasicServiceRoute = {
     new BasicServiceRoute {
-      override implicit def system: ActorSystem[_] = _system
+      override def sessionService: SessionService = _sessionService
     }
   }
 }

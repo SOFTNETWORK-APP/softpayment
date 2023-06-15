@@ -8,8 +8,8 @@ libraryDependencies ++= Seq(
   "app.softnetwork.persistence" %% "persistence-kv" % Versions.genericPersistence,
   "app.softnetwork.scheduler" %% "scheduler-common" % Versions.scheduler,
   "app.softnetwork.scheduler" %% "scheduler-common" % Versions.scheduler % "protobuf",
-  "app.softnetwork.api" %% "generic-server-api" % Versions.server,
-  "app.softnetwork.protobuf" %% "scalapb-extensions" % "0.1.6",
+  "app.softnetwork.api" %% "generic-server-api" % Versions.genericPersistence,
+  "app.softnetwork.protobuf" %% "scalapb-extensions" % "0.1.7",
   "commons-validator" % "commons-validator" % "1.6"
 )
 
