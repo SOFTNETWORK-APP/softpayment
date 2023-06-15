@@ -114,7 +114,11 @@ trait CardPaymentEndpoints extends BasicPaymentService {
           ),
           oneOfVariant[PaymentRedirection](
             statusCode(StatusCode.Accepted)
-              .and(jsonBody[PaymentRedirection].description("Pre authorization redirection to 3D secure"))
+              .and(
+                jsonBody[PaymentRedirection].description(
+                  "Pre authorization redirection to 3D secure"
+                )
+              )
           ),
           oneOfVariant[CardPreAuthorizationFailed](
             statusCode(StatusCode.BadRequest)
@@ -305,9 +309,11 @@ trait CardPaymentEndpoints extends BasicPaymentService {
           ),
           oneOfVariant[PaymentRedirection](
             statusCode(StatusCode.Accepted)
-              .and(jsonBody[PaymentRedirection].description(
-                "First recurring payment redirection to 3D secure"
-              ))
+              .and(
+                jsonBody[PaymentRedirection].description(
+                  "First recurring payment redirection to 3D secure"
+                )
+              )
           ),
           oneOfVariant[PayInFailed](
             statusCode(StatusCode.BadRequest)
