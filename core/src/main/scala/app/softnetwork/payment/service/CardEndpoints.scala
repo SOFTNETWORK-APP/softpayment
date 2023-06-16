@@ -17,8 +17,7 @@ import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
-trait CardEndpoints extends BasicPaymentService {
-  _: GenericPaymentEndpoints with GenericPaymentHandler =>
+trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
 
   import app.softnetwork.serialization._
 

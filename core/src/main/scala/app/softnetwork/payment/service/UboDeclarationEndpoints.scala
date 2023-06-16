@@ -17,8 +17,7 @@ import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
-trait UboDeclarationEndpoints extends BasicPaymentService {
-  _: GenericPaymentEndpoints with GenericPaymentHandler =>
+trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
 
   import app.softnetwork.serialization._
 

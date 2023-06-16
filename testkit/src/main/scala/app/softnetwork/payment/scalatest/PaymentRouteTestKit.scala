@@ -19,6 +19,11 @@ trait PaymentRouteTestKit extends SessionTestKit with PaymentTestKit with Paymen
 
   override lazy val additionalConfig: String = paymentGrpcConfig
 
+  override def beforeAll(): Unit = {
+    initAndJoinCluster()
+    apiRoutes(typedSystem())
+  }
+
   def loadPaymentAccount(): PaymentAccountView = {
     withHeaders(
       Get(s"/$RootPath/$PaymentPath")

@@ -16,12 +16,11 @@ import sttp.tapir.server.{PartialServerEndpoint, ServerEndpoint}
 
 import scala.concurrent.Future
 
-trait CardPaymentEndpoints extends BasicPaymentService {
-  _: GenericPaymentEndpoints with GenericPaymentHandler =>
+trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
 
   import app.softnetwork.serialization._
 
-  val payment: PartialServerEndpoint[
+  def payment(payment: Payment): PartialServerEndpoint[
     (Seq[Option[String]], Method, Option[String], Option[String]),
     ((Seq[Option[String]], Option[CookieValueWithMeta]), Session),
     (Option[String], Option[String], Option[String], Option[String], Payment),
@@ -35,7 +34,11 @@ trait CardPaymentEndpoints extends BasicPaymentService {
       .in(header[Option[String]](HeaderNames.Accept))
       .in(header[Option[String]](HeaderNames.UserAgent))
       .in(extractRemoteAddress)
-      .in(jsonBody[Payment])
+      .in(
+        jsonBody[Payment]
+          .description("Payment to perform")
+          .example(payment)
+      )
 
   val preAuthorizeCard: Full[
     (Seq[Option[String]], Method, Option[String], Option[String]),
@@ -46,7 +49,16 @@ trait CardPaymentEndpoints extends BasicPaymentService {
     Any,
     Future
   ] =
-    payment
+    payment(
+      Payment(
+        "pre-authorize-order-96",
+        5100,
+        registrationId = Some("2992bf00-8d3e-4448-8737-d7362b144de5"),
+        registrationData = Some("data"),
+        registerCard = true,
+        printReceipt = true
+      )
+    )
       .in(PaymentSettings.PreAuthorizeCardRoute)
       .post
       .out(
@@ -148,7 +160,16 @@ trait CardPaymentEndpoints extends BasicPaymentService {
     Any,
     Future
   ] =
-    payment
+    payment(
+      Payment(
+        "pay-in-order-97",
+        5100,
+        registrationId = Some("2992bf00-8d3e-4448-8737-d7362b144de5"),
+        registrationData = Some("data"),
+        registerCard = true,
+        printReceipt = true
+      )
+    )
       .in(PaymentSettings.PayInRoute)
       .in(path[String].description("credited account"))
       .post
@@ -249,7 +270,7 @@ trait CardPaymentEndpoints extends BasicPaymentService {
     Any,
     Future
   ] =
-    payment.post
+    payment(Payment("", 0)).post
       .in(PaymentSettings.RecurringPaymentRoute)
       .in(path[String].description("Recurring payment registration Id"))
       .out(
