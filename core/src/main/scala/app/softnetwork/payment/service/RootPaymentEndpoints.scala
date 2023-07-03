@@ -1,56 +1,41 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.{ApiEndpoint, ApiErrors}
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
-import app.softnetwork.payment.message.PaymentMessages.{
-  PaymentError,
-  PaymentErrorMessage,
-  UnauthorizedError
-}
+import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.service.SessionEndpoints
+import com.softwaremill.session.{
+  GetSessionTransport,
+  SetSessionTransport,
+  TapirCsrfCheckMode,
+  TapirSessionContinuity
+}
 import org.json4s.Formats
 import org.softnetwork.session.model.Session
-import sttp.model.{Method, StatusCode}
 import sttp.model.headers.CookieValueWithMeta
+import sttp.model.Method
 import sttp.monad.FutureMonad
-import sttp.tapir.generic.auto._
-import sttp.tapir.json.json4s.jsonBody
 import sttp.tapir.server.PartialServerEndpoint
-import sttp.tapir.{
-  emptyOutputAs,
-  endpoint,
-  extractFromRequest,
-  oneOf,
-  oneOfVariant,
-  oneOfVariantValueMatcher,
-  statusCode,
-  Endpoint,
-  EndpointInput,
-  EndpointOutput,
-  Schema
-}
+import sttp.tapir.{endpoint, extractFromRequest, Endpoint, EndpointInput}
 
 import scala.concurrent.Future
 
-trait RootPaymentEndpoints extends BasicPaymentService { _: GenericPaymentHandler =>
+trait RootPaymentEndpoints extends BasicPaymentService with ApiEndpoint {
+  _: GenericPaymentHandler =>
 
-  import app.softnetwork.serialization._
-
-  implicit def formats: Formats = paymentFormats
+  override implicit def formats: Formats = paymentFormats
 
   def sessionEndpoints: SessionEndpoints
 
-  def oneOfPaymentErrorMessageValueMatcher[T: Manifest: Schema](
-    description: String,
-    status: StatusCode = StatusCode.BadRequest
-  ): EndpointOutput.OneOfVariant[Left[PaymentErrorMessage, T]] =
-    oneOfVariantValueMatcher[Left[PaymentErrorMessage, T]](
-      statusCode(status)
-        .and(jsonBody[Left[PaymentErrorMessage, T]].description(description))
-    ) { case Left(PaymentErrorMessage(_)) =>
-      true
-    }
+  def sc: TapirSessionContinuity[Session] = sessionEndpoints.sc
+
+  def st: SetSessionTransport = sessionEndpoints.st
+
+  def gt: GetSessionTransport = sessionEndpoints.gt
+
+  def checkMode: TapirCsrfCheckMode[Session] = sessionEndpoints.checkMode
 
   def extractRemoteAddress: EndpointInput.ExtractFromRequest[Option[String]] =
     extractFromRequest[Option[String]](req => req.connectionInfo.remote.map(_.getHostName))
@@ -60,29 +45,24 @@ trait RootPaymentEndpoints extends BasicPaymentService { _: GenericPaymentHandle
       .in(PaymentSettings.PaymentPath)
 
   lazy val secureEndpoint: PartialServerEndpoint[
-    (Seq[Option[String]], Method, Option[String], Option[String]),
+    (Seq[Option[String]], Option[String], Method, Option[String]),
     ((Seq[Option[String]], Option[CookieValueWithMeta]), Session),
     Unit,
-    PaymentError,
+    ApiErrors.ErrorInfo,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
     Any,
     Future
-  ] =
-    sessionEndpoints.antiCsrfWithRequiredSession.endpoint
+  ] = {
+    val partial = sessionEndpoints.antiCsrfWithRequiredSession(sc, st, checkMode)
+    partial.endpoint
       .in(PaymentSettings.PaymentPath)
-      .out(sessionEndpoints.antiCsrfWithRequiredSession.securityOutput)
-      .errorOut(
-        oneOf[PaymentError](
-          oneOfVariant[UnauthorizedError.type](
-            statusCode(StatusCode.Unauthorized)
-              .and(emptyOutputAs(UnauthorizedError).description("Unauthorized"))
-          )
-        )
-      )
+      .out(partial.securityOutput)
+      .errorOut(errors)
       .serverSecurityLogic { inputs =>
-        sessionEndpoints.antiCsrfWithRequiredSession.securityLogic(new FutureMonad())(inputs).map {
-          case Left(_)  => Left(UnauthorizedError)
+        partial.securityLogic(new FutureMonad())(inputs).map {
+          case Left(_)  => Left(ApiErrors.Unauthorized("Unauthorized"))
           case Right(r) => Right((r._1, r._2))
         }
       }
+  }
 }

@@ -730,8 +730,6 @@ object PaymentMessages {
 
   case object PaymentAccountUpdated extends PaymentResult
 
-  case class PaymentErrorMessage(message: String) extends PaymentResult
-
   class PaymentError(override val message: String) extends ErrorMessage(message) with PaymentResult
 
   case object CardNotPreRegistered extends PaymentError("CardNotPreRegistered")
@@ -873,8 +871,6 @@ object PaymentMessages {
   case object Schedule4PaymentNotTriggered extends PaymentError("Schedule4PaymentNotTriggered")
 
   case class PayInWithCardPreAuthorizedFailed(error: String) extends PaymentError(error)
-
-  case object UnauthorizedError extends PaymentError("UnauthorizedError")
 
   trait ExternalEntityToPaymentEventDecorator extends PaymentEventWithCommand {
     _: ExternalEntityToPaymentEvent =>

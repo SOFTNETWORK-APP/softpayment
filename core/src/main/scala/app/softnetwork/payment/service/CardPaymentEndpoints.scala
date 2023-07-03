@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.ApiErrors
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
@@ -8,7 +9,6 @@ import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.{HeaderNames, Method, StatusCode}
 import sttp.model.headers.CookieValueWithMeta
-import sttp.tapir.server.ServerEndpoint.Full
 import sttp.tapir.generic.auto._
 import sttp.tapir.json.json4s.jsonBody
 import sttp.tapir._
@@ -21,10 +21,10 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
   import app.softnetwork.serialization._
 
   def payment(payment: Payment): PartialServerEndpoint[
-    (Seq[Option[String]], Method, Option[String], Option[String]),
+    (Seq[Option[String]], Option[String], Method, Option[String]),
     ((Seq[Option[String]], Option[CookieValueWithMeta]), Session),
     (Option[String], Option[String], Option[String], Option[String], Payment),
-    PaymentError,
+    ApiErrors.ErrorInfo,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
     Any,
     Future
@@ -40,15 +40,7 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           .example(payment)
       )
 
-  val preAuthorizeCard: Full[
-    (Seq[Option[String]], Method, Option[String], Option[String]),
-    ((Seq[Option[String]], Option[CookieValueWithMeta]), Session),
-    (Option[String], Option[String], Option[String], Option[String], Payment),
-    PaymentError,
-    (Seq[Option[String]], Option[CookieValueWithMeta], PaymentResult),
-    Any,
-    Future
-  ] =
+  val preAuthorizeCard: ServerEndpoint[Any with AkkaStreams, Future] =
     payment(
       Payment(
         "pre-authorize-order-96",
@@ -74,14 +66,6 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
                   "Pre authorization redirection to 3D secure"
                 )
               )
-          ),
-          oneOfVariant[CardPreAuthorizationFailed](
-            statusCode(StatusCode.BadRequest)
-              .and(jsonBody[CardPreAuthorizationFailed].description("Pre authorization failure"))
-          ),
-          oneOfVariant[PaymentAccountNotFound.type](
-            statusCode(StatusCode.NotFound)
-              .and(jsonBody[PaymentAccountNotFound.type].description("Payment account not found"))
           )
         )
       )
@@ -102,12 +86,15 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
             browserInfo,
             printReceipt
           )
-        ).map { result => Right((principal._1._1, principal._1._2, result)) }
+        ).map {
+          case result: CardPreAuthorized  => Right((principal._1._1, principal._1._2, result))
+          case result: PaymentRedirection => Right((principal._1._1, principal._1._2, result))
+          case other                      => Left(error(other))
+        }
       })
       .description("Pre authorize card")
 
-  val preAuthorizeCardFor3DS
-    : Full[Unit, Unit, (String, String, Boolean, Boolean), Unit, PaymentResult, Any, Future] =
+  val preAuthorizeCardFor3DS: ServerEndpoint[Any with AkkaStreams, Future] =
     rootEndpoint
       .in(PaymentSettings.SecureModeRoute / PaymentSettings.PreAuthorizeCardRoute)
       .in(path[String].description("Order uuid"))
@@ -131,16 +118,6 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
                   "Pre authorization redirection to 3D secure"
                 )
               )
-          ),
-          oneOfVariant[CardPreAuthorizationFailed](
-            statusCode(StatusCode.BadRequest)
-              .and(
-                jsonBody[CardPreAuthorizationFailed].description("Card pre authorization failure")
-              )
-          ),
-          oneOfVariant[PaymentAccountNotFound.type](
-            statusCode(StatusCode.NotFound)
-              .and(jsonBody[PaymentAccountNotFound.type].description("Payment account not found"))
           )
         )
       )
@@ -148,18 +125,14 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       .serverLogic { case (orderUuid, preAuthorizationId, registerCard, printReceipt) =>
         run(
           PreAuthorizeCardFor3DS(orderUuid, preAuthorizationId, registerCard, printReceipt)
-        ).map(result => Right(result))
+        ).map {
+          case result: CardPreAuthorized  => Right(result)
+          case result: PaymentRedirection => Right(result)
+          case other                      => Left(error(other))
+        }
       }
 
-  val payIn: Full[
-    (Seq[Option[String]], Method, Option[String], Option[String]),
-    ((Seq[Option[String]], Option[CookieValueWithMeta]), Session),
-    (Option[String], Option[String], Option[String], Option[String], Payment, String),
-    PaymentError,
-    (Seq[Option[String]], Option[CookieValueWithMeta], PaymentResult),
-    Any,
-    Future
-  ] =
+  val payIn: ServerEndpoint[Any with AkkaStreams, Future] =
     payment(
       Payment(
         "pay-in-order-97",
@@ -182,14 +155,6 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           oneOfVariant[PaymentRedirection](
             statusCode(StatusCode.Accepted)
               .and(jsonBody[PaymentRedirection].description("Payment redirection to 3D secure"))
-          ),
-          oneOfVariant[PayInFailed](
-            statusCode(StatusCode.BadRequest)
-              .and(jsonBody[PayInFailed].description("Payment transaction failure"))
-          ),
-          oneOfVariant[PaymentAccountNotFound.type](
-            statusCode(StatusCode.NotFound)
-              .and(jsonBody[PaymentAccountNotFound.type].description("Payment account not found"))
           )
         )
       )
@@ -214,12 +179,15 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
               paymentType,
               printReceipt
             )
-          ).map { result => Right((principal._1._1, principal._1._2, result)) }
+          ).map {
+            case result: PaidIn             => Right((principal._1._1, principal._1._2, result))
+            case result: PaymentRedirection => Right((principal._1._1, principal._1._2, result))
+            case other                      => Left(error(other))
+          }
       })
       .description("Pay in")
 
-  val payInFor3DS
-    : Full[Unit, Unit, (String, String, Boolean, Boolean), Unit, PaymentResult, Any, Future] =
+  val payInFor3DS: ServerEndpoint[Any with AkkaStreams, Future] =
     rootEndpoint
       .in(PaymentSettings.SecureModeRoute / PaymentSettings.PayInRoute)
       .in(path[String].description("Order uuid"))
@@ -239,18 +207,6 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           oneOfVariant[PaymentRedirection](
             statusCode(StatusCode.Accepted)
               .and(jsonBody[PaymentRedirection].description("Payment redirection to 3D secure"))
-          ),
-          oneOfVariant[PayInFailed](
-            statusCode(StatusCode.BadRequest)
-              .and(jsonBody[PayInFailed].description("Payment transaction failure"))
-          ),
-          oneOfVariant[PaymentAccountNotFound.type](
-            statusCode(StatusCode.NotFound)
-              .and(jsonBody[PaymentAccountNotFound.type].description("Payment account not found"))
-          ),
-          oneOfVariant[TransactionNotFound.type](
-            statusCode(StatusCode.NotFound)
-              .and(jsonBody[TransactionNotFound.type].description("Payment transaction not found"))
           )
         )
       )
@@ -258,18 +214,14 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       .serverLogic { case (orderUuid, transactionId, registerCard, printReceipt) =>
         run(
           PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt)
-        ).map(result => Right(result))
+        ).map {
+          case result: PaidIn             => Right(result)
+          case result: PaymentRedirection => Right(result)
+          case other                      => Left(error(other))
+        }
       }
 
-  val executeFirstRecurringCardPayment: Full[
-    (Seq[Option[String]], Method, Option[String], Option[String]),
-    ((Seq[Option[String]], Option[CookieValueWithMeta]), Session),
-    (Option[String], Option[String], Option[String], Option[String], Payment, String),
-    PaymentError,
-    (Seq[Option[String]], Option[CookieValueWithMeta], PaymentResult),
-    Any,
-    Future
-  ] =
+  val executeFirstRecurringCardPayment: ServerEndpoint[Any with AkkaStreams, Future] =
     payment(Payment("", 0)).post
       .in(PaymentSettings.RecurringPaymentRoute)
       .in(path[String].description("Recurring payment registration Id"))
@@ -288,14 +240,6 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
                   "First recurring payment redirection to 3D secure"
                 )
               )
-          ),
-          oneOfVariant[PayInFailed](
-            statusCode(StatusCode.BadRequest)
-              .and(jsonBody[PayInFailed])
-          ),
-          oneOfVariant[PaymentAccountNotFound.type](
-            statusCode(StatusCode.NotFound)
-              .and(jsonBody[PaymentAccountNotFound.type])
           )
         )
       )
@@ -312,12 +256,15 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
               browserInfo,
               statementDescriptor
             )
-          ).map { result => Right((principal._1._1, principal._1._2, result)) }
+          ).map {
+            case result: FirstRecurringPaidIn => Right((principal._1._1, principal._1._2, result))
+            case result: PaymentRedirection   => Right((principal._1._1, principal._1._2, result))
+            case other                        => Left(error(other))
+          }
       })
       .description("Execute first recurring payment")
 
-  val executeFirstRecurringCardPaymentFor3DS
-    : Full[Unit, Unit, (String, String), Unit, PaymentResult, Any, Future] =
+  val executeFirstRecurringCardPaymentFor3DS: ServerEndpoint[Any with AkkaStreams, Future] =
     rootEndpoint
       .in(PaymentSettings.SecureModeRoute / PaymentSettings.RecurringPaymentRoute)
       .in(path[String].description("Recurring payment registration Id"))
@@ -335,21 +282,6 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
                   "First recurring payment redirection to 3D secure"
                 )
               )
-          ),
-          oneOfVariant[PayInFailed](
-            statusCode(StatusCode.BadRequest)
-              .and(jsonBody[PayInFailed].description("First recurring payment transaction failure"))
-          ),
-          oneOfVariant[PaymentAccountNotFound.type](
-            statusCode(StatusCode.NotFound)
-              .and(jsonBody[PaymentAccountNotFound.type].description("Payment account not found"))
-          ),
-          oneOfVariant[TransactionNotFound.type](
-            statusCode(StatusCode.NotFound)
-              .and(
-                jsonBody[TransactionNotFound.type]
-                  .description("First recurring payment transaction not found")
-              )
           )
         )
       )
@@ -357,7 +289,11 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       .serverLogic { case (recurringPayInRegistrationId, transactionId) =>
         run(
           PayInFirstRecurringFor3DS(recurringPayInRegistrationId, transactionId)
-        ).map(result => Right(result))
+        ).map {
+          case result: PaidIn             => Right(result)
+          case result: PaymentRedirection => Right(result)
+          case other                      => Left(error(other))
+        }
       }
 
   val cardPaymentEndpoints: List[ServerEndpoint[AkkaStreams with capabilities.WebSockets, Future]] =

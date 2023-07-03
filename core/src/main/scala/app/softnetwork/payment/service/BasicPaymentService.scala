@@ -1,12 +1,8 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.ApiErrors
 import app.softnetwork.payment.handlers.GenericPaymentHandler
-import app.softnetwork.payment.message.PaymentMessages.{
-  Payment,
-  PaymentCommand,
-  PaymentCommandWithKey,
-  PaymentResult
-}
+import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.{computeExternalUuidWithProfile, BrowserInfo}
 import app.softnetwork.persistence.service.Service
 import org.softnetwork.session.model.Session
@@ -22,6 +18,24 @@ trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
     tTag: ClassTag[PaymentCommand]
   ): Future[PaymentResult] =
     super.run(command.key, command)
+
+  def error(result: PaymentResult): ApiErrors.ErrorInfo =
+    result match {
+      case PaymentAccountNotFound        => ApiErrors.NotFound(PaymentAccountNotFound.message)
+      case MandateNotFound               => ApiErrors.NotFound(MandateNotFound)
+      case UboDeclarationNotFound        => ApiErrors.NotFound(UboDeclarationNotFound)
+      case BankAccountNotFound           => ApiErrors.NotFound(BankAccountNotFound)
+      case TransactionNotFound           => ApiErrors.NotFound(TransactionNotFound.message)
+      case UserNotFound                  => ApiErrors.NotFound(UserNotFound)
+      case WalletNotFound                => ApiErrors.NotFound(WalletNotFound)
+      case CardNotFound                  => ApiErrors.NotFound(CardNotFound)
+      case RecurringPaymentNotFound      => ApiErrors.NotFound(RecurringPaymentNotFound)
+      case CardNotPreRegistered          => ApiErrors.InternalServerError(CardNotPreRegistered)
+      case r: CardPreAuthorizationFailed => ApiErrors.InternalServerError(r)
+      case r: PayInFailed                => ApiErrors.InternalServerError(r)
+      case r: PaymentError               => ApiErrors.BadRequest(r.message)
+      case _                             => ApiErrors.BadRequest("Unknown")
+    }
 
   protected[payment] def externalUuidWithProfile(session: Session): String =
     computeExternalUuidWithProfile(session.id, session.profile)

@@ -14,7 +14,6 @@ import akka.http.scaladsl.server.directives.FileInfo
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
-import app.softnetwork.persistence.message.ErrorMessage
 import app.softnetwork.session.service.SessionService
 import com.softwaremill.session.CsrfDirectives.hmacTokenCsrfProtection
 import com.softwaremill.session.CsrfOptions.checkHeader
@@ -29,6 +28,8 @@ import app.softnetwork.payment.model._
 
 import java.io.ByteArrayOutputStream
 import scala.concurrent.Await
+
+import scala.language.implicitConversions
 
 trait GenericPaymentService
     extends Directives
@@ -76,12 +77,7 @@ trait GenericPaymentService
                     entity = r.cards.map(_.view)
                   )
                 )
-              case r: CardsNotLoaded.type =>
-                complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           } ~
           post {
@@ -105,12 +101,7 @@ trait GenericPaymentService
                       entity = r.cardPreRegistration
                     )
                   )
-                case r: CardNotPreRegistered.type =>
-                  complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
-                case r: PaymentAccountNotFound.type =>
-                  complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                case _               => complete(HttpResponse(StatusCodes.BadRequest))
+                case other => error(other)
               }
             }
           } ~
@@ -118,12 +109,7 @@ trait GenericPaymentService
             parameter("cardId") { cardId =>
               run(DisableCard(externalUuidWithProfile(session), cardId)) completeWith {
                 case _: CardDisabled.type => complete(HttpResponse(StatusCodes.OK))
-                case r: CardNotDisabled.type =>
-                  complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                case r: PaymentAccountNotFound.type =>
-                  complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                case _               => complete(HttpResponse(StatusCodes.BadRequest))
+                case other                => error(other)
               }
             }
           }
@@ -142,10 +128,7 @@ trait GenericPaymentService
             run(LoadPaymentAccount(externalUuidWithProfile(session))) completeWith {
               case r: PaymentAccountLoaded =>
                 complete(HttpResponse(StatusCodes.OK, entity = r.paymentAccount.view))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           }
         } ~
@@ -192,15 +175,7 @@ trait GenericPaymentService
                               entity = r
                             )
                           )
-                        case r: CardPreAuthorizationFailed =>
-                          complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
-                        case r: PaymentAccountNotFound.type =>
-                          complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                        case r: ErrorMessage =>
-                          complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                        case other =>
-                          logger.error(other.toString)
-                          complete(HttpResponse(StatusCodes.BadRequest))
+                        case other => error(other)
                       }
                     } ~ pathPrefix(PayInRoute) {
                       pathPrefix(Segment) { creditedAccount =>
@@ -235,15 +210,7 @@ trait GenericPaymentService
                                 entity = r
                               )
                             )
-                          case r: PayInFailed =>
-                            complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
-                          case r: PaymentAccountNotFound.type =>
-                            complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                          case r: ErrorMessage =>
-                            complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                          case other =>
-                            logger.error(other.toString)
-                            complete(HttpResponse(StatusCodes.BadRequest))
+                          case other => error(other)
                         }
                       }
                     } ~ pathPrefix(RecurringPaymentRoute) {
@@ -271,15 +238,7 @@ trait GenericPaymentService
                                 entity = r
                               )
                             )
-                          case r: PayInFailed =>
-                            complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
-                          case r: PaymentAccountNotFound.type =>
-                            complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                          case r: ErrorMessage =>
-                            complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                          case other =>
-                            logger.error(other.toString)
-                            complete(HttpResponse(StatusCodes.BadRequest))
+                          case other => error(other)
                         }
                       }
                     }
@@ -312,14 +271,7 @@ trait GenericPaymentService
                   entity = r
                 )
               )
-            case r: PayInFailed =>
-              complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
-            case r: TransactionNotFound.type =>
-              complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-            case r: PaymentAccountNotFound.type =>
-              complete(HttpResponse(StatusCodes.NotFound, entity = r))
-            case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-            case _               => complete(HttpResponse(StatusCodes.BadRequest))
+            case other => error(other)
           }
       }
     }
@@ -345,12 +297,7 @@ trait GenericPaymentService
                   entity = r
                 )
               )
-            case r: CardPreAuthorizationFailed =>
-              complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
-            case r: PaymentAccountNotFound.type =>
-              complete(HttpResponse(StatusCodes.NotFound, entity = r))
-            case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-            case _               => complete(HttpResponse(StatusCodes.BadRequest))
+            case other => error(other)
           }
       }
     }
@@ -374,13 +321,7 @@ trait GenericPaymentService
                 entity = r
               )
             )
-          case r: PayInFailed => complete(HttpResponse(StatusCodes.InternalServerError, entity = r))
-          case r: TransactionNotFound.type =>
-            complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-          case r: PaymentAccountNotFound.type =>
-            complete(HttpResponse(StatusCodes.NotFound, entity = r))
-          case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-          case _               => complete(HttpResponse(StatusCodes.BadRequest))
+          case other => error(other)
         }
       }
     }
@@ -407,9 +348,7 @@ trait GenericPaymentService
                     entity = r.bankAccount.view
                   )
                 )
-              case r: BankAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case _ => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           } ~
           post {
@@ -461,22 +400,14 @@ trait GenericPaymentService
               ) completeWith {
                 case r: BankAccountCreatedOrUpdated =>
                   complete(HttpResponse(StatusCodes.OK, entity = r))
-                case r: PaymentAccountNotFound.type =>
-                  complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                case r: PaymentError => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                case _               => complete(HttpResponse(StatusCodes.BadRequest))
+                case other => error(other)
               }
             }
           } ~
           delete {
             run(DeleteBankAccount(externalUuidWithProfile(session), Some(false))) completeWith {
               case _: BankAccountDeleted.type => complete(HttpResponse(StatusCodes.OK))
-              case r: BankAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentError => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other                      => error(other)
             }
           }
         }
@@ -494,36 +425,21 @@ trait GenericPaymentService
             run(GetUboDeclaration(externalUuidWithProfile(session))) completeWith {
               case r: UboDeclarationLoaded =>
                 complete(HttpResponse(StatusCodes.OK, entity = r.declaration.view))
-              case r: UboDeclarationNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentError => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           } ~ post {
             entity(as[UboDeclaration.UltimateBeneficialOwner]) { ubo =>
               run(CreateOrUpdateUbo(externalUuidWithProfile(session), ubo)) completeWith {
                 case r: UboCreatedOrUpdated =>
                   complete(HttpResponse(StatusCodes.OK, entity = r.ubo))
-                case r: UboDeclarationNotFound.type =>
-                  complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                case r: PaymentAccountNotFound.type =>
-                  complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                case r: PaymentError => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                case _               => complete(HttpResponse(StatusCodes.BadRequest))
+                case other => error(other)
               }
             }
           } ~ put {
             run(ValidateUboDeclaration(externalUuidWithProfile(session))) completeWith {
               case _: UboDeclarationAskedForValidation.type =>
                 complete(HttpResponse(StatusCodes.OK))
-              case r: UboDeclarationNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentError => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           }
         }
@@ -551,11 +467,7 @@ trait GenericPaymentService
                     ) completeWith {
                       case r: KycDocumentStatusLoaded =>
                         complete(HttpResponse(StatusCodes.OK, entity = r.report))
-                      case r: PaymentAccountNotFound.type =>
-                        complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                      case r: PaymentError =>
-                        complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                      case _ => complete(HttpResponse(StatusCodes.BadRequest))
+                      case other => error(other)
                     }
                   } ~
                   post {
@@ -580,11 +492,7 @@ trait GenericPaymentService
                           ) completeWith {
                             case r: KycDocumentAdded =>
                               complete(HttpResponse(StatusCodes.OK, entity = r))
-                            case r: PaymentAccountNotFound.type =>
-                              complete(HttpResponse(StatusCodes.NotFound, entity = r))
-                            case r: PaymentError =>
-                              complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-                            case _ => complete(HttpResponse(StatusCodes.BadRequest))
+                            case other => error(other)
                           }
                         case _ => complete(HttpResponse(StatusCodes.BadRequest))
                       }
@@ -603,8 +511,7 @@ trait GenericPaymentService
       parameter("MandateId") { mandateId =>
         run(UpdateMandateStatus(mandateId)) completeWith {
           case r: MandateStatusUpdated => complete(HttpResponse(StatusCodes.OK, entity = r.result))
-          case r: PaymentError         => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-          case _                       => complete(HttpResponse(StatusCodes.BadRequest))
+          case other                   => error(other)
         }
       } ~
       // check anti CSRF token
@@ -616,19 +523,13 @@ trait GenericPaymentService
               case r: MandateConfirmationRequired =>
                 complete(HttpResponse(StatusCodes.OK, entity = r))
               case MandateCreated => complete(HttpResponse(StatusCodes.OK))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentError => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other          => error(other)
             }
           } ~
           delete {
             run(CancelMandate(externalUuidWithProfile(session))) completeWith {
               case MandateCanceled => complete(HttpResponse(StatusCodes.OK))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentError => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other           => error(other)
             }
           }
         }
@@ -647,12 +548,7 @@ trait GenericPaymentService
             ) completeWith {
               case r: RecurringPaymentLoaded =>
                 complete(HttpResponse(StatusCodes.OK, entity = r.recurringPayment.view))
-              case r: RecurringPaymentNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           }
         } ~ post {
@@ -662,10 +558,7 @@ trait GenericPaymentService
                 complete(HttpResponse(StatusCodes.OK, entity = r))
               case r: MandateConfirmationRequired =>
                 complete(HttpResponse(StatusCodes.OK, entity = r))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           }
         } ~ put {
@@ -673,10 +566,7 @@ trait GenericPaymentService
             run(cmd.copy(debitedAccount = externalUuidWithProfile(session))) completeWith {
               case r: RecurringCardPaymentRegistrationUpdated =>
                 complete(HttpResponse(StatusCodes.OK, entity = r.result))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           }
         } ~ delete {
@@ -691,10 +581,7 @@ trait GenericPaymentService
             ) completeWith {
               case r: RecurringCardPaymentRegistrationUpdated =>
                 complete(HttpResponse(StatusCodes.OK, entity = r.result))
-              case r: PaymentAccountNotFound.type =>
-                complete(HttpResponse(StatusCodes.NotFound, entity = r))
-              case r: ErrorMessage => complete(HttpResponse(StatusCodes.BadRequest, entity = r))
-              case _               => complete(HttpResponse(StatusCodes.BadRequest))
+              case other => error(other)
             }
           }
         }
