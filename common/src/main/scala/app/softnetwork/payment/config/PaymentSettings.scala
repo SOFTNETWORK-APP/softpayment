@@ -24,6 +24,7 @@ trait PaymentSettings extends StrictLogging {
   val BankRoute: String = config.getString("payment.bank-route")
   val DeclarationRoute: String = config.getString("payment.declaration-route")
   val KycRoute: String = config.getString("payment.kyc-route")
+  val PayPalRoute: String = config.getString("payment.payPal-route")
 
   val DisableBankAccountDeletion: Boolean =
     config.getBoolean("payment.disable-bank-account-deletion")

@@ -221,6 +221,35 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
         }
       }
 
+  val payInForPayPal: ServerEndpoint[Any with AkkaStreams, Future] =
+    rootEndpoint
+      .in(PaymentSettings.PayPalRoute)
+      .in(path[String].description("Order uuid"))
+      .in(query[String]("transactionId").description("Payment transaction id"))
+      .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))
+      .out(
+        oneOf[PaymentResult](
+          oneOfVariant[PaidIn](
+            statusCode(StatusCode.Ok)
+              .and(jsonBody[PaidIn].description("Payment transaction result"))
+          ),
+          oneOfVariant[PaymentRedirection](
+            statusCode(StatusCode.Accepted)
+              .and(jsonBody[PaymentRedirection].description("Payment redirection to 3D secure"))
+          )
+        )
+      )
+      .description("Pay in for PayPal")
+      .serverLogic { case (orderUuid, transactionId, printReceipt) =>
+        run(
+          PayInForPayPal(orderUuid, transactionId, printReceipt)
+        ).map {
+          case result: PaidIn             => Right(result)
+          case result: PaymentRedirection => Right(result)
+          case other                      => Left(error(other))
+        }
+      }
+
   val executeFirstRecurringCardPayment: ServerEndpoint[Any with AkkaStreams, Future] =
     payment(Payment("", 0)).post
       .in(PaymentSettings.RecurringPaymentRoute)
@@ -302,6 +331,7 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       preAuthorizeCardFor3DS,
       payIn,
       payInFor3DS,
+      payInForPayPal,
       executeFirstRecurringCardPayment,
       executeFirstRecurringCardPaymentFor3DS
     )

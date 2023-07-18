@@ -194,6 +194,18 @@ private[payment] trait PaymentProvider {
     idempotency: Option[Boolean] = None
   ): Option[Transaction]
 
+  /** @param payInWithPayPalTransaction
+    *   - pay in with PayPal transaction
+    * @param idempotency
+    *   - whether to use an idempotency key for this request or not
+    * @return
+    *   pay in with PayPal transaction result
+    */
+  def payInWithPayPal(
+    payInWithPayPalTransaction: PayInWithPayPalTransaction,
+    idempotency: Option[Boolean] = None
+  ): Option[Transaction]
+
   /** @param maybeRefundTransaction
     *   - refund transaction
     * @param idempotency

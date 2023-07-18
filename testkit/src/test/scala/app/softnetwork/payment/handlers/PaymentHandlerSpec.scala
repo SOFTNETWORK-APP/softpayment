@@ -838,7 +838,7 @@ class PaymentHandlerSpec
       }
     }
 
-    "pay in / out" in {
+    "pay in / out with Card" in {
       !?(
         PayIn(
           orderUuid,
@@ -860,6 +860,55 @@ class PaymentHandlerSpec
               assert(s.transactionId.isDefined)
               assert(s.error.isEmpty)
             case Failure(f) => fail(f.getMessage)
+          }
+        case other => fail(other.toString)
+      }
+    }
+
+    "pay in / out with PayPal" in {
+      !?(
+        PayIn(
+          orderUuid,
+          computeExternalUuidWithProfile(customerUuid, Some("customer")),
+          100,
+          "EUR",
+          computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+          paymentType = Transaction.PaymentType.PAYPAL,
+          printReceipt = true
+        )
+      ) await {
+        case r: PaymentRedirection =>
+          val params = r.redirectUrl
+            .split("\\?")
+            .last
+            .split("[&=]")
+            .grouped(2)
+            .map(a => (a(0), a(1)))
+            .toMap
+          val transactionId = params.getOrElse("transactionId", "")
+          val printReceipt = params.getOrElse("printReceipt", "")
+          assert(printReceipt == "true")
+          !?(
+            PayInForPayPal(
+              orderUuid,
+              transactionId,
+              printReceipt.toBoolean
+            )
+          ) await {
+            case _: PaidIn =>
+              client.payOut(
+                orderUuid,
+                computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+                100,
+                0,
+                "EUR"
+              ) complete () match {
+                case Success(s) =>
+                  assert(s.transactionId.isDefined)
+                  assert(s.error.isEmpty)
+                case Failure(f) => fail(f.getMessage)
+              }
+            case other => fail(other.toString)
           }
         case other => fail(other.toString)
       }

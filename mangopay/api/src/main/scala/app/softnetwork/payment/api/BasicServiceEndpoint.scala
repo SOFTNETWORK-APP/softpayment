@@ -45,7 +45,7 @@ trait BasicServiceEndpoint extends ApiEndpoint with TapirEndpoints {
       )
     }.post
       .in("auth" / "basic")
-      .serverLogicSuccess(_ => _ => Future.successful())
+      .serverLogicSuccess(_ => _ => Future.successful(()))
   }
 
   val invalidateSessionEndpoint: ServerEndpoint[Any, Future] =
@@ -55,7 +55,7 @@ trait BasicServiceEndpoint extends ApiEndpoint with TapirEndpoints {
       }
       .delete
       .in("auth" / "basic")
-      .serverLogicSuccess(_ => _ => Future.successful())
+      .serverLogicSuccess(_ => _ => Future.successful(()))
 
   override def endpoints: List[ServerEndpoint[Any, Future]] =
     List(createSessionEndpoint, invalidateSessionEndpoint)

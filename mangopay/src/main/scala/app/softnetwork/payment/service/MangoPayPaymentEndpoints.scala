@@ -37,12 +37,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] KYC has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] KYC has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.KYC_SUCCEEDED =>
                 run(
@@ -55,12 +55,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] KYC has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] KYC has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.KYC_OUTDATED =>
                 run(
@@ -73,12 +73,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] KYC has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] KYC has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.UBO_DECLARATION_REFUSED =>
                 run(
@@ -91,12 +91,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Ubo Declaration has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Ubo Declaration has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.UBO_DECLARATION_VALIDATED =>
                 run(
@@ -109,12 +109,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Ubo Declaration has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Ubo Declaration has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.UBO_DECLARATION_INCOMPLETE =>
                 run(
@@ -127,12 +127,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Ubo Declaration has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Ubo Declaration has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.USER_KYC_REGULAR =>
                 run(ValidateRegularUser(resourceId)).map {
@@ -140,12 +140,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Regular User has been validated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Regular User has not been validated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.USER_KYC_LIGHT =>
                 run(InvalidateRegularUser(resourceId)).map {
@@ -153,12 +153,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Regular User has been validated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Regular User has not been validated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.MANDATE_FAILED =>
                 run(
@@ -168,12 +168,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Mandate has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Mandate has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.MANDATE_SUBMITTED =>
                 run(
@@ -186,12 +186,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Mandate has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Mandate has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.MANDATE_CREATED =>
                 run(
@@ -201,12 +201,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Mandate has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Mandate has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.MANDATE_EXPIRED =>
                 run(
@@ -216,12 +216,12 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Mandate has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Mandate has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case EventType.MANDATE_ACTIVATED =>
                 run(
@@ -234,20 +234,20 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
                     log.info(
                       s"[Payment Hooks] Mandate has been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                   case _ =>
                     log.warn(
                       s"[Payment Hooks] Mandate has not been updated for $resourceId -> $eventType"
                     )
-                    Right()
+                    Right(())
                 }
               case _ =>
                 log.error(s"[Payment Hooks] Event $eventType for $resourceId is not supported")
-                Future.successful(Left())
+                Future.successful(Left(()))
             }
           case None =>
             log.error(s"[Payment Hooks] Event $eventType for $resourceId is not supported")
-            Future.successful(Left())
+            Future.successful(Left(()))
         }
       }
 

@@ -643,6 +643,67 @@ trait GenericPaymentBehavior
                   case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
                 }
 
+              case Transaction.PaymentType.PAYPAL =>
+                paymentAccount.userId match {
+                  case Some(userId) =>
+                    // load credited payment account
+                    paymentDao.loadPaymentAccount(creditedAccount) complete () match {
+                      case Success(s) =>
+                        s match {
+                          case Some(creditedPaymentAccount) =>
+                            creditedPaymentAccount.walletId match {
+                              case Some(creditedWalletId) =>
+                                payInWithPayPal(
+                                  PayInWithPayPalTransaction.defaultInstance
+                                    .withAuthorId(userId)
+                                    .withDebitedAmount(debitedAmount)
+                                    .withCurrency(currency)
+                                    .withOrderUuid(orderUuid)
+                                    .withCreditedWalletId(creditedWalletId)
+                                    .withStatementDescriptor(
+                                      statementDescriptor.getOrElse(PayInStatementDescriptor)
+                                    )
+                                    .withPrintReceipt(printReceipt)
+                                    .copy(
+                                      language = browserInfo.map(_.language)
+                                    )
+                                ) match {
+                                  case Some(transaction) =>
+                                    handlePayIn(
+                                      entityId,
+                                      orderUuid,
+                                      replyTo,
+                                      paymentAccount,
+                                      registerCard = false,
+                                      printReceipt = printReceipt,
+                                      transaction
+                                    )
+                                  case _ =>
+                                    Effect.none.thenRun(_ =>
+                                      PayInFailed(
+                                        "",
+                                        Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                                        "unknown"
+                                      ) ~> replyTo
+                                    )
+                                }
+                              case _ =>
+                                Effect.none.thenRun(_ =>
+                                  PayInFailed(
+                                    "",
+                                    Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                                    "no credited wallet"
+                                  ) ~> replyTo
+                                )
+                            }
+                          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+                        }
+                      case Failure(_) =>
+                        Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+                    }
+                  case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+                }
+
               case _ =>
                 Effect
                   .persist(
@@ -681,6 +742,26 @@ trait GenericPaymentBehavior
                   paymentAccount,
                   registerCard,
                   printReceipt,
+                  transaction
+                )
+              case _ => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
+            }
+          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+        }
+
+      case cmd: PayInForPayPal =>
+        import cmd._
+        state match {
+          case Some(paymentAccount) =>
+            loadPayIn(orderUuid, transactionId, None) match {
+              case Some(transaction) =>
+                handlePayIn(
+                  entityId,
+                  orderUuid,
+                  replyTo,
+                  paymentAccount,
+                  registerCard = false,
+                  printReceipt = printReceipt,
                   transaction
                 )
               case _ => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
@@ -3426,7 +3507,7 @@ trait GenericPaymentBehavior
         .withLastUpdated(lastUpdated)
     transaction.status match {
       case Transaction.TransactionStatus.TRANSACTION_CREATED
-          if transaction.redirectUrl.isDefined => // 3ds
+          if transaction.redirectUrl.isDefined => // 3ds | PayPal
         Effect
           .persist(
             PaymentAccountUpsertedEvent.defaultInstance

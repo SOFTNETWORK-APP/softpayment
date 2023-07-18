@@ -421,6 +421,54 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
       }
     }
 
+    "pay in / out with PayPal" in {
+      createSession(customerUuid, Some("customer"))
+      withHeaders(
+        Post(
+          s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder
+            .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
+          Payment(
+            orderUuid,
+            5100,
+            "EUR",
+            paymentType = Transaction.PaymentType.PAYPAL,
+            printReceipt = true
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.Accepted
+        val redirection = responseAs[PaymentRedirection]
+        val params = redirection.redirectUrl
+          .split("\\?")
+          .last
+          .split("[&=]")
+          .grouped(2)
+          .map(a => (a(0), a(1)))
+          .toMap
+        val transactionId = params.getOrElse("transactionId", "")
+        val printReceipt = params.getOrElse("printReceipt", "")
+        assert(printReceipt == "true")
+        Get(
+          s"/$RootPath/$PaymentPath/$PayPalRoute/$orderUuid?transactionId=$transactionId&printReceipt=$printReceipt"
+        ) ~> routes ~> check {
+          status shouldEqual StatusCodes.OK
+          assert(responseAs[PaidIn].transactionId == transactionId)
+          client.payOut(
+            orderUuid,
+            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+            5100,
+            0,
+            "EUR"
+          ) complete () match {
+            case Success(s) =>
+              assert(s.transactionId.isDefined)
+              assert(s.error.isEmpty)
+            case Failure(f) => fail(f.getMessage)
+          }
+        }
+      }
+    }
+
     "create mandate" in {
       createSession(sellerUuid, Some("seller"))
       withHeaders(

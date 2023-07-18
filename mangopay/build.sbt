@@ -4,5 +4,5 @@ name := "mangopay-core"
 
 libraryDependencies ++= Seq(
   // mangopay
-  "com.mangopay" % "mangopay2-java-sdk" % "2.25.1"
+  "com.mangopay" % "mangopay2-java-sdk" % "2.29.1"
 )

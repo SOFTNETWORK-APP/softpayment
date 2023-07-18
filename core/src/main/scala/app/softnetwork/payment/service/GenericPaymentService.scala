@@ -51,6 +51,7 @@ trait GenericPaymentService
       hooks ~
       card ~
       payInFor3ds ~
+      payInForPayPal ~
       preAuthorizeCardFor3ds ~
       payInFirstRecurringFor3ds ~
       bank ~
@@ -273,6 +274,30 @@ trait GenericPaymentService
               )
             case other => error(other)
           }
+      }
+    }
+  }
+
+  lazy val payInForPayPal: Route = pathPrefix(PayPalRoute) {
+    pathPrefix(Segment) { orderUuid =>
+      parameters("transactionId", "printReceipt".as[Boolean]) { (transactionId, printReceipt) =>
+        run(PayInForPayPal(orderUuid, transactionId, printReceipt)) completeWith {
+          case r: PaidIn =>
+            complete(
+              HttpResponse(
+                StatusCodes.OK,
+                entity = r
+              )
+            )
+          case r: PaymentRedirection =>
+            complete(
+              HttpResponse(
+                StatusCodes.Accepted,
+                entity = r
+              )
+            )
+          case other => error(other)
+        }
       }
     }
   }

@@ -175,7 +175,7 @@ object PaymentMessages {
     lazy val key: String = preAuthorizationId
   }
 
-  /** Flow [PreRegisterCard ->] PayIn [ -> PayInFor3DS]
+  /** Flow [PreRegisterCard ->] PayIn [ -> PayInFor3DS | PayInForPayPal]
     *
     * @param orderUuid
     *   - order uuid
@@ -236,6 +236,24 @@ object PaymentMessages {
     orderUuid: String,
     transactionId: String,
     registerCard: Boolean,
+    printReceipt: Boolean = false
+  ) extends PaymentCommandWithKey {
+    lazy val key: String = transactionId
+  }
+
+  /** PayPal return command
+    *
+    * @param orderUuid
+    *   - order unique id
+    * @param transactionId
+    *   - payIn transaction id
+    * @param printReceipt
+    *   - whether or not the client asks to print a receipt
+    */
+  @InternalApi
+  private[payment] case class PayInForPayPal(
+    orderUuid: String,
+    transactionId: String,
     printReceipt: Boolean = false
   ) extends PaymentCommandWithKey {
     lazy val key: String = transactionId

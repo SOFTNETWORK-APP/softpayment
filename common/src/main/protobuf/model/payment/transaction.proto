@@ -81,6 +81,9 @@ message Transaction {
     optional bool preAuthorizationCanceled = 27;
     optional bool preAuthorizationExpired = 28;
     optional int32 preAuthorizationDebitedAmount = 29;
+    optional string returnUrl = 30;
+    optional string payPalBuyerAccountEmail = 31;
+    optional string idempotencyKey = 32;
 }
 
 message BrowserInfo {
@@ -110,6 +113,19 @@ message PayInTransaction {
     required string statementDescriptor = 10;
     required Transaction.PaymentType paymentType = 11 [default = CARD];
     optional bool printReceipt = 12;
+}
+
+message PayInWithPayPalTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string orderUuid = 1;
+    required int32 debitedAmount = 2;
+    required int32 feesAmount = 3;
+    required string currency = 4 [default = "EUR"];
+    required string creditedWalletId = 5;
+    required string authorId = 6;
+    optional string language = 7;
+    optional string statementDescriptor = 8;
+    optional bool printReceipt = 9;
 }
 
 message RefundTransaction {
