@@ -7,9 +7,7 @@ import app.softnetwork.payment.model.MandateResult
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
-import sttp.tapir.generic.auto._
 import sttp.tapir.json.json4s.jsonBody
-import sttp.tapir._
 import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
@@ -34,14 +32,12 @@ trait MandateEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
           )
         )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         _ =>
-          run(CreateMandate(externalUuidWithProfile(principal._2))).map {
-            case MandateCreated =>
-              Right((principal._1._1, principal._1._2, MandateCreated))
-            case r: MandateConfirmationRequired =>
-              Right((principal._1._1, principal._1._2, r))
-            case other => Left(error(other))
+          run(CreateMandate(externalUuidWithProfile(session))).map {
+            case MandateCreated                 => Right(MandateCreated)
+            case r: MandateConfirmationRequired => Right(r)
+            case other                          => Left(error(other))
           }
       )
       .description("Create a mandate for the authenticated payment account")
@@ -53,12 +49,11 @@ trait MandateEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
         statusCode(StatusCode.Ok)
           .and(jsonBody[MandateCanceled.type].description("Mandate canceled"))
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         _ =>
-          run(CancelMandate(externalUuidWithProfile(principal._2))).map {
-            case MandateCanceled =>
-              Right((principal._1._1, principal._1._2, MandateCanceled))
-            case other => Left(error(other))
+          run(CancelMandate(externalUuidWithProfile(session))).map {
+            case MandateCanceled => Right(MandateCanceled)
+            case other           => Left(error(other))
           }
       )
       .description("Create Mandate for the authenticated payment account")

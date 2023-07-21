@@ -7,9 +7,7 @@ import app.softnetwork.payment.model.{RecurringPayment, RecurringPaymentView}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
-import sttp.tapir.generic.auto._
 import sttp.tapir.json.json4s.jsonBody
-import sttp.tapir._
 import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
@@ -40,14 +38,12 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
           )
         )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         cmd =>
-          run(cmd.copy(debitedAccount = externalUuidWithProfile(principal._2))).map {
-            case r: RecurringPaymentRegistered =>
-              Right((principal._1._1, principal._1._2, r))
-            case r: MandateConfirmationRequired =>
-              Right((principal._1._1, principal._1._2, r))
-            case other => Left(error(other))
+          run(cmd.copy(debitedAccount = externalUuidWithProfile(session))).map {
+            case r: RecurringPaymentRegistered  => Right(r)
+            case r: MandateConfirmationRequired => Right(r)
+            case other                          => Left(error(other))
           }
       )
       .description("Register a recurring payment for the authenticated payment account")
@@ -62,17 +58,16 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
             .description("Recurring payment successfully loaded")
         )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         recurringPaymentRegistrationId =>
           run(
             LoadRecurringPayment(
-              externalUuidWithProfile(principal._2),
+              externalUuidWithProfile(session),
               recurringPaymentRegistrationId
             )
           ).map {
-            case r: RecurringPaymentLoaded =>
-              Right((principal._1._1, principal._1._2, r.recurringPayment.view))
-            case other => Left(error(other))
+            case r: RecurringPaymentLoaded => Right(r.recurringPayment.view)
+            case other                     => Left(error(other))
           }
       )
       .description("Load the recurring payment of the authenticated payment account")
@@ -92,12 +87,11 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
               .description("Recurring card payment successfully updated")
           )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         cmd =>
-          run(cmd.copy(debitedAccount = externalUuidWithProfile(principal._2))).map {
-            case r: RecurringCardPaymentRegistrationUpdated =>
-              Right((principal._1._1, principal._1._2, r.result))
-            case other => Left(error(other))
+          run(cmd.copy(debitedAccount = externalUuidWithProfile(session))).map {
+            case r: RecurringCardPaymentRegistrationUpdated => Right(r.result)
+            case other                                      => Left(error(other))
           }
       )
       .description(
@@ -112,19 +106,18 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
         statusCode(StatusCode.Ok)
           .and(jsonBody[RecurringPayment.RecurringCardPaymentResult])
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         recurringPaymentRegistrationId =>
           run(
             UpdateRecurringCardPaymentRegistration(
-              externalUuidWithProfile(principal._2),
+              externalUuidWithProfile(session),
               recurringPaymentRegistrationId,
               None,
               Some(RecurringPayment.RecurringCardPaymentStatus.ENDED)
             )
           ).map {
-            case r: RecurringCardPaymentRegistrationUpdated =>
-              Right((principal._1._1, principal._1._2, r.result))
-            case other => Left(error(other))
+            case r: RecurringCardPaymentRegistrationUpdated => Right(r.result)
+            case other                                      => Left(error(other))
           }
       )
 

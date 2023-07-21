@@ -7,9 +7,7 @@ import app.softnetwork.payment.model.{UboDeclaration, UboDeclarationView}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
-import sttp.tapir.generic.auto._
 import sttp.tapir.json.json4s.jsonBody
-import sttp.tapir._
 import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
@@ -32,9 +30,9 @@ trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandl
               .description("The UBO successfully recorded")
           )
       )
-      .serverLogic(principal => { ubo =>
-        run(CreateOrUpdateUbo(externalUuidWithProfile(principal._2), ubo)).map {
-          case r: UboCreatedOrUpdated => Right((principal._1._1, principal._1._2, r.ubo))
+      .serverLogic(session => { ubo =>
+        run(CreateOrUpdateUbo(externalUuidWithProfile(session), ubo)).map {
+          case r: UboCreatedOrUpdated => Right(r.ubo)
           case other                  => Left(error(other))
         }
       })
@@ -50,12 +48,11 @@ trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandl
               .description("Ubo declaration of the authenticated legal payment account")
           )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         _ =>
-          run(GetUboDeclaration(externalUuidWithProfile(principal._2))).map {
-            case r: UboDeclarationLoaded =>
-              Right((principal._1._1, principal._1._2, r.declaration.view))
-            case other => Left(error(other))
+          run(GetUboDeclaration(externalUuidWithProfile(session))).map {
+            case r: UboDeclarationLoaded => Right(r.declaration.view)
+            case other                   => Left(error(other))
           }
       )
       .description("Load the Ubo declaration of the authenticated legal payment account")
@@ -70,12 +67,11 @@ trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandl
           )
         )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         _ =>
-          run(ValidateUboDeclaration(externalUuidWithProfile(principal._2))).map {
-            case UboDeclarationAskedForValidation =>
-              Right((principal._1._1, principal._1._2, UboDeclarationAskedForValidation))
-            case other => Left(error(other))
+          run(ValidateUboDeclaration(externalUuidWithProfile(session))).map {
+            case UboDeclarationAskedForValidation => Right(UboDeclarationAskedForValidation)
+            case other                            => Left(error(other))
           }
       )
       .description("Validate the Ubo declaration of the authenticated legal payment account")

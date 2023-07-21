@@ -7,7 +7,6 @@ import app.softnetwork.payment.model._
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.Part
-import sttp.tapir.generic.auto._
 import sttp.tapir.json.json4s.jsonBody
 import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.ServerEndpoint.Full
@@ -35,12 +34,11 @@ trait GenericPaymentEndpoints
   val loadPaymentAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     secureEndpoint.get
       .out(jsonBody[PaymentAccountView].description("Authenticated user payment account"))
-      .serverLogic(principal =>
+      .serverLogic(session =>
         _ => {
-          run(LoadPaymentAccount(externalUuidWithProfile(principal._2))).map {
-            case r: PaymentAccountLoaded =>
-              Right((principal._1._1, principal._1._2, r.paymentAccount.view))
-            case other => Left(error(other))
+          run(LoadPaymentAccount(externalUuidWithProfile(session))).map {
+            case r: PaymentAccountLoaded => Right(r.paymentAccount.view)
+            case other                   => Left(error(other))
           }
         }
       )

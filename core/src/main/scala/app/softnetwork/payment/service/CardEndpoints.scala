@@ -7,9 +7,7 @@ import app.softnetwork.payment.model.{CardPreRegistration, CardView}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
-import sttp.tapir.generic.auto._
 import sttp.tapir.json.json4s.jsonBody
-import sttp.tapir._
 import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
@@ -26,12 +24,11 @@ trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
           jsonBody[Seq[CardView]].description("Authenticated user cards")
         )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         _ => {
-          run(LoadCards(externalUuidWithProfile(principal._2))).map {
-            case r: CardsLoaded =>
-              Right((principal._1._1, principal._1._2, r.cards.map(_.view)))
-            case other => Left(error(other))
+          run(LoadCards(externalUuidWithProfile(session))).map {
+            case r: CardsLoaded => Right(r.cards.map(_.view))
+            case other          => Left(error(other))
           }
         }
       )
@@ -47,9 +44,8 @@ trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
             .description("Card pre registration data")
         )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         cmd => {
-          val session = principal._2
           var updatedUser =
             if (cmd.user.externalUuid.trim.isEmpty) {
               cmd.user.withExternalUuid(session.id)
@@ -62,9 +58,8 @@ trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
             case _ =>
           }
           run(cmd.copy(user = updatedUser)).map {
-            case r: CardPreRegistered =>
-              Right((principal._1._1, principal._1._2, r.cardPreRegistration))
-            case other => Left(error(other))
+            case r: CardPreRegistered => Right(r.cardPreRegistration)
+            case other                => Left(error(other))
           }
         }
       )
@@ -77,10 +72,10 @@ trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[CardDisabled.type])
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         cardId => {
-          run(DisableCard(externalUuidWithProfile(principal._2), cardId)).map {
-            case CardDisabled => Right((principal._1._1, principal._1._2, CardDisabled))
+          run(DisableCard(externalUuidWithProfile(session), cardId)).map {
+            case CardDisabled => Right(CardDisabled)
             case other        => Left(error(other))
           }
         }

@@ -7,9 +7,7 @@ import app.softnetwork.payment.model.{BankAccountView, PaymentAccount}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
-import sttp.tapir.generic.auto._
 import sttp.tapir.json.json4s.jsonBody
-import sttp.tapir._
 import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
@@ -26,8 +24,7 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
         statusCode(StatusCode.Ok)
           .and(jsonBody[BankAccountCreatedOrUpdated].description("Bank account created or updated"))
       )
-      .serverLogic(principal => { bank =>
-        val session = principal._2
+      .serverLogic(session => { bank =>
         import bank._
         var externalUuid: String = ""
         val updatedUser: Option[PaymentAccount.User] = {
@@ -73,7 +70,7 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
             acceptedTermsOfPSP
           )
         ).map {
-          case r: BankAccountCreatedOrUpdated => Right((principal._1._1, principal._1._2, r))
+          case r: BankAccountCreatedOrUpdated => Right(r)
           case other                          => Left(error(other))
         }
       })
@@ -88,14 +85,13 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
             .description("Authenticated user bank account")
         )
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         _ => {
           run(
-            LoadBankAccount(externalUuidWithProfile(principal._2))
+            LoadBankAccount(externalUuidWithProfile(session))
           ).map {
-            case r: BankAccountLoaded =>
-              Right((principal._1._1, principal._1._2, r.bankAccount.view))
-            case other => Left(error(other))
+            case r: BankAccountLoaded => Right(r.bankAccount.view)
+            case other                => Left(error(other))
           }
         }
       )
@@ -107,12 +103,11 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[BankAccountDeleted.type])
       )
-      .serverLogic(principal =>
+      .serverLogic(session =>
         _ =>
-          run(DeleteBankAccount(externalUuidWithProfile(principal._2), Some(false))).map {
-            case BankAccountDeleted =>
-              Right((principal._1._1, principal._1._2, BankAccountDeleted))
-            case other => Left(error(other))
+          run(DeleteBankAccount(externalUuidWithProfile(session), Some(false))).map {
+            case BankAccountDeleted => Right(BankAccountDeleted)
+            case other              => Left(error(other))
           }
       )
       .description("Delete authenticated user bank account")

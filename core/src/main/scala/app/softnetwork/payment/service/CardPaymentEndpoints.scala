@@ -1,6 +1,5 @@
 package app.softnetwork.payment.service
 
-import app.softnetwork.api.server.ApiErrors
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
@@ -9,10 +8,8 @@ import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.{HeaderNames, Method, StatusCode}
 import sttp.model.headers.CookieValueWithMeta
-import sttp.tapir.generic.auto._
 import sttp.tapir.json.json4s.jsonBody
-import sttp.tapir._
-import sttp.tapir.server.{PartialServerEndpoint, ServerEndpoint}
+import sttp.tapir.server.{PartialServerEndpointWithSecurityOutput, ServerEndpoint}
 
 import scala.concurrent.Future
 
@@ -20,12 +17,13 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
 
   import app.softnetwork.serialization._
 
-  def payment(payment: Payment): PartialServerEndpoint[
+  def payment(payment: Payment): PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    ((Seq[Option[String]], Option[CookieValueWithMeta]), Session),
+    Session,
     (Option[String], Option[String], Option[String], Option[String], Payment),
-    ApiErrors.ErrorInfo,
+    Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
+    Unit,
     Any,
     Future
   ] =
@@ -69,9 +67,8 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           )
         )
       )
-      .serverLogic(principal => { case (language, accept, userAgent, ipAddress, payment) =>
+      .serverLogic(session => { case (language, accept, userAgent, ipAddress, payment) =>
         val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
-        val session = principal._2
         import payment._
         run(
           PreAuthorizeCard(
@@ -87,8 +84,8 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
             printReceipt
           )
         ).map {
-          case result: CardPreAuthorized  => Right((principal._1._1, principal._1._2, result))
-          case result: PaymentRedirection => Right((principal._1._1, principal._1._2, result))
+          case result: CardPreAuthorized  => Right(result)
+          case result: PaymentRedirection => Right(result)
           case other                      => Left(error(other))
         }
       })
@@ -158,10 +155,9 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           )
         )
       )
-      .serverLogic(principal => {
+      .serverLogic(session => {
         case (language, accept, userAgent, ipAddress, payment, creditedAccount) =>
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
-          val session = principal._2
           import payment._
           run(
             PayIn(
@@ -180,8 +176,8 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
               printReceipt
             )
           ).map {
-            case result: PaidIn             => Right((principal._1._1, principal._1._2, result))
-            case result: PaymentRedirection => Right((principal._1._1, principal._1._2, result))
+            case result: PaidIn             => Right(result)
+            case result: PaymentRedirection => Right(result)
             case other                      => Left(error(other))
           }
       })
@@ -272,10 +268,9 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           )
         )
       )
-      .serverLogic(principal => {
+      .serverLogic(session => {
         case (language, accept, userAgent, ipAddress, payment, recurringPaymentRegistrationId) =>
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
-          val session = principal._2
           import payment._
           run(
             PayInFirstRecurring(
@@ -286,8 +281,8 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
               statementDescriptor
             )
           ).map {
-            case result: FirstRecurringPaidIn => Right((principal._1._1, principal._1._2, result))
-            case result: PaymentRedirection   => Right((principal._1._1, principal._1._2, result))
+            case result: FirstRecurringPaidIn => Right(result)
+            case result: PaymentRedirection   => Right(result)
             case other                        => Left(error(other))
           }
       })
