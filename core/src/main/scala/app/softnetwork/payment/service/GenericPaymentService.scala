@@ -36,7 +36,8 @@ trait GenericPaymentService
     with DefaultComplete
     with Json4sSupport
     with StrictLogging
-    with BasicPaymentService { _: GenericPaymentHandler =>
+    with BasicPaymentService
+    with ApiRoute { _: GenericPaymentHandler =>
 
   implicit def serialization: Serialization.type = jackson.Serialization
 

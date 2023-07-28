@@ -1,5 +1,6 @@
 package app.softnetwork.payment.api
 
+import akka.actor.typed.ActorSystem
 import app.softnetwork.api.server.ApiEndpoint
 import app.softnetwork.session.service.SessionEndpoints
 import com.softwaremill.session.{
@@ -15,7 +16,7 @@ import sttp.tapir._
 import sttp.tapir.model.UsernamePassword
 import sttp.tapir.server.{PartialServerEndpointWithSecurityOutput, ServerEndpoint}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 
 trait BasicServiceEndpoint extends ApiEndpoint with TapirEndpoints {
@@ -63,8 +64,9 @@ trait BasicServiceEndpoint extends ApiEndpoint with TapirEndpoints {
 }
 
 object BasicServiceEndpoint {
-  def apply(_sessionEndpoints: SessionEndpoints): BasicServiceEndpoint =
+  def apply(_system: ActorSystem[_], _sessionEndpoints: SessionEndpoints): BasicServiceEndpoint =
     new BasicServiceEndpoint {
       override def sessionEndpoints: SessionEndpoints = _sessionEndpoints
+      override implicit def ec: ExecutionContext = _system.executionContext
     }
 }

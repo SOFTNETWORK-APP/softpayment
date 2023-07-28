@@ -1,8 +1,7 @@
 package app.softnetwork.payment.launch
 
 import akka.actor.typed.ActorSystem
-import akka.http.scaladsl.server.Route
-import app.softnetwork.api.server.ApiRoutes
+import app.softnetwork.api.server.{ApiRoute, ApiRoutes}
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.payment.service.GenericPaymentService
 import app.softnetwork.persistence.schema.SchemaProvider
@@ -17,6 +16,10 @@ trait PaymentRoutes extends ApiRoutes with PaymentGuardian { _: SchemaProvider =
 
   def paymentService: ActorSystem[_] => GenericPaymentService
 
-  override def apiRoutes(system: ActorSystem[_]): Route = paymentService(system).route
+  override def apiRoutes: ActorSystem[_] => List[ApiRoute] =
+    system =>
+      List(
+        paymentService(system)
+      )
 
 }

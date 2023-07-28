@@ -1,6 +1,5 @@
 package app.softnetwork.payment.service
 
-import akka.http.scaladsl.server.Route
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
@@ -57,7 +56,6 @@ trait GenericPaymentEndpoints
       hooks
     )
 
-  lazy val route: Route = apiRoute
 }
 
 case class UploadDocument(pages: Part[Array[Byte]]) { //TODO pages may include multiple parts
