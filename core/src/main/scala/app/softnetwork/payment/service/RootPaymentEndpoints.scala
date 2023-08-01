@@ -11,7 +11,7 @@ import org.softnetwork.session.model.Session
 import sttp.model.headers.CookieValueWithMeta
 import sttp.model.Method
 import sttp.tapir.server.PartialServerEndpointWithSecurityOutput
-import sttp.tapir.{Endpoint, EndpointInput}
+import sttp.tapir.Endpoint
 
 import scala.concurrent.Future
 import scala.language.implicitConversions
@@ -24,9 +24,6 @@ trait RootPaymentEndpoints
   override implicit def formats: Formats = paymentFormats
 
   override implicit def resultToApiError(result: PaymentResult): ApiErrors.ErrorInfo = error(result)
-
-  def extractRemoteAddress: EndpointInput.ExtractFromRequest[Option[String]] =
-    extractFromRequest[Option[String]](req => req.connectionInfo.remote.map(_.getHostName))
 
   lazy val rootEndpoint: Endpoint[Unit, Unit, Unit, Unit, Any] =
     endpoint

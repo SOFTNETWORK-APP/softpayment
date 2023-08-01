@@ -31,7 +31,7 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       .in(header[Option[String]](HeaderNames.AcceptLanguage))
       .in(header[Option[String]](HeaderNames.Accept))
       .in(header[Option[String]](HeaderNames.UserAgent))
-      .in(extractRemoteAddress)
+      .in(clientIp)
       .in(
         jsonBody[Payment]
           .description("Payment to perform")

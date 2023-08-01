@@ -1,6 +1,7 @@
 package app.softnetwork.payment.service
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{RemoteAddress, StatusCodes}
+import akka.http.scaladsl.model.headers.`X-Forwarded-For`
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.api.server.config.ServerSettings.RootPath
 import app.softnetwork.payment.api.PaymentClient
@@ -14,7 +15,7 @@ import app.softnetwork.persistence.now
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
 
-import java.net.URLEncoder
+import java.net.{InetAddress, URLEncoder}
 import java.time.LocalDate
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
@@ -64,7 +65,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
             registerCard = true,
             printReceipt = true
           )
-        )
+        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.Accepted
         val redirection = responseAs[PaymentRedirection]
@@ -340,7 +341,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
             Some(cardPreRegistration.preregistrationData),
             registerCard = true
           )
-        )
+        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         preAuthorizationId = responseAs[CardPreAuthorized].transactionId
@@ -384,7 +385,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
             registerCard = true,
             printReceipt = true
           )
-        )
+        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.Accepted
         val redirection = responseAs[PaymentRedirection]
@@ -434,7 +435,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
             paymentType = Transaction.PaymentType.PAYPAL,
             printReceipt = true
           )
-        )
+        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.Accepted
         val redirection = responseAs[PaymentRedirection]
@@ -597,7 +598,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
             "",
             0
           )
-        )
+        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         withHeaders(
