@@ -140,7 +140,9 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
 
   override def payOut(in: PayOutRequest): Future[TransactionResponse] = {
     import in._
-    !?(PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency)) map {
+    !?(
+      PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency, externalReference)
+    ) map {
       case r: PaidOut =>
         TransactionResponse(
           transactionId = Some(r.transactionId),

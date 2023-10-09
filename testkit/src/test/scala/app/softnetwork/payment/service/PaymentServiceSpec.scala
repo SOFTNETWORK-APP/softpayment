@@ -358,7 +358,8 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
               computeExternalUuidWithProfile(sellerUuid, Some("seller")),
               100,
               0,
-              "EUR"
+              "EUR",
+              Some("reference")
             ) complete () match {
               case Success(s) =>
                 assert(s.transactionId.isDefined)
@@ -411,7 +412,8 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             5100,
             0,
-            "EUR"
+            "EUR",
+            None
           ) complete () match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
@@ -459,7 +461,8 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             5100,
             0,
-            "EUR"
+            "EUR",
+            None
           ) complete () match {
             case Success(s) =>
               assert(s.transactionId.isDefined)

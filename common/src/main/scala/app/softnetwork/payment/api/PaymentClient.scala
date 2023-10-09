@@ -70,10 +70,18 @@ trait PaymentClient extends GrpcClient {
     creditedAccount: String,
     creditedAmount: Int,
     feesAmount: Int,
-    currency: String
+    currency: String,
+    externalReference: Option[String]
   ): Future[TransactionResponse] = {
     grpcClient.payOut(
-      PayOutRequest(orderUuid, creditedAccount, creditedAmount, feesAmount, currency)
+      PayOutRequest(
+        orderUuid,
+        creditedAccount,
+        creditedAmount,
+        feesAmount,
+        currency,
+        externalReference
+      )
     )
   }
 

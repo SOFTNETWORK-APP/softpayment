@@ -91,7 +91,14 @@ trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentE
             }
           case evt: PayOutCommandEvent =>
             import evt._
-            val command = PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency)
+            val command = PayOut(
+              orderUuid,
+              creditedAccount,
+              creditedAmount,
+              feesAmount,
+              currency,
+              externalReference
+            )
             !?(command) map {
               case _: PaidOut =>
                 if (forTests) system.eventStream.tell(Publish(event))

@@ -80,6 +80,7 @@ message PayOutRequest {
     int32 creditedAmount = 3;
     int32 feesAmount = 4;
     string currency = 5;
+    google.protobuf.StringValue externalReference = 6;
 }
 
 message TransferRequest {

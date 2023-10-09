@@ -189,11 +189,20 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
     }
   }
 
-  def payOut(orderUuid: String, creditedAccount: String, creditedAmount: Int, feesAmount: Int)(
-    implicit system: ActorSystem[_]
+  def payOut(
+    orderUuid: String,
+    creditedAccount: String,
+    creditedAmount: Int,
+    feesAmount: Int,
+    currency: String = "EUR",
+    externalReference: Option[String]
+  )(implicit
+    system: ActorSystem[_]
   ): Future[Either[PayOutFailed, PaidOut]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    !?(PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount)) map {
+    !?(
+      PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency, externalReference)
+    ) map {
       case result: PaidOut     => Right(result)
       case error: PayOutFailed => Left(error)
       case _ =>

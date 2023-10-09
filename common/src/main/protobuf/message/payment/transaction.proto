@@ -78,6 +78,7 @@ message PaidOutEvent {
     required string currency = 6 [default = "EUR"];
     required string transactionId = 7;
     required app.softnetwork.payment.model.Transaction.PaymentType paymentType = 8;
+    optional string externalReference = 9;
 }
 
 message PayOutFailedEvent {
@@ -86,6 +87,7 @@ message PayOutFailedEvent {
     required string orderUuid = 1;
     required string resultMessage = 2;
     optional app.softnetwork.payment.model.Transaction transaction = 3;
+    optional string externalReference = 4;
 }
 
 message RefundedEvent {

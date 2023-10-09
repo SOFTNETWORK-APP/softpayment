@@ -264,7 +264,8 @@ object PaymentMessages {
     creditedAccount: String,
     creditedAmount: Int,
     feesAmount: Int = 0,
-    currency: String = "EUR"
+    currency: String = "EUR",
+    externalReference: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }

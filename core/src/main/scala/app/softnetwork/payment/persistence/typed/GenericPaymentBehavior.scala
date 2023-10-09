@@ -937,6 +937,7 @@ trait GenericPaymentBehavior
                               .withAuthorId(userId)
                               .withCreditedUserId(userId)
                               .withDebitedWalletId(walletId)
+                              .copy(externalReference = externalReference)
                           )
                         ) match {
                           case Some(transaction) =>
@@ -962,6 +963,7 @@ trait GenericPaymentBehavior
                                       .withOrderUuid(orderUuid)
                                       .withResultMessage(transaction.resultMessage)
                                       .withTransaction(transaction)
+                                      .copy(externalReference = externalReference)
                                   ) :+
                                   PaymentAccountUpsertedEvent.defaultInstance
                                     .withDocument(updatedPaymentAccount)
@@ -995,6 +997,7 @@ trait GenericPaymentBehavior
                                       .withCurrency(currency)
                                       .withTransactionId(transaction.id)
                                       .withPaymentType(transaction.paymentType)
+                                      .copy(externalReference = externalReference)
                                   ) :+
                                   PaymentAccountUpsertedEvent.defaultInstance
                                     .withDocument(updatedPaymentAccount)
@@ -1017,6 +1020,7 @@ trait GenericPaymentBehavior
                                       .withOrderUuid(orderUuid)
                                       .withResultMessage(transaction.resultMessage)
                                       .withTransaction(transaction)
+                                      .copy(externalReference = externalReference)
                                   ) :+
                                   PaymentAccountUpsertedEvent.defaultInstance
                                     .withDocument(updatedPaymentAccount)
@@ -1041,6 +1045,7 @@ trait GenericPaymentBehavior
                                   PayOutFailedEvent.defaultInstance
                                     .withOrderUuid(orderUuid)
                                     .withResultMessage("no transaction returned by provider")
+                                    .copy(externalReference = externalReference)
                                 )
                               )
                               .thenRun(_ =>
@@ -1052,31 +1057,58 @@ trait GenericPaymentBehavior
                               )
                         }
                       case _ =>
-                        Effect.none.thenRun(_ =>
-                          PayOutFailed(
-                            "",
-                            Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-                            "no bank account"
-                          ) ~> replyTo
-                        )
+                        Effect
+                          .persist(
+                            broadcastEvent(
+                              PayOutFailedEvent.defaultInstance
+                                .withOrderUuid(orderUuid)
+                                .withResultMessage("no bank account")
+                                .copy(externalReference = externalReference)
+                            )
+                          )
+                          .thenRun(_ =>
+                            PayOutFailed(
+                              "",
+                              Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                              "no bank account"
+                            ) ~> replyTo
+                          )
                     }
                   case _ =>
-                    Effect.none.thenRun(_ =>
-                      PayOutFailed(
-                        "",
-                        Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-                        "no wallet id"
-                      ) ~> replyTo
-                    )
+                    Effect
+                      .persist(
+                        broadcastEvent(
+                          PayOutFailedEvent.defaultInstance
+                            .withOrderUuid(orderUuid)
+                            .withResultMessage("no wallet id")
+                            .copy(externalReference = externalReference)
+                        )
+                      )
+                      .thenRun(_ =>
+                        PayOutFailed(
+                          "",
+                          Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                          "no wallet id"
+                        ) ~> replyTo
+                      )
                 }
               case _ =>
-                Effect.none.thenRun(_ =>
-                  PayOutFailed(
-                    "",
-                    Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-                    "no payment provider user id"
-                  ) ~> replyTo
-                )
+                Effect
+                  .persist(
+                    broadcastEvent(
+                      PayOutFailedEvent.defaultInstance
+                        .withOrderUuid(orderUuid)
+                        .withResultMessage("no payment provider user id")
+                        .copy(externalReference = externalReference)
+                    )
+                  )
+                  .thenRun(_ =>
+                    PayOutFailed(
+                      "",
+                      Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+                      "no payment provider user id"
+                    ) ~> replyTo
+                  )
             }
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
@@ -1144,7 +1176,9 @@ trait GenericPaymentBehavior
                         orderUuid.getOrElse(""),
                         creditedAccount,
                         debitedAmount,
-                        feesAmount = 0 /* fees have already been applied with Transfer */
+                        feesAmount = 0, /* fees have already been applied with Transfer */
+                        currency,
+                        externalReference
                       ) complete () match {
                         case Success(s) =>
                           s match {

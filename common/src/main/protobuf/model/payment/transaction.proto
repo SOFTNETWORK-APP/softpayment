@@ -162,6 +162,7 @@ message PayOutTransaction {
     required string bankAccountId = 6;
     required string authorId = 7;
     required string debitedWalletId = 8;
+    optional string externalReference = 9;
 }
 
 message DirectDebitTransaction {

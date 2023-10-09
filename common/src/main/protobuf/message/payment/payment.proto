@@ -207,6 +207,7 @@ message PayOutCommandEvent{
     required int32 creditedAmount = 3;
     required int32 feesAmount = 4;
     required string currency = 5 [default = "EUR"];
+    optional string externalReference = 6;
 }
 
 message TransferCommandEvent{

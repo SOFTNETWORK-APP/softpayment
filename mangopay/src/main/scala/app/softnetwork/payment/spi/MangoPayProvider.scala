@@ -1419,7 +1419,8 @@ trait MangoPayProvider extends PaymentProvider {
                   authorId = result.getAuthorId,
                   creditedUserId = Option(result.getCreditedUserId),
                   debitedWalletId = Option(result.getDebitedWalletId),
-                  idempotencyKey = idempotencyKey
+                  idempotencyKey = idempotencyKey,
+                  externalReference = externalReference
                 )
                 .withPaymentType(Transaction.PaymentType.BANK_WIRE)
             )
@@ -1441,7 +1442,8 @@ trait MangoPayProvider extends PaymentProvider {
                     resultMessage = Option(r.getApiMessage).getOrElse(""),
                     authorId = authorId,
                     creditedUserId = Some(creditedUserId),
-                    debitedWalletId = Some(debitedWalletId)
+                    debitedWalletId = Some(debitedWalletId),
+                    externalReference = externalReference
                   )
                 )
               case _ =>

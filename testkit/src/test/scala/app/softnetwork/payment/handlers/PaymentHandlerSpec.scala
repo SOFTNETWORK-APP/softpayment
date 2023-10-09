@@ -825,7 +825,8 @@ class PaymentHandlerSpec
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
                 0,
-                "EUR"
+                "EUR",
+                None
               ) complete () match {
                 case Success(s) =>
                   assert(s.transactionId.isDefined)
@@ -854,7 +855,8 @@ class PaymentHandlerSpec
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             100,
             0,
-            "EUR"
+            "EUR",
+            None
           ) complete () match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
@@ -901,7 +903,8 @@ class PaymentHandlerSpec
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
                 0,
-                "EUR"
+                "EUR",
+                None
               ) complete () match {
                 case Success(s) =>
                   assert(s.transactionId.isDefined)
