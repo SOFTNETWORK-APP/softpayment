@@ -1,7 +1,7 @@
 package app.softnetwork.payment.scalatest
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.api.server.{ApiEndpoint, Endpoint}
+import app.softnetwork.api.server.Endpoint
 import app.softnetwork.payment.launch.{PaymentEndpoints, PaymentGuardian}
 import app.softnetwork.payment.service.{GenericPaymentEndpoints, MockPaymentEndpoints}
 import app.softnetwork.persistence.schema.SchemaProvider
