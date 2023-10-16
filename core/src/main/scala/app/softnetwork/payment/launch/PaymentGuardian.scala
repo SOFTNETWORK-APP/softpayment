@@ -1,6 +1,7 @@
 package app.softnetwork.payment.launch
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.payment.PaymentCoreBuildInfo
 import app.softnetwork.payment.persistence.data.paymentKvDao
 import app.softnetwork.payment.persistence.query.{
   GenericPaymentCommandProcessorStream,
@@ -11,9 +12,10 @@ import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.persistence.typed.Singleton
+import app.softnetwork.session.CsrfCheck
 import app.softnetwork.session.launch.SessionGuardian
 
-trait PaymentGuardian extends SessionGuardian { _: SchemaProvider =>
+trait PaymentGuardian extends SessionGuardian { _: SchemaProvider with CsrfCheck =>
 
   import app.softnetwork.persistence.launch.PersistenceGuardian._
 
@@ -45,4 +47,6 @@ trait PaymentGuardian extends SessionGuardian { _: SchemaProvider =>
   override def eventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
     paymentEventProcessorStreams(sys)
 
+  override def systemVersion(): String =
+    sys.env.getOrElse("VERSION", PaymentCoreBuildInfo.version)
 }

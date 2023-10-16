@@ -22,7 +22,7 @@ trait PaymentRouteTestKit extends SessionTestKit with PaymentTestKit with Paymen
   override def beforeAll(): Unit = {
     initAndJoinCluster()
     // pre load routes
-    apiRoutes(typedSystem())
+    mainRoutes(typedSystem())
   }
 
   def loadPaymentAccount(): PaymentAccountView = {

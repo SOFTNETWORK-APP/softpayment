@@ -3,13 +3,8 @@ package app.softnetwork.payment.api
 import akka.actor.typed.ActorSystem
 import app.softnetwork.api.server.ApiEndpoint
 import app.softnetwork.session.service.SessionEndpoints
-import com.softwaremill.session.{
-  GetSessionTransport,
-  SetSessionTransport,
-  TapirCsrfCheckMode,
-  TapirEndpoints,
-  TapirSessionContinuity
-}
+import com.softwaremill.session.{GetSessionTransport, SetSessionTransport}
+import app.softnetwork.session.{TapirCsrfCheckMode, TapirEndpoints, TapirSessionContinuity}
 import org.softnetwork.session.model.Session
 import sttp.model.headers.WWWAuthenticateChallenge
 import sttp.tapir._

@@ -9,7 +9,6 @@ import app.softnetwork.session.service.SessionEndpoints
 import com.mangopay.core.enumerations.EventType
 import org.slf4j.{Logger, LoggerFactory}
 import sttp.tapir.server.ServerEndpoint.Full
-import sttp.tapir._
 
 import scala.concurrent.Future
 
@@ -19,9 +18,10 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
     */
   override lazy val hooks: Full[Unit, Unit, (String, String), Unit, Unit, Any, Future] =
     rootEndpoint
+      .description("MangoPay Payment Hooks")
       .in(PaymentSettings.HooksRoute)
-      .in(query[String]("EventType"))
-      .in(query[String]("RessourceId"))
+      .in(query[String]("EventType").description("MangoPay Event Type"))
+      .in(query[String]("RessourceId").description("MangoPay Resource Id related to this event"))
       .serverLogic { case (eventType, resourceId) =>
         Option(EventType.valueOf(eventType)) match {
           case Some(s) =>

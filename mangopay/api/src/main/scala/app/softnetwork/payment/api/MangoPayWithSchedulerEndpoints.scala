@@ -1,14 +1,14 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.api.server.ApiEndpoint
+import app.softnetwork.api.server.Endpoint
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.scheduler.launch.SchedulerEndpoints
-import com.softwaremill.session.CsrfCheck
+import app.softnetwork.session.CsrfCheck
 
 trait MangoPayWithSchedulerEndpoints extends SchedulerEndpoints with MangoPayEndpoints {
-  _: SchemaProvider with CsrfCheck =>
+  _: MangoPayWithSchedulerApi with SchemaProvider with CsrfCheck =>
 
-  override def endpoints: ActorSystem[_] => List[ApiEndpoint] =
-    system => super.endpoints(system) :+ schedulerEndpoints(system)
+  override def endpoints: ActorSystem[_] => List[Endpoint] = system =>
+    super.endpoints(system) :+ schedulerEndpoints(system) :+ schedulerSwagger(system)
 }

@@ -1,5 +1,3 @@
-import app.softnetwork.sbt.build._
-
 organization := "app.softnetwork.payment"
 
 name := "payment-common"

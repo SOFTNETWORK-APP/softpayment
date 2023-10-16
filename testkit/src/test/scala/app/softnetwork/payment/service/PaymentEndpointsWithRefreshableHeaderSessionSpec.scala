@@ -2,7 +2,7 @@ package app.softnetwork.payment.service
 
 import app.softnetwork.payment.scalatest.PaymentEndpointsTestKit
 import app.softnetwork.session.scalatest.RefreshableHeaderSessionEndpointsTestKit
-import com.softwaremill.session.CsrfCheckHeader
+import app.softnetwork.session.CsrfCheckHeader
 
 class PaymentEndpointsWithRefreshableHeaderSessionSpec
     extends PaymentServiceSpec
