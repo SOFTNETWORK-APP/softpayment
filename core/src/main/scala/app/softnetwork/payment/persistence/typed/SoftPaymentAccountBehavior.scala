@@ -50,7 +50,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
               )
           case _ => None
         }
-      case _ => None
+      case _ => SoftPaymentAccount(BasicAccount(cmd, Some(entityId)))
     }
   }
 

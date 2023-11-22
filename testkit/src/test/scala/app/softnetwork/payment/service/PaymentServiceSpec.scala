@@ -28,7 +28,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
 
   import app.softnetwork.serialization._
 
-  lazy val client: PaymentClient = PaymentClient(typedSystem())
+  lazy val paymentClient: PaymentClient = PaymentClient(ts)
 
   "Payment service" must {
     "pre register card" in {
@@ -347,7 +347,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         preAuthorizationId = responseAs[CardPreAuthorized].transactionId
-        client.payInWithCardPreAuthorized(
+        paymentClient.payInWithCardPreAuthorized(
           preAuthorizationId,
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           None
@@ -355,7 +355,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
           case Success(result) =>
             assert(result.transactionId.isDefined)
             assert(result.error.isEmpty)
-            client.payOut(
+            paymentClient.payOut(
               orderUuid,
               computeExternalUuidWithProfile(sellerUuid, Some("seller")),
               100,
@@ -409,7 +409,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          client.payOut(
+          paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             5100,
@@ -458,7 +458,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          client.payOut(
+          paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             5100,

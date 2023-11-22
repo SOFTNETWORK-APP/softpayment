@@ -1,8 +1,18 @@
 package app.softnetwork.payment.scalatest
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.account.config.AccountSettings
+import app.softnetwork.account.handlers.AccountDao
+import app.softnetwork.account.model.BasicAccountProfile
+import app.softnetwork.account.persistence.query.AccountEventProcessorStreams.InternalAccountEvents2AccountProcessorStream
+import app.softnetwork.account.persistence.typed.AccountBehavior
+import app.softnetwork.notification.scalatest.AllNotificationsTestKit
 import app.softnetwork.payment.config.PaymentSettings._
-import app.softnetwork.payment.handlers.MockPaymentHandler
+import app.softnetwork.payment.handlers.{
+  MockPaymentHandler,
+  MockSoftPaymentAccountDao,
+  MockSoftPaymentAccountHandler
+}
 import app.softnetwork.payment.launch.PaymentGuardian
 import app.softnetwork.payment.message.PaymentMessages.{
   KycDocumentStatusNotUpdated,
@@ -17,8 +27,7 @@ import app.softnetwork.payment.persistence.query.{
 import app.softnetwork.payment.persistence.typed.{
   GenericPaymentBehavior,
   MockPaymentBehavior,
-  MockSoftPaymentAccountBehavior,
-  SoftPaymentAccountBehavior
+  MockSoftPaymentAccountBehavior
 }
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.{
@@ -34,19 +43,22 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
 
-trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian {
+trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotificationsTestKit {
   _: Suite with SessionMaterials =>
 
   /** @return
     *   roles associated with this node
     */
-  override def roles: Seq[String] = super.roles :+ AkkaNodeRole
+  override def roles: Seq[String] = super.roles :+ AkkaNodeRole :+ AccountSettings.AkkaNodeRole
 
   override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
     MockPaymentBehavior
 
-  override def softPaymentAccountBehavior: ActorSystem[_] => SoftPaymentAccountBehavior = _ =>
+  override def accountBehavior
+    : ActorSystem[_] => AccountBehavior[SoftPaymentAccount, BasicAccountProfile] = _ =>
     MockSoftPaymentAccountBehavior
+
+  override def accountDao: AccountDao = MockSoftPaymentAccountDao
 
   override def paymentCommandProcessorStream
     : ActorSystem[_] => GenericPaymentCommandProcessorStream = sys =>
@@ -68,6 +80,18 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian {
       lazy val log: Logger = LoggerFactory getLogger getClass.getName
       override val tag: String = SchedulerSettings.tag(MockPaymentBehavior.persistenceId)
       override val forTests: Boolean = true
+      override implicit def system: ActorSystem[_] = sys
+    }
+
+  override def internalAccountEvents2AccountProcessorStream
+    : ActorSystem[_] => InternalAccountEvents2AccountProcessorStream = sys =>
+    new InternalAccountEvents2AccountProcessorStream
+      with MockSoftPaymentAccountHandler
+      with InMemoryJournalProvider
+      with InMemoryOffsetProvider {
+      lazy val log: Logger = LoggerFactory getLogger getClass.getName
+      override def tag: String = s"${MockSoftPaymentAccountBehavior.persistenceId}-to-internal"
+      override lazy val forTests: Boolean = true
       override implicit def system: ActorSystem[_] = sys
     }
 
@@ -176,13 +200,18 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian {
   }
 
   override def entities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
-    schedulerEntities(sys) ++ sessionEntities(sys) ++ paymentEntities(sys)
+    schedulerEntities(sys) ++ sessionEntities(sys) ++ accountEntities(sys) ++ paymentEntities(
+      sys
+    ) ++ notificationEntities(sys)
 
   override def eventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
     schedulerEventProcessorStreams(sys) ++
-    paymentEventProcessorStreams(sys)
+    paymentEventProcessorStreams(sys) ++
+    accountEventProcessorStreams(sys) ++
+    notificationEventProcessorStreams(sys)
 
-  /*override def initSystem: ActorSystem[_] => Unit = system => {
+  override def initSystem: ActorSystem[_] => Unit = system => {
+    initAccountSystem(system)
     initSchedulerSystem(system)
-  }*/
+  }
 }

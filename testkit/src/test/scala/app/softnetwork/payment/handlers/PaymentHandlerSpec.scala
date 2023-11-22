@@ -33,7 +33,7 @@ class PaymentHandlerSpec
   override protected def sessionType: Session.SessionType =
     Settings.Session.SessionContinuityAndTransport
 
-  lazy val client: PaymentClient = PaymentClient(ts)
+  lazy val paymentClient: PaymentClient = PaymentClient(ts)
 
   "Payment handler" must {
     "pre register card" in {
@@ -503,7 +503,7 @@ class PaymentHandlerSpec
               sellerBankAccountId = paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
 //              assert(sellerBankAccountId != previousBankAccountId)
               uboDeclarationId = paymentAccount.getLegalUser.uboDeclaration.map(_.id).getOrElse("")
-              client.loadLegalUserDetails(
+              paymentClient.loadLegalUserDetails(
                 computeExternalUuidWithProfile(sellerUuid, Some("seller"))
               ) complete () match {
                 case Success(value) =>
@@ -796,7 +796,7 @@ class PaymentHandlerSpec
         case result: CardPreAuthorized =>
           val transactionId = result.transactionId
           preAuthorizationId = transactionId
-          client.payInWithCardPreAuthorized(
+          paymentClient.payInWithCardPreAuthorized(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             Some(110)
@@ -806,7 +806,7 @@ class PaymentHandlerSpec
               assert(result.error.getOrElse("") == "DebitedAmountAbovePreAuthorizationAmount")
             case Failure(f) => fail(f.getMessage)
           }
-          client.payInWithCardPreAuthorized(
+          paymentClient.payInWithCardPreAuthorized(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             Some(90)
@@ -827,7 +827,7 @@ class PaymentHandlerSpec
                   )
                 case other => fail(other.getClass.toString)
               }
-              client.payOut(
+              paymentClient.payOut(
                 orderUuid,
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
@@ -857,7 +857,7 @@ class PaymentHandlerSpec
         )
       ) await {
         case _: PaidIn =>
-          client.payOut(
+          paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             100,
@@ -905,7 +905,7 @@ class PaymentHandlerSpec
             )
           ) await {
             case _: PaidIn =>
-              client.payOut(
+              paymentClient.payOut(
                 orderUuid,
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
@@ -936,7 +936,7 @@ class PaymentHandlerSpec
       ) await {
         case result: PaidIn =>
           val payInTransactionId = result.transactionId
-          client.refund(
+          paymentClient.refund(
             orderUuid,
             payInTransactionId,
             101,
@@ -947,7 +947,7 @@ class PaymentHandlerSpec
             case Success(r) =>
               assert(r.transactionId.isEmpty)
               assert(r.error.getOrElse("") == "IllegalTransactionAmount")
-              client.refund(
+              paymentClient.refund(
                 orderUuid,
                 payInTransactionId,
                 50,
@@ -1006,7 +1006,7 @@ class PaymentHandlerSpec
                   }
                 case other => fail(other.toString)
               }
-              client.transfer(
+              paymentClient.transfer(
                 Some(orderUuid),
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
@@ -1043,7 +1043,7 @@ class PaymentHandlerSpec
     }
 
     "direct debit" in {
-      client.directDebit(
+      paymentClient.directDebit(
         computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
         100,
         0,

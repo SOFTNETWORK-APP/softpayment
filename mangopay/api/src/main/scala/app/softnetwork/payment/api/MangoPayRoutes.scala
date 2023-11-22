@@ -10,6 +10,8 @@ import com.softwaremill.session.{SessionConfig, SessionManager}
 import org.slf4j.{Logger, LoggerFactory}
 import org.softnetwork.session.model.Session
 
+import scala.concurrent.ExecutionContext
+
 trait MangoPayRoutes extends PaymentRoutes { self: MangoPayApi with SchemaProvider =>
 
   override def paymentService: ActorSystem[_] => GenericPaymentService = sys =>
@@ -21,6 +23,7 @@ trait MangoPayRoutes extends PaymentRoutes { self: MangoPayApi with SchemaProvid
       override def log: Logger = LoggerFactory getLogger getClass.getName
       override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
+      override lazy val ec: ExecutionContext = sys.executionContext
     }
 
   override def apiRoutes: ActorSystem[_] => List[ApiRoute] = system =>

@@ -14,9 +14,8 @@ trait MockBasicAccountTypeKey extends CommandTypeKey[AccountCommand] {
     MockSoftPaymentAccountBehavior.TypeKey
 }
 
-object MockSoftPaymentAccountDao
-    extends SoftPaymentAccountDao
-    with AccountHandler
-    with MockBasicAccountTypeKey {
+trait MockSoftPaymentAccountHandler extends AccountHandler with MockBasicAccountTypeKey
+
+object MockSoftPaymentAccountDao extends SoftPaymentAccountDao with MockSoftPaymentAccountHandler {
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 }

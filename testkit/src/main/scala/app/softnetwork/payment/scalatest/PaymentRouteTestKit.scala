@@ -1,5 +1,6 @@
 package app.softnetwork.payment.scalatest
 
+import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, Multipart, StatusCodes}
 import app.softnetwork.api.server.ApiRoutes
@@ -19,6 +20,8 @@ trait PaymentRouteTestKit extends SessionTestKit with PaymentTestKit with Paymen
   import app.softnetwork.serialization._
 
   override lazy val additionalConfig: String = paymentGrpcConfig
+
+  override implicit lazy val ts: ActorSystem[_] = typedSystem()
 
   override def beforeAll(): Unit = {
     initAndJoinCluster()
