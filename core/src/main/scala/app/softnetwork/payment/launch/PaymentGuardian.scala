@@ -7,7 +7,10 @@ import app.softnetwork.payment.persistence.query.{
   GenericPaymentCommandProcessorStream,
   Scheduler2PaymentProcessorStream
 }
-import app.softnetwork.payment.persistence.typed.GenericPaymentBehavior
+import app.softnetwork.payment.persistence.typed.{
+  GenericPaymentBehavior,
+  SoftPaymentAccountBehavior
+}
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
 import app.softnetwork.persistence.schema.SchemaProvider
@@ -21,9 +24,12 @@ trait PaymentGuardian extends SessionGuardian { _: SchemaProvider with CsrfCheck
 
   def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior
 
+  def softPaymentAccountBehavior: ActorSystem[_] => SoftPaymentAccountBehavior
+
   def paymentEntities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
     Seq(
-      paymentAccountBehavior(sys)
+      paymentAccountBehavior(sys),
+      softPaymentAccountBehavior(sys)
     )
 
   /** initialize all entities

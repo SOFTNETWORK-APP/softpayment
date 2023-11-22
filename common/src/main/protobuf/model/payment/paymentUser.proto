@@ -123,6 +123,7 @@ message PaymentAccount {
     required PaymentAccountStatus paymentAccountStatus = 9 [default = DOCUMENTS_KO];
     repeated Transaction transactions = 10;
     repeated RecurringPayment recurryingPayments = 11;
+    optional string clientId = 12;
 }
 
 message MandateResult{

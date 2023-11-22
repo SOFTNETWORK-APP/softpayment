@@ -3,6 +3,8 @@ package app.softnetwork.payment.spi
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
 import app.softnetwork.payment.model.PaymentUser.PaymentUserType
 import app.softnetwork.payment.model.RecurringPayment.RecurringCardPaymentState
+import app.softnetwork.payment.model.SoftPaymentAccount.Client
+import app.softnetwork.payment.model.SoftPaymentAccount.Client.Provider
 import app.softnetwork.payment.model.{RecurringPayment, _}
 import app.softnetwork.persistence._
 import app.softnetwork.time.DateExtensions
@@ -1236,6 +1238,13 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
+  override def client: Option[SoftPaymentAccount.Client] =
+    Some(
+      SoftPaymentAccount.Client.defaultInstance
+        .withProvider(provider)
+        .withClientId(s"${generateUUID()}.${provider.providerType.name.toLowerCase}")
+    )
+
   /** @return
     *   client fees
     */
@@ -1710,3 +1719,12 @@ case class RecurringCardPaymentRegistration(
   currentState: RecurringCardPaymentState,
   registration: CreateRecurringPayment
 )
+
+class MockMangoPayProviderFactory extends PaymentProviderSpi {
+  override val providerType: Provider.ProviderType = Provider.ProviderType.MOCK
+
+  override def paymentProvider(p: Client.Provider): MockMangoPayProvider =
+    new MockMangoPayProvider {
+      override implicit def provider: Provider = p
+    }
+}

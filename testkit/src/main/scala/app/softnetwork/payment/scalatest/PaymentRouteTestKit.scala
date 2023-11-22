@@ -8,12 +8,13 @@ import app.softnetwork.payment.api.PaymentGrpcServices
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
 import app.softnetwork.session.scalatest.SessionTestKit
+import app.softnetwork.session.service.SessionMaterials
 import org.scalatest.Suite
 
 import java.nio.file.Paths
 
 trait PaymentRouteTestKit extends SessionTestKit with PaymentTestKit with PaymentGrpcServices {
-  _: Suite with ApiRoutes =>
+  _: Suite with ApiRoutes with SessionMaterials =>
 
   import app.softnetwork.serialization._
 

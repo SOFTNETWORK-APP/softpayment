@@ -14,7 +14,12 @@ import app.softnetwork.payment.persistence.query.{
   GenericPaymentCommandProcessorStream,
   Scheduler2PaymentProcessorStream
 }
-import app.softnetwork.payment.persistence.typed.{GenericPaymentBehavior, MockPaymentBehavior}
+import app.softnetwork.payment.persistence.typed.{
+  GenericPaymentBehavior,
+  MockPaymentBehavior,
+  MockSoftPaymentAccountBehavior,
+  SoftPaymentAccountBehavior
+}
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.{
   EventProcessorStream,
@@ -23,12 +28,14 @@ import app.softnetwork.persistence.query.{
 }
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.scheduler.scalatest.SchedulerTestKit
+import app.softnetwork.session.service.SessionMaterials
 import org.scalatest.Suite
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.Future
 
-trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
+trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian {
+  _: Suite with SessionMaterials =>
 
   /** @return
     *   roles associated with this node
@@ -37,6 +44,9 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
 
   override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
     MockPaymentBehavior
+
+  override def softPaymentAccountBehavior: ActorSystem[_] => SoftPaymentAccountBehavior = _ =>
+    MockSoftPaymentAccountBehavior
 
   override def paymentCommandProcessorStream
     : ActorSystem[_] => GenericPaymentCommandProcessorStream = sys =>
@@ -66,10 +76,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     transactionId: String,
     registerCard: Boolean,
     printReceipt: Boolean
-  )(implicit
-    system: ActorSystem[_]
   ): Future[Either[PayInFailed, Either[PaymentRedirection, PaidIn]]] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
     MockPaymentHandler !? PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt) map {
       case result: PaymentRedirection => Right(Left(result))
       case result: PaidIn             => Right(Right(result))
@@ -84,10 +91,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     preAuthorizationId: String,
     registerCard: Boolean = true,
     printReceipt: Boolean = false
-  )(implicit
-    system: ActorSystem[_]
   ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
     MockPaymentHandler !? PreAuthorizeCardFor3DS(
       orderUuid,
       preAuthorizationId,
@@ -101,12 +105,12 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     }
   }
 
-  def payInFirstRecurringFor3DS(recurringPayInRegistrationId: String, transactionId: String)(
-    implicit system: ActorSystem[_]
+  def payInFirstRecurringFor3DS(
+    recurringPayInRegistrationId: String,
+    transactionId: String
   ): Future[
     Either[FirstRecurringCardPaymentFailed, Either[PaymentRedirection, FirstRecurringPaidIn]]
   ] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
     MockPaymentHandler !? PayInFirstRecurringFor3DS(
       recurringPayInRegistrationId,
       transactionId
@@ -128,8 +132,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
   def updateKycDocumentStatus(
     kycDocumentId: String,
     status: Option[KycDocument.KycDocumentStatus] = None
-  )(implicit system: ActorSystem[_]): Future[Either[PaymentError, KycDocumentStatusUpdated]] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  ): Future[Either[PaymentError, KycDocumentStatusUpdated]] = {
     MockPaymentHandler !? UpdateKycDocumentStatus(kycDocumentId, status) map {
       case result: KycDocumentStatusUpdated => Right(result)
       case error: PaymentError              => Left(error)
@@ -140,18 +143,17 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
   def updateUboDeclarationStatus(
     uboDeclarationId: String,
     status: Option[UboDeclaration.UboDeclarationStatus] = None
-  )(implicit system: ActorSystem[_]): Future[Boolean] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  ): Future[Boolean] = {
     MockPaymentHandler !? UpdateUboDeclarationStatus(uboDeclarationId, status) map {
       case UboDeclarationStatusUpdated => true
       case _                           => false
     }
   }
 
-  def updateMandateStatus(mandateId: String, status: Option[BankAccount.MandateStatus] = None)(
-    implicit system: ActorSystem[_]
+  def updateMandateStatus(
+    mandateId: String,
+    status: Option[BankAccount.MandateStatus] = None
   ): Future[Either[PaymentError, MandateStatusUpdated]] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
     MockPaymentHandler !? UpdateMandateStatus(mandateId, status) map {
       case result: MandateStatusUpdated => Right(result)
       case error: PaymentError          => Left(error)
@@ -159,16 +161,14 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     }
   }
 
-  def validateRegularUser(userId: String)(implicit system: ActorSystem[_]): Future[Boolean] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  def validateRegularUser(userId: String): Future[Boolean] = {
     MockPaymentHandler !? ValidateRegularUser(userId) map {
       case RegularUserValidated => true
       case _                    => false
     }
   }
 
-  def invalidateRegularUser(userId: String)(implicit system: ActorSystem[_]): Future[Boolean] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  def invalidateRegularUser(userId: String): Future[Boolean] = {
     MockPaymentHandler !? InvalidateRegularUser(userId) map {
       case RegularUserInvalidated => true
       case _                      => false

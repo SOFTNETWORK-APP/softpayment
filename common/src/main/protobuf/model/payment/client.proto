@@ -1,0 +1,84 @@
+syntax = "proto2";
+
+import "scalapb/scalapb.proto";
+import "model/accountStatus.proto";
+import "model/auth.proto";
+import "model/payment/address.proto";
+import "google/protobuf/timestamp.proto";
+
+package app.softnetwork.payment.model;
+
+option (scalapb.options) = {
+  single_file: true
+  flat_package: true
+  import: "app.softnetwork.persistence.message._"
+  import: "app.softnetwork.persistence.model._"
+  import: "app.softnetwork.account.model._"
+  import: "app.softnetwork.account.serialization._"
+  import: "app.softnetwork.protobuf.ScalaPBTypeMappers._"
+  import: "Protobuf._"
+  preserve_unknown_fields: false
+};
+
+message SoftPaymentAccount {
+
+  message Client {
+
+    message Provider {
+
+      enum ProviderType{
+        MOCK = -1;
+        MANGOPAY = 0;
+        STRIPE = 1;
+      }
+
+      required string providerId = 1;
+      required string providerApiKey = 2;
+      required ProviderType providerType = 3 [default = MANGOPAY];
+
+    }
+
+    option (scalapb.message).extends = "SoftPaymentClientDecorator";
+
+    required Provider provider = 1;
+    required string clientId = 2;
+    optional string clientApiKey = 3;
+    optional string name = 4;
+    optional string description = 5;
+    optional string logoUrl = 6;
+    optional string websiteUrl = 7;
+    repeated string technicalEmails = 8;
+    repeated string administrativeEmails = 9;
+    repeated string billingEmails = 10;
+    repeated string fraudEmails = 11;
+    optional string vatNumber = 12;
+    optional Address address = 13;
+  }
+
+  option (scalapb.message).extends = "ProtobufDomainObject";
+  option (scalapb.message).extends = "Account";
+  option (scalapb.message).extends = "Timestamped";
+  option (scalapb.message).extends = "SoftPaymentAccountDecorator";
+  option (scalapb.message).companion_extends = "SoftPaymentAccountCompanion";
+  required string uuid = 1;
+  required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.time.Instant"];
+  required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.time.Instant"];
+  required app.softnetwork.account.model.Principal principal = 4;
+  repeated app.softnetwork.account.model.Principal secondaryPrincipals = 6;
+  optional app.softnetwork.account.model.BasicAccountProfile currentProfile = 7 [(scalapb.field).type = "Profile"];
+  map<string, app.softnetwork.account.model.BasicAccountProfile> profiles = 8 [(scalapb.field).value_type = "Profile"];
+  required string credentials = 9;
+  optional google.protobuf.Timestamp lastLogin = 10 [(scalapb.field).type = "java.time.Instant"];
+  required int32 nbLoginFailures = 11 [default = 0];
+  required app.softnetwork.account.model.AccountStatus status = 12 [default = Inactive];
+  optional app.softnetwork.account.model.VerificationToken verificationToken = 13;
+  optional app.softnetwork.account.model.VerificationCode verificationCode = 14;
+  optional app.softnetwork.account.model.BasicAccountDetails details = 15 [(scalapb.field).type = "AccountDetails"];
+  repeated app.softnetwork.account.model.DeviceRegistration registrations = 16;
+  optional google.protobuf.Timestamp lastLogout = 17 [(scalapb.field).type = "java.time.Instant"];
+  optional bool anonymous = 18;
+  optional bool fromAnonymous = 19;
+  repeated app.softnetwork.account.model.Application applications = 20;
+
+  optional Client client = 21;
+}

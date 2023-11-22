@@ -24,6 +24,7 @@ import app.softnetwork.payment.model.{RecurringPayment, _}
 import app.softnetwork.payment.config.{MangoPay, MangoPaySettings}
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
 import app.softnetwork.payment.model.PaymentUser.PaymentUserType
+import app.softnetwork.payment.model.SoftPaymentAccount.Client.Provider
 
 import scala.util.{Failure, Success, Try}
 import app.softnetwork.persistence._
@@ -234,7 +235,7 @@ trait MangoPayProvider extends PaymentProvider {
             (if (userId.getOrElse("").trim.isEmpty)
                None
              else
-               Try(MangoPay().getUserApi.getNatural(userId.getOrElse(""))) match {
+               Try(MangoPay(provider).getUserApi.getNatural(userId.getOrElse(""))) match {
                  case Success(u) => Option(u)
                  case Failure(f) =>
                    mlog.error(f.getMessage, f)
@@ -242,14 +243,14 @@ trait MangoPayProvider extends PaymentProvider {
                }) match {
               case Some(u) =>
                 user.setId(u.getId)
-                Try(MangoPay().getUserApi.update(user).getId) match {
+                Try(MangoPay(provider).getUserApi.update(user).getId) match {
                   case Success(id) => Some(id)
                   case Failure(f) =>
                     mlog.error(f.getMessage, f)
                     None
                 }
               case None =>
-                Try(MangoPay().getUserApi.create(user).getId) match {
+                Try(MangoPay(provider).getUserApi.create(user).getId) match {
                   case Success(id) => Some(id)
                   case Failure(f) =>
                     mlog.error(f.getMessage, f)
@@ -322,7 +323,9 @@ trait MangoPayProvider extends PaymentProvider {
             (if (legalRepresentative.userId.isEmpty)
                None
              else
-               Try(MangoPay().getUserApi.getLegal(legalRepresentative.userId.getOrElse(""))) match {
+               Try(
+                 MangoPay(provider).getUserApi.getLegal(legalRepresentative.userId.getOrElse(""))
+               ) match {
                  case Success(u) => Option(u)
                  case Failure(f) =>
                    mlog.error(f.getMessage, f)
@@ -330,14 +333,14 @@ trait MangoPayProvider extends PaymentProvider {
                }) match {
               case Some(u) =>
                 user.setId(u.getId)
-                Try(MangoPay().getUserApi.update(user).getId) match {
+                Try(MangoPay(provider).getUserApi.update(user).getId) match {
                   case Success(id) => Some(id)
                   case Failure(f) =>
                     mlog.error(f.getMessage, f)
                     None
                 }
               case None =>
-                Try(MangoPay().getUserApi.create(user).getId) match {
+                Try(MangoPay(provider).getUserApi.create(user).getId) match {
                   case Success(id) => Some(id)
                   case Failure(f) =>
                     mlog.error(f.getMessage, f)
@@ -377,7 +380,7 @@ trait MangoPayProvider extends PaymentProvider {
         wallet.setDescription(s"wallet for $externalUuid")
         wallet.setTag(externalUuid)
         Try(
-          MangoPay().getUserApi
+          MangoPay(provider).getUserApi
             .getWallets(userId)
             .asScala
             .find(w =>
@@ -388,14 +391,14 @@ trait MangoPayProvider extends PaymentProvider {
             maybeWallet match {
               case Some(w) =>
                 wallet.setId(w.getId)
-                Try(MangoPay().getWalletApi.update(wallet).getId) match {
+                Try(MangoPay(provider).getWalletApi.update(wallet).getId) match {
                   case Success(id) => Some(id)
                   case Failure(f) =>
                     mlog.error(f.getMessage, f)
                     None
                 }
               case None =>
-                Try(MangoPay().getWalletApi.create(wallet).getId) match {
+                Try(MangoPay(provider).getWalletApi.create(wallet).getId) match {
                   case Success(id) => Some(id)
                   case Failure(f) =>
                     mlog.error(f.getMessage, f)
@@ -441,7 +444,7 @@ trait MangoPayProvider extends PaymentProvider {
         bankAccount.setType(BankAccountType.IBAN)
         bankAccount.setUserId(userId)
         (if (id.isDefined)
-           Try(MangoPay().getUserApi.getBankAccount(userId, getId)) match {
+           Try(MangoPay(provider).getUserApi.getBankAccount(userId, getId)) match {
              case Success(b) => Option(b)
              case Failure(f) =>
                mlog.error(f.getMessage, f)
@@ -450,7 +453,7 @@ trait MangoPayProvider extends PaymentProvider {
          else None) match {
           case Some(previousBankAccount) =>
             Try(
-              MangoPay().getUserApi
+              MangoPay(provider).getUserApi
                 .updateBankAccount(userId, bankAccount, previousBankAccount.getId)
                 .getId
             ) match {
@@ -460,7 +463,7 @@ trait MangoPayProvider extends PaymentProvider {
                 None
             }
           case _ =>
-            Try(MangoPay().getUserApi.createBankAccount(userId, bankAccount).getId) match {
+            Try(MangoPay(provider).getUserApi.createBankAccount(userId, bankAccount).getId) match {
               case Success(id) => Option(id)
               case Failure(f) =>
                 mlog.error(f.getMessage, f)
@@ -478,7 +481,7 @@ trait MangoPayProvider extends PaymentProvider {
     */
   override def getActiveBankAccount(userId: String): Option[String] = {
     Try(
-      MangoPay().getUserApi
+      MangoPay(provider).getUserApi
         .getBankAccounts(userId)
         .asScala
         .filter(bankAccount => bankAccount.isActive)
@@ -504,7 +507,7 @@ trait MangoPayProvider extends PaymentProvider {
     */
   def checkBankAccount(userId: String, bankAccountId: String): Boolean = {
     Try(
-      MangoPay().getUserApi
+      MangoPay(provider).getUserApi
         .getBankAccounts(userId)
         .asScala
         .find(bankAccount => bankAccount.getId == bankAccountId)
@@ -538,7 +541,7 @@ trait MangoPayProvider extends PaymentProvider {
         cardPreRegistration.setCurrency(CurrencyIso.valueOf(currency))
         cardPreRegistration.setTag(externalUuid)
         cardPreRegistration.setUserId(userId)
-        Try(MangoPay().getCardRegistrationApi.create(cardPreRegistration)) match {
+        Try(MangoPay(provider).getCardRegistrationApi.create(cardPreRegistration)) match {
           case Success(cardRegistration) =>
             Some(
               CardPreRegistration.defaultInstance
@@ -569,10 +572,12 @@ trait MangoPayProvider extends PaymentProvider {
   ): Option[String] = {
     maybeRegistrationData match {
       case Some(registrationData) =>
-        Try(MangoPay().getCardRegistrationApi.get(cardPreRegistrationId)) match {
+        Try(MangoPay(provider).getCardRegistrationApi.get(cardPreRegistrationId)) match {
           case Success(cardRegistration) =>
             cardRegistration.setRegistrationData(registrationData)
-            Try(MangoPay().getCardRegistrationApi.update(cardRegistration).getCardId) match {
+            Try(
+              MangoPay(provider).getCardRegistrationApi.update(cardRegistration).getCardId
+            ) match {
               case Success(cardId) =>
                 Option(cardId)
               case Failure(f) =>
@@ -594,7 +599,7 @@ trait MangoPayProvider extends PaymentProvider {
     *   card
     */
   def loadCard(cardId: String): Option[Card] = {
-    Try(MangoPay().getCardApi.get(cardId)) match {
+    Try(MangoPay(provider).getCardApi.get(cardId)) match {
       case Success(card) =>
         Some(
           Card.defaultInstance
@@ -615,9 +620,9 @@ trait MangoPayProvider extends PaymentProvider {
     *   the card disabled or none
     */
   override def disableCard(cardId: String): Option[Card] = {
-    Try(MangoPay().getCardApi.get(cardId)) match {
+    Try(MangoPay(provider).getCardApi.get(cardId)) match {
       case Success(card) =>
-        Try(MangoPay().getCardApi.disable(card)) match {
+        Try(MangoPay(provider).getCardApi.disable(card)) match {
           case Success(disabledCard) =>
             Some(
               Card.defaultInstance
@@ -686,8 +691,9 @@ trait MangoPayProvider extends PaymentProvider {
       }
     Try(
       idempotencyKey match {
-        case Some(s) => MangoPay().getCardPreAuthorizationApi.create(s, cardPreAuthorization)
-        case _       => MangoPay().getCardPreAuthorizationApi.create(cardPreAuthorization)
+        case Some(s) =>
+          MangoPay(provider).getCardPreAuthorizationApi.create(s, cardPreAuthorization)
+        case _ => MangoPay(provider).getCardPreAuthorizationApi.create(cardPreAuthorization)
       }
     ) match {
       case Success(result) =>
@@ -761,7 +767,7 @@ trait MangoPayProvider extends PaymentProvider {
     cardPreAuthorizedTransactionId: String
   ): Option[Transaction] = {
     Try(
-      MangoPay().getCardPreAuthorizationApi.get(cardPreAuthorizedTransactionId)
+      MangoPay(provider).getCardPreAuthorizationApi.get(cardPreAuthorizedTransactionId)
     ) match {
       case Success(result) =>
         Some(
@@ -832,8 +838,8 @@ trait MangoPayProvider extends PaymentProvider {
       }
     Try(
       idempotencyKey match {
-        case Some(s) => MangoPay().getPayInApi.create(s, payIn)
-        case _       => MangoPay().getPayInApi.create(payIn)
+        case Some(s) => MangoPay(provider).getPayInApi.create(s, payIn)
+        case _       => MangoPay(provider).getPayInApi.create(payIn)
       }
     ) match {
       case Success(result) =>
@@ -911,12 +917,12 @@ trait MangoPayProvider extends PaymentProvider {
     cardPreAuthorizedTransactionId: String
   ): Boolean = {
     Try(
-      MangoPay().getCardPreAuthorizationApi.get(cardPreAuthorizedTransactionId)
+      MangoPay(provider).getCardPreAuthorizationApi.get(cardPreAuthorizedTransactionId)
     ) match {
       case Success(result) =>
         result.setPaymentStatus(PaymentStatus.CANCELED)
         Try(
-          MangoPay().getCardPreAuthorizationApi.update(result)
+          MangoPay(provider).getCardPreAuthorizationApi.update(result)
         ) match {
           case Success(_) => true
           case Failure(f) =>
@@ -941,12 +947,12 @@ trait MangoPayProvider extends PaymentProvider {
     cardPreAuthorizedTransactionId: String
   ): Boolean = {
     Try(
-      MangoPay().getCardPreAuthorizationApi.get(cardPreAuthorizedTransactionId)
+      MangoPay(provider).getCardPreAuthorizationApi.get(cardPreAuthorizedTransactionId)
     ) match {
       case Success(result) =>
         result.setPaymentStatus(PaymentStatus.VALIDATED)
         Try(
-          MangoPay().getCardPreAuthorizationApi.update(result)
+          MangoPay(provider).getCardPreAuthorizationApi.update(result)
         ) match {
           case Success(_) => true
           case Failure(f) =>
@@ -1024,8 +1030,8 @@ trait MangoPayProvider extends PaymentProvider {
           }
         Try(
           idempotencyKey match {
-            case Some(s) => MangoPay().getPayInApi.create(s, payIn)
-            case _       => MangoPay().getPayInApi.create(payIn)
+            case Some(s) => MangoPay(provider).getPayInApi.create(s, payIn)
+            case _       => MangoPay(provider).getPayInApi.create(payIn)
           }
         ) match {
           case Success(result) =>
@@ -1124,7 +1130,7 @@ trait MangoPayProvider extends PaymentProvider {
     payIn.setExecutionDetails(executionDetails)
     payIn.setExecutionType(PayInExecutionType.WEB)
     Try(
-      MangoPay().getPayInApi.create(payIn)
+      MangoPay(provider).getPayInApi.create(payIn)
     ) match {
       case Success(result) =>
         Some(
@@ -1205,8 +1211,9 @@ trait MangoPayProvider extends PaymentProvider {
           }
         Try(
           idempotencyKey match {
-            case Some(s) => MangoPay().getPayInApi.createRefund(s, payInTransactionId, refund)
-            case _       => MangoPay().getPayInApi.createRefund(payInTransactionId, refund)
+            case Some(s) =>
+              MangoPay(provider).getPayInApi.createRefund(s, payInTransactionId, refund)
+            case _ => MangoPay(provider).getPayInApi.createRefund(payInTransactionId, refund)
           }
         ) match {
           case Success(result) =>
@@ -1289,7 +1296,7 @@ trait MangoPayProvider extends PaymentProvider {
         transfer.getFees.setAmount(feesAmount)
         transfer.getFees.setCurrency(CurrencyIso.valueOf(currency))
         transfer.setDebitedWalletId(debitedWalletId)
-        Try(MangoPay().getTransferApi.create(transfer)) match {
+        Try(MangoPay(provider).getTransferApi.create(transfer)) match {
           case Success(result) =>
             Some(
               Transaction()
@@ -1388,8 +1395,8 @@ trait MangoPayProvider extends PaymentProvider {
           }
         Try(
           idempotencyKey match {
-            case Some(s) => MangoPay().getPayOutApi.create(s, payOut)
-            case _       => MangoPay().getPayOutApi.create(payOut)
+            case Some(s) => MangoPay(provider).getPayOutApi.create(s, payOut)
+            case _       => MangoPay(provider).getPayOutApi.create(payOut)
           }
         ) match {
           case Success(result) =>
@@ -1468,7 +1475,7 @@ trait MangoPayProvider extends PaymentProvider {
     transactionId: String,
     recurringPayInRegistrationId: Option[String]
   ): Option[Transaction] = {
-    Try(MangoPay().getPayInApi.get(transactionId)) match {
+    Try(MangoPay(provider).getPayInApi.get(transactionId)) match {
       case Success(result) =>
         val `type` =
           if (result.getPaymentType == PayInPaymentType.DIRECT_DEBIT) {
@@ -1571,7 +1578,7 @@ trait MangoPayProvider extends PaymentProvider {
     *   Refund transaction
     */
   override def loadRefund(orderUuid: String, transactionId: String): Option[Transaction] = {
-    Try(MangoPay().getPayInApi.getRefund(transactionId)) match {
+    Try(MangoPay(provider).getPayInApi.getRefund(transactionId)) match {
       case Success(result) =>
         Some(
           Transaction().copy(
@@ -1603,7 +1610,7 @@ trait MangoPayProvider extends PaymentProvider {
     *   pay out transaction
     */
   override def loadPayOut(orderUuid: String, transactionId: String): Option[Transaction] = {
-    Try(MangoPay().getPayOutApi.get(transactionId)) match {
+    Try(MangoPay(provider).getPayOutApi.get(transactionId)) match {
       case Success(result) =>
         Some(
           Transaction().copy(
@@ -1632,7 +1639,7 @@ trait MangoPayProvider extends PaymentProvider {
     *   transfer transaction
     */
   override def loadTransfer(transactionId: String): Option[Transaction] = {
-    Try(MangoPay().getTransferApi.get(transactionId)) match {
+    Try(MangoPay(provider).getTransferApi.get(transactionId)) match {
       case Success(result) =>
         Some(
           Transaction().copy(
@@ -1694,19 +1701,19 @@ trait MangoPayProvider extends PaymentProvider {
     documentType: KycDocument.KycDocumentType
   ): Option[String] = {
     // create document
-    Try(MangoPay().getUserApi.createKycDocument(userId, documentType, externalUuid)) match {
+    Try(MangoPay(provider).getUserApi.createKycDocument(userId, documentType, externalUuid)) match {
       case Success(s) =>
         mlog.info(s"""Create $documentType for $externalUuid""")
         // ask for document creation
         s.setTag(externalUuid)
         s.setStatus(KycStatus.CREATED)
-        Try(MangoPay().getUserApi.updateKycDocument(userId, s)) match {
+        Try(MangoPay(provider).getUserApi.updateKycDocument(userId, s)) match {
           case Success(s2) =>
             mlog.info(s"""Update $documentType for $externalUuid""")
             // add document pages
             if (
               pages.forall { page =>
-                Try(MangoPay().getUserApi.createKycPage(userId, s2.getId, page)) match {
+                Try(MangoPay(provider).getUserApi.createKycPage(userId, s2.getId, page)) match {
                   case Success(_) =>
                     mlog.info(s"""Add document page for $externalUuid""")
                     true
@@ -1719,7 +1726,7 @@ trait MangoPayProvider extends PaymentProvider {
               // ask for document validation
               s2.setTag(externalUuid)
               s2.setStatus(KycStatus.VALIDATION_ASKED)
-              Try(MangoPay().getUserApi.updateKycDocument(userId, s2)) match {
+              Try(MangoPay(provider).getUserApi.updateKycDocument(userId, s2)) match {
                 case Success(s3) =>
                   mlog.info(s"""Ask document ${s3.getId} validation for $externalUuid""")
                   Some(s3.getId)
@@ -1749,7 +1756,7 @@ trait MangoPayProvider extends PaymentProvider {
     */
   override def loadDocumentStatus(userId: String, documentId: String): KycDocumentValidationReport =
     // load document
-    Try(MangoPay().getUserApi.getKycDocument(userId, documentId)) match {
+    Try(MangoPay(provider).getUserApi.getKycDocument(userId, documentId)) match {
       case Success(s) =>
         KycDocumentValidationReport.defaultInstance
           .withId(documentId)
@@ -1796,8 +1803,8 @@ trait MangoPayProvider extends PaymentProvider {
     mandate.setUserId(userId)
     Try(
       idempotencyKey match {
-        case Some(key) => MangoPay().getMandateApi.create(key, mandate)
-        case _         => MangoPay().getMandateApi.create(mandate)
+        case Some(key) => MangoPay(provider).getMandateApi.create(key, mandate)
+        case _         => MangoPay(provider).getMandateApi.create(mandate)
       }
     ) match {
       case Success(s) =>
@@ -1838,11 +1845,11 @@ trait MangoPayProvider extends PaymentProvider {
   ): Option[MandateResult] = {
     Try(
       maybeMandateId match {
-        case Some(mandateId) => Option(MangoPay().getMandateApi.get(mandateId))
+        case Some(mandateId) => Option(MangoPay(provider).getMandateApi.get(mandateId))
         case None =>
           val sorting = new Sorting()
           sorting.addField("creationDate", SortDirection.desc)
-          MangoPay().getMandateApi
+          MangoPay(provider).getMandateApi
             .getForBankAccount(
               userId,
               bankAccountId,
@@ -1885,7 +1892,7 @@ trait MangoPayProvider extends PaymentProvider {
     *   mandate result
     */
   override def cancelMandate(mandateId: String): Option[MandateResult] = {
-    Try(MangoPay().getMandateApi.cancel(mandateId)) match {
+    Try(MangoPay(provider).getMandateApi.cancel(mandateId)) match {
       case Success(mandate) =>
         Some(
           MandateResult.defaultInstance
@@ -1960,8 +1967,8 @@ trait MangoPayProvider extends PaymentProvider {
           }
         Try(
           idempotencyKey match {
-            case Some(s) => MangoPay().getPayInApi.create(s, payIn)
-            case _       => MangoPay().getPayInApi.create(payIn)
+            case Some(s) => MangoPay(provider).getPayInApi.create(s, payIn)
+            case _       => MangoPay(provider).getPayInApi.create(payIn)
           }
         ) match {
           case Success(result) =>
@@ -2030,7 +2037,7 @@ trait MangoPayProvider extends PaymentProvider {
     filters.setType(MangoPayTransactionType.PAYIN)
     filters.setAfterDate(transactionDate.toEpochSecond)
     Try(
-      MangoPay().getWalletApi
+      MangoPay(provider).getWalletApi
         .getTransactions(
           walletId,
           new Pagination(1, 100),
@@ -2075,11 +2082,44 @@ trait MangoPayProvider extends PaymentProvider {
     }
   }
 
+  override def client: Option[SoftPaymentAccount.Client] = {
+    Try(MangoPay(provider).getClientApi.get()) match {
+      case Success(client) =>
+        Some(
+          SoftPaymentAccount.Client.defaultInstance
+            .withClientId(client.getClientId + "." + provider.providerType.name.toLowerCase)
+            .withProvider(provider)
+            .copy(
+              name = Option(client.getName),
+              description = Option(client.getPlatformDescription),
+              logoUrl = Option(client.getLogo),
+              websiteUrl = Option(client.getPlatformUrl),
+              address = Option(client.getHeadquartersAddress).map(address =>
+                Address.defaultInstance
+                  .withAddressLine(address.getAddressLine1)
+                  .withCity(address.getCity)
+                  .withPostalCode(address.getPostalCode)
+                  .withCountry(address.getCountry.name())
+                  .copy(state = Option(address.getRegion))
+              ),
+              technicalEmails = client.getTechEmails.asScala,
+              administrativeEmails = client.getAdminEmails.asScala,
+              billingEmails = client.getBillingEmails.asScala,
+              fraudEmails = client.getFraudEmails.asScala,
+              vatNumber = Option(client.getTaxNumber)
+            )
+        )
+      case Failure(f) =>
+        mlog.error(f.getMessage, f)
+        None
+    }
+  }
+
   /** @return
     *   client fees
     */
   override def clientFees(): Option[Double] = {
-    Try(MangoPay().getClientApi.getWallet(FundsType.FEES, CurrencyIso.EUR)) match {
+    Try(MangoPay(provider).getClientApi.getWallet(FundsType.FEES, CurrencyIso.EUR)) match {
       case Success(wallet) => Some(wallet.getBalance.getAmount.toDouble / 100)
       case Failure(f) =>
         mlog.error(f.getMessage, f)
@@ -2093,7 +2133,7 @@ trait MangoPayProvider extends PaymentProvider {
     *   Ultimate Beneficial Owner Declaration
     */
   override def createDeclaration(userId: String): Option[UboDeclaration] = {
-    Try(MangoPay().getUboDeclarationApi.create(userId)) match {
+    Try(MangoPay(provider).getUboDeclarationApi.create(userId)) match {
       case Success(declaration) =>
         Some(
           UboDeclaration.defaultInstance
@@ -2152,9 +2192,9 @@ trait MangoPayProvider extends PaymentProvider {
 
         {
           if (id.isEmpty) {
-            Try(MangoPay().getUboDeclarationApi.createUbo(userId, uboDeclarationId, ubo))
+            Try(MangoPay(provider).getUboDeclarationApi.createUbo(userId, uboDeclarationId, ubo))
           } else {
-            Try(MangoPay().getUboDeclarationApi.updateUbo(userId, uboDeclarationId, ubo))
+            Try(MangoPay(provider).getUboDeclarationApi.updateUbo(userId, uboDeclarationId, ubo))
           }
         } match {
           case Success(s2) =>
@@ -2177,7 +2217,7 @@ trait MangoPayProvider extends PaymentProvider {
     *   declaration with Ultimate Beneficial Owner(s)
     */
   override def getDeclaration(userId: String, uboDeclarationId: String): Option[UboDeclaration] = {
-    Try(MangoPay().getUboDeclarationApi.get(userId, uboDeclarationId)) match {
+    Try(MangoPay(provider).getUboDeclarationApi.get(userId, uboDeclarationId)) match {
       case Success(s) =>
         import scala.collection.JavaConverters._
         Some(
@@ -2226,7 +2266,9 @@ trait MangoPayProvider extends PaymentProvider {
     userId: String,
     uboDeclarationId: String
   ): Option[UboDeclaration] = {
-    Try(MangoPay().getUboDeclarationApi.submitForValidation(userId, uboDeclarationId)) match {
+    Try(
+      MangoPay(provider).getUboDeclarationApi.submitForValidation(userId, uboDeclarationId)
+    ) match {
       case Success(s) =>
         Some(
           UboDeclaration.defaultInstance
@@ -2323,7 +2365,8 @@ trait MangoPayProvider extends PaymentProvider {
         case _               =>
       }
       Try(
-        MangoPay().getPayInApi.createRecurringPayment(generateUUID(), createRecurringPayment)
+        MangoPay(provider).getPayInApi
+          .createRecurringPayment(generateUUID(), createRecurringPayment)
       ) match {
         case Success(s) =>
           Some(
@@ -2366,7 +2409,7 @@ trait MangoPayProvider extends PaymentProvider {
         case _       =>
       }
       Try(
-        MangoPay().getPayInApi
+        MangoPay(provider).getPayInApi
           .updateRecurringPayment(recurringPayInRegistrationId, recurringPaymentUpdate)
       ) match {
         case Success(s) =>
@@ -2394,7 +2437,7 @@ trait MangoPayProvider extends PaymentProvider {
     recurringPayInRegistrationId: String
   ): Option[RecurringPayment.RecurringCardPaymentResult] = {
     Try(
-      MangoPay().getPayInApi.getRecurringPayment(recurringPayInRegistrationId)
+      MangoPay(provider).getPayInApi.getRecurringPayment(recurringPayInRegistrationId)
     ) match {
       case Success(s) =>
         Some(
@@ -2458,7 +2501,7 @@ trait MangoPayProvider extends PaymentProvider {
           s"$recurringPaymentFor3DS/$recurringPayInRegistrationId"
         )
         Try(
-          MangoPay().getPayInApi.createRecurringPayInCIT(generateUUID(), recurringPayInCIT)
+          MangoPay(provider).getPayInApi.createRecurringPayInCIT(generateUUID(), recurringPayInCIT)
         ) match {
           case Success(result) =>
             Some(
@@ -2511,7 +2554,7 @@ trait MangoPayProvider extends PaymentProvider {
         recurringPayInMIT.setFees(fees)
         recurringPayInMIT.setTag(externalUuid)
         Try(
-          MangoPay().getPayInApi.createRecurringPayInMIT(generateUUID(), recurringPayInMIT)
+          MangoPay(provider).getPayInApi.createRecurringPayInMIT(generateUUID(), recurringPayInMIT)
         ) match {
           case Success(result) =>
             Some(
@@ -2547,4 +2590,13 @@ trait MangoPayProvider extends PaymentProvider {
     }
   }
 
+}
+
+class MangoPayProviderFactory extends PaymentProviderSpi {
+  override val providerType: Provider.ProviderType = Provider.ProviderType.MANGOPAY
+
+  override def paymentProvider(p: SoftPaymentAccount.Client.Provider): MangoPayProvider =
+    new MangoPayProvider {
+      override implicit val provider: SoftPaymentAccount.Client.Provider = p
+    }
 }

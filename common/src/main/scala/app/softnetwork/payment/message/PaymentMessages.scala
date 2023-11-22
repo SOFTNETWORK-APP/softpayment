@@ -27,9 +27,15 @@ object PaymentMessages {
     *   - payment user
     * @param currency
     *   - currency
+    * @param clientId
+    *   - optional client id
     */
-  case class PreRegisterCard(orderUuid: String, user: PaymentUser, currency: String = "EUR")
-      extends PaymentCommandWithKey {
+  case class PreRegisterCard(
+    orderUuid: String,
+    user: PaymentUser,
+    currency: String = "EUR",
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey {
     val key: String = user.externalUuidWithProfile
   }
 
@@ -141,8 +147,10 @@ object PaymentMessages {
     * @param cardPreAuthorizedTransactionId
     *   - card pre authorized transaction id
     */
-  case class CancelPreAuthorization(orderUuid: String, cardPreAuthorizedTransactionId: String)
-      extends PaymentCommandWithKey {
+  case class CancelPreAuthorization(
+    orderUuid: String,
+    cardPreAuthorizedTransactionId: String
+  ) extends PaymentCommandWithKey {
     lazy val key: String = cardPreAuthorizedTransactionId
   }
 
@@ -151,8 +159,10 @@ object PaymentMessages {
     * @param cardPreAuthorizedTransactionId
     *   - card pre authorized transaction id
     */
-  case class ValidatePreAuthorization(orderUuid: String, cardPreAuthorizedTransactionId: String)
-      extends PaymentCommandWithKey {
+  case class ValidatePreAuthorization(
+    orderUuid: String,
+    cardPreAuthorizedTransactionId: String
+  ) extends PaymentCommandWithKey {
     lazy val key: String = cardPreAuthorizedTransactionId
   }
 
@@ -259,6 +269,19 @@ object PaymentMessages {
     lazy val key: String = transactionId
   }
 
+  /** @param orderUuid
+    *   - order uuid
+    * @param creditedAccount
+    *   - account to credit
+    * @param creditedAmount
+    *   - credited amount
+    * @param feesAmount
+    *   - fees amount
+    * @param currency
+    *   - currency
+    * @param externalReference
+    *   - optional external reference
+    */
   case class PayOut(
     orderUuid: String,
     creditedAccount: String,
@@ -270,6 +293,19 @@ object PaymentMessages {
     val key: String = creditedAccount
   }
 
+  /** @param orderUuid
+    *   - order uuid
+    * @param payInTransactionId
+    *   - payIn transaction id
+    * @param refundAmount
+    *   - refund amount
+    * @param currency
+    *   - currency
+    * @param reasonMessage
+    *   - reason message
+    * @param initializedByClient
+    *   - whether the refund is initialized by the client or not
+    */
   case class Refund(
     orderUuid: String,
     payInTransactionId: String,
@@ -448,6 +484,8 @@ object PaymentMessages {
     *   - next debited amount
     * @param nextFeesAmount
     *   - next fees amount
+    * @param statementDescriptor
+    *   - statement descriptor
     */
   case class PayNextRecurring(
     recurringPaymentRegistrationId: String,
@@ -475,6 +513,9 @@ object PaymentMessages {
     lazy val key: String = account
   }
 
+  /** @param transactionId
+    *   - transaction id
+    */
   case class LoadTransaction(transactionId: String) extends PaymentCommandWithKey {
     lazy val key: String = transactionId
   }
@@ -502,34 +543,70 @@ object PaymentMessages {
     ): BankAccountCommand = BankAccountCommand(bankAccount, Right(legalUser), acceptedTermsOfPSP)
   }
 
+  /** @param creditedAccount
+    *   - account to credit
+    * @param bankAccount
+    *   - bank account
+    * @param user
+    *   - payment user
+    * @param acceptedTermsOfPSP
+    *   - whether or not the terms of the psp are accepted
+    * @param clientId
+    *   - optional client id
+    */
   case class CreateOrUpdateBankAccount(
     creditedAccount: String,
     bankAccount: BankAccount,
     user: Option[PaymentAccount.User] = None,
-    acceptedTermsOfPSP: Option[Boolean] = None
+    acceptedTermsOfPSP: Option[Boolean] = None,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
+  /** @param creditedAccount
+    *   - account to load
+    */
   case class LoadBankAccount(creditedAccount: String) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
-  case class DeleteBankAccount(creditedAccount: String, force: Option[Boolean])
-      extends PaymentCommandWithKey {
+  /** @param creditedAccount
+    *   - account to delete
+    * @param force
+    *   - whether or not the bank account should be deleted even if the bank account deletion has
+    *     been disabled
+    */
+  case class DeleteBankAccount(
+    creditedAccount: String,
+    force: Option[Boolean]
+  ) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
+  /** @param debitedAccount
+    *   - account owning the cards to load
+    */
   case class LoadCards(debitedAccount: String) extends PaymentCommandWithKey {
     val key: String = debitedAccount
   }
 
+  /** @param debitedAccount
+    *   - account owning the card to disable
+    * @param cardId
+    *   - card id
+    */
   case class DisableCard(debitedAccount: String, cardId: String) extends PaymentCommandWithKey {
     val key: String = debitedAccount
   }
 
   /** Commands related to the kyc documents */
 
+  /** @param creditedAccount
+    *   - account to whom the KYC document would be added
+    * @param pages
+    *   - pages of the KYC document
+    */
   case class AddKycDocument(
     creditedAccount: String,
     pages: Seq[Array[Byte]],
@@ -553,6 +630,11 @@ object PaymentMessages {
     lazy val key: String = kycDocumentId
   }
 
+  /** @param creditedAccount
+    *   - account which owns the KYC document that would be loaded
+    * @param kycDocumentType
+    *   - KYC document type
+    */
   case class LoadKycDocumentStatus(
     creditedAccount: String,
     kycDocumentType: KycDocument.KycDocumentType
@@ -562,15 +644,28 @@ object PaymentMessages {
 
   /** Commands related to the ubo declaration */
 
-  case class CreateOrUpdateUbo(creditedAccount: String, ubo: UboDeclaration.UltimateBeneficialOwner)
-      extends PaymentCommandWithKey {
+  /** @param creditedAccount
+    *   - account to whom the UBO declaration would be added
+    * @param ubo
+    *   - ultimate beneficial owner
+    */
+  case class CreateOrUpdateUbo(
+    creditedAccount: String,
+    ubo: UboDeclaration.UltimateBeneficialOwner
+  ) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
+  /** @param creditedAccount
+    *   - account which owns the UBO declaration that would be validated
+    */
   case class ValidateUboDeclaration(creditedAccount: String) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
+  /** @param creditedAccount
+    *   - account which owns the UBO declaration that would be loaded
+    */
   case class GetUboDeclaration(creditedAccount: String) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
@@ -592,10 +687,16 @@ object PaymentMessages {
 
   /** Commands related to the mandate */
 
+  /** @param creditedAccount
+    *   - account to whom the mandate would be added
+    */
   case class CreateMandate(creditedAccount: String) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
+  /** @param creditedAccount
+    *   - account which owns the mandate that would be canceled
+    */
   case class CancelMandate(creditedAccount: String) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
@@ -635,6 +736,9 @@ object PaymentMessages {
     lazy val key: String = userId
   }
 
+  /** @param paymentAccount
+    *   - payment account
+    */
   @InternalApi
   private[payment] case class CreateOrUpdatePaymentAccount(paymentAccount: PaymentAccount)
       extends PaymentCommandWithKey {

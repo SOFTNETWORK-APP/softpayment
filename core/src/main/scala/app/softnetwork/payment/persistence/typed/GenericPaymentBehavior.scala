@@ -1,13 +1,14 @@
 package app.softnetwork.payment.persistence.typed
 
-import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
+import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.kv.handlers.GenericKeyValueDao
+import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.config.PaymentSettings.{AkkaNodeRole, PayInStatementDescriptor}
-import app.softnetwork.payment.handlers.{GenericPaymentDao, PaymentKvDao}
+import app.softnetwork.payment.handlers.{GenericPaymentDao, PaymentKvDao, SoftPaymentAccountDao}
 import app.softnetwork.payment.message.PaymentEvents._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.message.TransactionEvents._
@@ -19,9 +20,6 @@ import app.softnetwork.persistence._
 import app.softnetwork.persistence.message.{BroadcastEvent, CrudEvent}
 import app.softnetwork.persistence.typed._
 import app.softnetwork.scheduler.config.SchedulerSettings
-import app.softnetwork.serialization.asJson
-import app.softnetwork.time._
-import org.slf4j.Logger
 import app.softnetwork.scheduler.message.SchedulerEvents.{
   ExternalEntityToSchedulerEvent,
   ExternalSchedulerEvent,
@@ -29,6 +27,9 @@ import app.softnetwork.scheduler.message.SchedulerEvents.{
 }
 import app.softnetwork.scheduler.message.{AddSchedule, RemoveSchedule}
 import app.softnetwork.scheduler.model.Schedule
+import app.softnetwork.serialization.asJson
+import app.softnetwork.time._
+import org.slf4j.Logger
 
 import java.time.LocalDate
 import java.util.Date
@@ -44,7 +45,7 @@ trait GenericPaymentBehavior
       ExternalSchedulerEvent,
       PaymentResult
     ]
-    with ManifestWrapper[PaymentAccount] { _: PaymentProvider =>
+    with ManifestWrapper[PaymentAccount] {
 
   override protected val manifestWrapper: ManifestW = ManifestW()
 
@@ -54,6 +55,10 @@ trait GenericPaymentBehavior
   val nextRecurringPayment: String = "NextRecurringPayment"
 
   def paymentDao: GenericPaymentDao
+
+  def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
+
+  def defaultProvider: SoftPaymentAccount.Client.Provider
 
   /** @return
     *   node role required to start this actor
@@ -193,8 +198,10 @@ trait GenericPaymentBehavior
       case cmd: PreRegisterCard =>
         import cmd._
         var registerWallet: Boolean = false
-        loadPaymentAccount(entityId, state, PaymentAccount.User.NaturalUser(user)) match {
+        loadPaymentAccount(entityId, state, PaymentAccount.User.NaturalUser(user), clientId) match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             val lastUpdated = now()
             (paymentAccount.userId match {
               case None =>
@@ -329,6 +336,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             paymentAccount.getNaturalUser.userId match {
               case Some(userId) =>
                 (registrationId match {
@@ -380,6 +389,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             loadCardPreAuthorized(orderUuid, preAuthorizationId) match {
               case Some(transaction) =>
                 handleCardPreAuthorization(
@@ -400,6 +411,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             paymentAccount.transactions.find(_.id == cardPreAuthorizedTransactionId) match {
               case Some(preAuthorizationTransaction) =>
                 val preAuthorizationCanceled =
@@ -490,6 +503,8 @@ trait GenericPaymentBehavior
                   case Success(s) =>
                     s match {
                       case Some(creditedPaymentAccount) =>
+                        val paymentProvider = loadPaymentProvider(creditedPaymentAccount.clientId)
+                        import paymentProvider._
                         creditedPaymentAccount.walletId match {
                           case Some(creditedWalletId) =>
                             payInWithCardPreAuthorized(
@@ -557,6 +572,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             paymentType match {
               case Transaction.PaymentType.CARD =>
                 paymentAccount.userId match {
@@ -733,6 +750,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             loadPayIn(orderUuid, transactionId, None) match {
               case Some(transaction) =>
                 handlePayIn(
@@ -753,6 +772,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             loadPayIn(orderUuid, transactionId, None) match {
               case Some(transaction) =>
                 handlePayIn(
@@ -773,6 +794,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             (paymentAccount.transactions.find(_.id == payInTransactionId) match {
               case None => loadPayIn(orderUuid, payInTransactionId, None)
               case some => some
@@ -920,6 +943,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             paymentAccount.userId match {
               case Some(userId) =>
                 paymentAccount.walletId match {
@@ -1117,6 +1142,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) => // debited account
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             var maybeCreditedPaymentAccount: Option[PaymentAccount] = None
             transfer(paymentAccount.userId match {
               case Some(authorId) =>
@@ -1291,6 +1318,8 @@ trait GenericPaymentBehavior
                 )
                 .thenRun(_ => MandateNotCanceled ~> replyTo)
             } else {
+              val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+              import paymentProvider._
               paymentAccount.bankAccount match {
                 case Some(bankAccount) =>
                   bankAccount.mandateId match {
@@ -1345,6 +1374,8 @@ trait GenericPaymentBehavior
               case Some(userId) =>
                 paymentAccount.bankAccount.flatMap(_.id) match {
                   case Some(bankAccountId) =>
+                    val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                    import paymentProvider._
                     loadMandate(Some(mandateId), userId, bankAccountId) match {
                       case Some(report) =>
                         val internalStatus =
@@ -1399,6 +1430,8 @@ trait GenericPaymentBehavior
                     paymentAccount.bankAccount.flatMap(_.mandateId) match {
                       case Some(mandateId) =>
                         if (paymentAccount.mandateActivated) {
+                          val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                          import paymentProvider._
                           directDebit(
                             Some(
                               DirectDebitTransaction.defaultInstance
@@ -1489,6 +1522,8 @@ trait GenericPaymentBehavior
               case Some(transaction) =>
                 paymentAccount.walletId match {
                   case Some(creditedWalletId) =>
+                    val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                    import paymentProvider._
                     val transactionDate: LocalDate = Date.from(transaction.createdDate)
                     directDebitTransaction(
                       transaction.creditedWalletId.getOrElse(creditedWalletId),
@@ -1567,6 +1602,8 @@ trait GenericPaymentBehavior
               _.getId == cmd.recurringPayInRegistrationId
             ) match {
               case Some(recurringPayment) =>
+                val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                import paymentProvider._
                 createRecurringCardPayment(
                   RecurringPaymentTransaction.defaultInstance
                     .withExternalUuid(paymentAccount.externalUuid)
@@ -1612,6 +1649,8 @@ trait GenericPaymentBehavior
             import cmd._
             paymentAccount.recurryingPayments.find(_.getId == recurringPayInRegistrationId) match {
               case Some(recurringPayment) =>
+                val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                import paymentProvider._
                 loadPayIn("", transactionId, Some(recurringPayInRegistrationId)) match {
                   case Some(transaction) =>
                     handleRecurringPayment(
@@ -1663,6 +1702,8 @@ trait GenericPaymentBehavior
               _.getId == recurringPaymentRegistrationId
             ) match {
               case Some(recurringPayment) =>
+                val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                import paymentProvider._
                 val debitedAmount = nextDebitedAmount.getOrElse(
                   recurringPayment.nextDebitedAmount.getOrElse(
                     recurringPayment.firstDebitedAmount
@@ -1855,7 +1896,7 @@ trait GenericPaymentBehavior
             case None =>
               cmd.user match {
                 case Some(user) =>
-                  loadPaymentAccount(entityId, None, user)
+                  loadPaymentAccount(entityId, None, user, cmd.clientId)
                 case _ => None
               }
             case some => some
@@ -2057,6 +2098,8 @@ trait GenericPaymentBehavior
                     updatedPaymentAccount.getLegalUser.uboDeclarationRequired &&
                     updatedPaymentAccount.getLegalUser.uboDeclaration.isEmpty
 
+                  val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                  import paymentProvider._
                   (paymentAccount.userId match {
                     case None =>
                       createOrUpdatePaymentAccount(Some(updatedPaymentAccount))
@@ -2288,6 +2331,8 @@ trait GenericPaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) if paymentAccount.hasAcceptedTermsOfPSP =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             paymentAccount.userId match {
               case Some(userId) =>
                 addDocument(userId, entityId, pages, kycDocumentType) match {
@@ -2412,6 +2457,8 @@ trait GenericPaymentBehavior
       case cmd: CreateOrUpdateUbo =>
         state match {
           case Some(paymentAccount) =>
+            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+            import paymentProvider._
             var declarationCreated: Boolean = false
             def createInternalDeclaration(): Option[UboDeclaration] = {
               createDeclaration(paymentAccount.userId.getOrElse("")) match {
@@ -2486,6 +2533,8 @@ trait GenericPaymentBehavior
               case Some(uboDeclaration)
                   if uboDeclaration.status.isUboDeclarationCreated ||
                     uboDeclaration.status.isUboDeclarationIncomplete || uboDeclaration.status.isUboDeclarationRefused =>
+                val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                import paymentProvider._
                 validateDeclaration(paymentAccount.userId.getOrElse(""), uboDeclaration.id) match {
                   case Some(declaration) =>
                     val updatedUbo = declaration.withUbos(uboDeclaration.ubos)
@@ -2536,6 +2585,8 @@ trait GenericPaymentBehavior
                   if cmd.uboDeclarationId == uboDeclaration.id &&
                     uboDeclaration.status.isUboDeclarationValidationAsked =>
                 import cmd._
+                val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                import paymentProvider._
                 getDeclaration(paymentAccount.userId.getOrElse(""), uboDeclarationId) match {
                   case Some(declaration) =>
                     val internalStatus = {
@@ -2839,6 +2890,8 @@ trait GenericPaymentBehavior
                   case Some(_) =>
                     Effect.none.thenRun(_ => CardNotDisabled ~> replyTo)
                   case _ =>
+                    val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                    import paymentProvider._
                     disableCard(cmd.cardId) match {
                       case Some(_) =>
                         val lastUpdated = now()
@@ -2896,6 +2949,8 @@ trait GenericPaymentBehavior
                                   nextDebitedAmount = cmd.nextDebitedAmount,
                                   nextFeesAmount = cmd.nextFeesAmount
                                 )
+                            val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                            import paymentProvider._
                             registerRecurringCardPayment(
                               userId,
                               walletId,
@@ -3024,6 +3079,8 @@ trait GenericPaymentBehavior
               _.getId == cmd.recurringPayInRegistrationId
             ) match {
               case Some(recurringPayment) if recurringPayment.`type`.isCard =>
+                val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+                import paymentProvider._
                 val cardId: Option[String] =
                   cmd.cardId match {
                     case Some(cardId) =>
@@ -3192,6 +3249,8 @@ trait GenericPaymentBehavior
     bankAccountId: String
   )(implicit context: ActorContext[_]): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     implicit val system: ActorSystem[_] = context.system
+    val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+    import paymentProvider._
     mandate(creditedAccount, creditedUserId, bankAccountId) match {
       case Some(mandateResult) =>
         if (mandateResult.status.isMandateFailed) {
@@ -3254,9 +3313,10 @@ trait GenericPaymentBehavior
   private[this] def loadPaymentAccount(
     entityId: String,
     state: Option[PaymentAccount],
-    user: PaymentAccount.User
+    user: PaymentAccount.User,
+    clientId: Option[String]
   )(implicit system: ActorSystem[_], log: Logger): Option[PaymentAccount] = {
-    val pa = PaymentAccount.defaultInstance.withUser(user)
+    val pa = PaymentAccount.defaultInstance.withUser(user).copy(clientId = clientId)
     val uuid = pa.externalUuidWithProfile
     state match {
       case None =>
@@ -3280,6 +3340,11 @@ trait GenericPaymentBehavior
         if (paymentAccount.externalUuid != pa.externalUuid) {
           log.warn(
             s"the payment account entity $entityId has already been associated with another external uuid ${paymentAccount.externalUuid}"
+          )
+          None
+        } else if (paymentAccount.clientId.getOrElse("") != clientId.getOrElse("")) {
+          log.warn(
+            s"the payment account entity $entityId has already been associated with another client ${paymentAccount.clientId}"
           )
           None
         } else {
@@ -3552,6 +3617,8 @@ trait GenericPaymentBehavior
       case _ =>
         if (transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated) {
           log.debug("Order-{} paid in: {} -> {}", orderUuid, transaction.id, asJson(transaction))
+          val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+          import paymentProvider._
           val registerCardEvents: List[ExternalSchedulerEvent] =
             if (registerCard) {
               transaction.cardId match {
@@ -3696,6 +3763,8 @@ trait GenericPaymentBehavior
             transaction.id,
             asJson(transaction)
           )
+          val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+          import paymentProvider._
           val registerCardEvents: List[ExternalSchedulerEvent] =
             if (registerCard) {
               transaction.cardId match {
@@ -3782,6 +3851,8 @@ trait GenericPaymentBehavior
 
     val userId = paymentAccount.userId.getOrElse("")
 
+    val paymentProvider = loadPaymentProvider(paymentAccount.clientId)
+    import paymentProvider._
     val report = loadDocumentStatus(userId, documentId)
 
     val internalStatus =
@@ -3943,4 +4014,19 @@ trait GenericPaymentBehavior
 
     newDocuments
   }
+
+  @InternalApi
+  private[this] def loadPaymentProvider(
+    clientId: Option[String]
+  )(implicit system: ActorSystem[_]): PaymentProvider = {
+    PaymentProviders.paymentProvider(
+      clientId
+        .flatMap(softPaymentAccountDao.loadProvider(_) complete () match {
+          case Success(s) => s
+          case Failure(_) => None
+        })
+        .getOrElse(defaultProvider)
+    )
+  }
+
 }

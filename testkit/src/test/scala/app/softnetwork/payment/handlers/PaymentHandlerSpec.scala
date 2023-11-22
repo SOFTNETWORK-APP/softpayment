@@ -9,8 +9,11 @@ import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
+import app.softnetwork.session.config.Settings
+import app.softnetwork.session.service.BasicSessionMaterials
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
+import org.softnetwork.session.model.Session
 
 import java.time.LocalDate
 import scala.language.implicitConversions
@@ -20,13 +23,17 @@ class PaymentHandlerSpec
     extends MockPaymentHandler
     with AnyWordSpecLike
     with PaymentGrpcServer
-    with PaymentTestKit {
+    with PaymentTestKit
+    with BasicSessionMaterials {
 
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
-  implicit lazy val system: ActorSystem[_] = typedSystem()
+  override implicit lazy val ts: ActorSystem[_] = typedSystem()
 
-  lazy val client: PaymentClient = PaymentClient(system)
+  override protected def sessionType: Session.SessionType =
+    Settings.Session.SessionContinuityAndTransport
+
+  lazy val client: PaymentClient = PaymentClient(ts)
 
   "Payment handler" must {
     "pre register card" in {

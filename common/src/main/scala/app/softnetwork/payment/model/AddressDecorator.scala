@@ -17,7 +17,8 @@ trait AddressDecorator { self: Address =>
       address.addressLine.equals(addressLine) &&
         address.city.equals(city) &&
         address.country.equals(country) &&
-        address.postalCode.equals(postalCode)
+        address.postalCode.equals(postalCode) &&
+        address.state.getOrElse("").equals(state.getOrElse(""))
     case _ => super.equals(obj)
   }
 
@@ -25,11 +26,17 @@ trait AddressDecorator { self: Address =>
     new Locale(language, country.toUpperCase).getDisplayCountry
 }
 
-case class AddressView(addressLine: String, city: String, postalCode: String, country: String)
+case class AddressView(
+  addressLine: String,
+  city: String,
+  postalCode: String,
+  country: String,
+  state: Option[String]
+)
 
 object AddressView {
   def apply(address: Address): AddressView = {
     import address._
-    AddressView(addressLine, city, postalCode, country)
+    AddressView(addressLine, city, postalCode, country, state)
   }
 }
