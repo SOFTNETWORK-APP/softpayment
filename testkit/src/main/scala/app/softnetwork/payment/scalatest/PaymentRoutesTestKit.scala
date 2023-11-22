@@ -1,9 +1,20 @@
 package app.softnetwork.payment.scalatest
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.account.model.{
+  DefaultAccountDetailsView,
+  DefaultAccountView,
+  DefaultProfileView
+}
+import app.softnetwork.account.service.{AccountService, OAuthService}
 import app.softnetwork.api.server.ApiRoute
 import app.softnetwork.payment.launch.PaymentRoutes
-import app.softnetwork.payment.service.{GenericPaymentService, MockPaymentService}
+import app.softnetwork.payment.service.{
+  GenericPaymentService,
+  MockPaymentService,
+  MockSoftPaymentAccountService,
+  MockSoftPaymentOAuthService
+}
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.scalatest.{SessionServiceRoutes, SessionTestKit}
 import app.softnetwork.session.service.SessionMaterials
@@ -28,11 +39,38 @@ trait PaymentRoutesTestKit extends PaymentRoutes with SessionServiceRoutes {
       override lazy val ec: ExecutionContext = sys.executionContext
     }
 
+  implicit def sessionConfig: SessionConfig
+
+  override def accountService: ActorSystem[_] => AccountService[
+    DefaultProfileView,
+    DefaultAccountDetailsView,
+    DefaultAccountView[DefaultProfileView, DefaultAccountDetailsView]
+  ] = sys =>
+    new MockSoftPaymentAccountService with SessionMaterials {
+      override implicit def manager(implicit
+        sessionConfig: SessionConfig
+      ): SessionManager[Session] = self.manager
+      override protected def sessionType: Session.SessionType = self.sessionType
+      override def log: Logger = LoggerFactory getLogger getClass.getName
+      override implicit def sessionConfig: SessionConfig = self.sessionConfig
+      override implicit def system: ActorSystem[_] = sys
+      override lazy val ec: ExecutionContext = sys.executionContext
+      override protected val manifestWrapper: ManifestW = ManifestW()
+    }
+
+  override def oauthService: ActorSystem[_] => OAuthService = sys =>
+    new MockSoftPaymentOAuthService with SessionMaterials {
+      override implicit def manager(implicit
+        sessionConfig: SessionConfig
+      ): SessionManager[Session] = self.manager
+      override protected def sessionType: Session.SessionType = self.sessionType
+      override def log: Logger = LoggerFactory getLogger getClass.getName
+      override implicit def sessionConfig: SessionConfig = self.sessionConfig
+      override implicit def system: ActorSystem[_] = sys
+      override lazy val ec: ExecutionContext = sys.executionContext
+    }
+
   override def apiRoutes: ActorSystem[_] => List[ApiRoute] =
-    system =>
-      List(
-        sessionServiceRoute(system),
-        paymentService(system)
-      )
+    system => super.apiRoutes(system) :+ sessionServiceRoute(system)
 
 }

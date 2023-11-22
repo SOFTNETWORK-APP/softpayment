@@ -9,12 +9,12 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.reflect.ClassTag
 
-trait MockBasicAccountTypeKey extends CommandTypeKey[AccountCommand] {
+trait MockSoftPaymentAccountTypeKey extends CommandTypeKey[AccountCommand] {
   override def TypeKey(implicit tTag: ClassTag[AccountCommand]): EntityTypeKey[AccountCommand] =
     MockSoftPaymentAccountBehavior.TypeKey
 }
 
-trait MockSoftPaymentAccountHandler extends AccountHandler with MockBasicAccountTypeKey
+trait MockSoftPaymentAccountHandler extends AccountHandler with MockSoftPaymentAccountTypeKey
 
 object MockSoftPaymentAccountDao extends SoftPaymentAccountDao with MockSoftPaymentAccountHandler {
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
