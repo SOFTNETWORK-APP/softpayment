@@ -6,6 +6,7 @@ trait SoftPaymentClientDecorator { _: SoftPaymentAccount.Client =>
 
   def generateApiKey(): String = BearerTokenGenerator.generateSHAToken(clientId)
 
+  lazy val view: SoftPaymentClientView = SoftPaymentClientView(this)
 }
 
 case class SoftPaymentClientView(

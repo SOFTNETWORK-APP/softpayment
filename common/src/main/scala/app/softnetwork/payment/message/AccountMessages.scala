@@ -4,11 +4,12 @@ import app.softnetwork.account.message.{
   AccountCommand,
   AccountCommandResult,
   AccountErrorMessage,
+  LookupAccountCommand,
   SignUp
 }
 import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.payment.annotation.InternalApi
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.{ApiKey, SoftPaymentAccount}
 
 object AccountMessages {
   case class SoftPaymentSignup(
@@ -22,16 +23,32 @@ object AccountMessages {
   case class RegisterProvider(provider: SoftPaymentAccount.Client.Provider) extends AccountCommand
 
   @InternalApi
-  private[payment] case class LoadProvider(clientId: String) extends AccountCommand
+  private[payment] case class LoadClient(clientId: String) extends LookupAccountCommand
+
+  case object ListApiKeys extends AccountCommand
+
+  case class GenerateClientToken(
+    client_id: String,
+    client_secret: String,
+    scope: Option[String] = None
+  ) extends LookupAccountCommand
+
+  case class RefreshClientToken(refreshToken: String) extends LookupAccountCommand
+
+  case class OAuthClient(token: String) extends LookupAccountCommand
 
   case class ProviderRegistered(client: SoftPaymentAccount.Client) extends AccountCommandResult
 
-  case class ProviderLoaded(provider: SoftPaymentAccount.Client.Provider)
+  case class ClientLoaded(client: SoftPaymentAccount.Client) extends AccountCommandResult
+
+  case class ApiKeysLoaded(apiKeys: Seq[ApiKey]) extends AccountCommandResult
+
+  case class OAuthClientSucceededResult(client: SoftPaymentAccount.Client)
       extends AccountCommandResult
 
   case object ProviderAlreadyRegistered extends AccountErrorMessage("provider.already.registered")
 
   case object ProviderNotRegistered extends AccountErrorMessage("provider.not.registered")
 
-  case object ProviderNotFound extends AccountErrorMessage("provider.not.found")
+  case object ClientNotFound extends AccountErrorMessage("client.not.found")
 }

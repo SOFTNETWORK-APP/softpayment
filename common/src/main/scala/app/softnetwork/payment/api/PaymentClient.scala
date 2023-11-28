@@ -2,7 +2,9 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import akka.grpc.GrpcClientSettings
+import akka.grpc.scaladsl.SingleResponseRequestBuilder
 import app.softnetwork.api.server.client.{GrpcClient, GrpcClientFactory}
+import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.model.{
   BankAccountOwner,
   LegalUserDetails,
@@ -20,29 +22,57 @@ trait PaymentClient extends GrpcClient {
       GrpcClientSettings.fromConfig(name)
     )
 
-  def createOrUpdatePaymentAccount(paymentAccount: PaymentAccount): Future[Boolean] = {
-    grpcClient.createOrUpdatePaymentAccount(
-      CreateOrUpdatePaymentAccountRequest(Some(paymentAccount))
-    ) map (_.succeeded)
+  @InternalApi
+  private[payment] def withAuthorization[Req, Res](
+    single: SingleResponseRequestBuilder[Req, Res],
+    token: Option[String]
+  ): SingleResponseRequestBuilder[Req, Res] = {
+    token match {
+      case Some(t) => single.addHeader("Authorization", s"Bearer $t")
+      case _       => single
+    }
+  }
+
+  def createOrUpdatePaymentAccount(
+    paymentAccount: PaymentAccount,
+    token: Option[String] = None
+  ): Future[Boolean] = {
+    withAuthorization(
+      grpcClient.createOrUpdatePaymentAccount(),
+      token
+    )
+      .invoke(
+        CreateOrUpdatePaymentAccountRequest(Some(paymentAccount))
+      ) map (_.succeeded)
   }
 
   def payInWithCardPreAuthorized(
     preAuthorizationId: String,
     creditedAccount: String,
-    debitedAmount: Option[Int]
+    debitedAmount: Option[Int],
+    token: Option[String] = None
   ): Future[TransactionResponse] = {
-    grpcClient.payInWithCardPreAuthorized(
-      PayInWithCardPreAuthorizedRequest(preAuthorizationId, creditedAccount, debitedAmount)
+    withAuthorization(
+      grpcClient.payInWithCardPreAuthorized(),
+      token
     )
+      .invoke(
+        PayInWithCardPreAuthorizedRequest(preAuthorizationId, creditedAccount, debitedAmount)
+      )
   }
 
   def cancelPreAuthorization(
     orderUuid: String,
-    cardPreAuthorizedTransactionId: String
+    cardPreAuthorizedTransactionId: String,
+    token: Option[String] = None
   ): Future[Option[Boolean]] = {
-    grpcClient.cancelPreAuthorization(
-      CancelPreAuthorizationRequest(orderUuid, cardPreAuthorizedTransactionId)
-    ) map (_.preAuthorizationCanceled)
+    withAuthorization(
+      grpcClient.cancelPreAuthorization(),
+      token
+    )
+      .invoke(
+        CancelPreAuthorizationRequest(orderUuid, cardPreAuthorizedTransactionId)
+      ) map (_.preAuthorizationCanceled)
   }
 
   def refund(
@@ -51,18 +81,23 @@ trait PaymentClient extends GrpcClient {
     refundAmount: Int,
     currency: String,
     reasonMessage: String,
-    initializedByClient: Boolean
+    initializedByClient: Boolean,
+    token: Option[String] = None
   ): Future[TransactionResponse] = {
-    grpcClient.refund(
-      RefundRequest(
-        orderUuid,
-        payInTransactionId,
-        refundAmount,
-        currency,
-        reasonMessage,
-        initializedByClient
-      )
+    withAuthorization(
+      grpcClient.refund(),
+      token
     )
+      .invoke(
+        RefundRequest(
+          orderUuid,
+          payInTransactionId,
+          refundAmount,
+          currency,
+          reasonMessage,
+          initializedByClient
+        )
+      )
   }
 
   def payOut(
@@ -71,18 +106,23 @@ trait PaymentClient extends GrpcClient {
     creditedAmount: Int,
     feesAmount: Int,
     currency: String,
-    externalReference: Option[String]
+    externalReference: Option[String],
+    token: Option[String] = None
   ): Future[TransactionResponse] = {
-    grpcClient.payOut(
-      PayOutRequest(
-        orderUuid,
-        creditedAccount,
-        creditedAmount,
-        feesAmount,
-        currency,
-        externalReference
-      )
+    withAuthorization(
+      grpcClient.payOut(),
+      token
     )
+      .invoke(
+        PayOutRequest(
+          orderUuid,
+          creditedAccount,
+          creditedAmount,
+          feesAmount,
+          currency,
+          externalReference
+        )
+      )
   }
 
   def transfer(
@@ -93,20 +133,25 @@ trait PaymentClient extends GrpcClient {
     feesAmount: Int,
     currency: String,
     payOutRequired: Boolean,
-    externalReference: Option[String]
+    externalReference: Option[String],
+    token: Option[String] = None
   ): Future[TransferResponse] = {
-    grpcClient.transfer(
-      TransferRequest(
-        orderUuid,
-        debitedAccount,
-        creditedAccount,
-        debitedAmount,
-        feesAmount,
-        currency,
-        payOutRequired,
-        externalReference
-      )
+    withAuthorization(
+      grpcClient.transfer(),
+      token
     )
+      .invoke(
+        TransferRequest(
+          orderUuid,
+          debitedAccount,
+          creditedAccount,
+          debitedAmount,
+          feesAmount,
+          currency,
+          payOutRequired,
+          externalReference
+        )
+      )
   }
 
   def directDebit(
@@ -115,24 +160,36 @@ trait PaymentClient extends GrpcClient {
     feesAmount: Int,
     currency: String,
     statementDescriptor: String,
-    externalReference: Option[String]
+    externalReference: Option[String],
+    token: Option[String] = None
   ): Future[TransactionResponse] = {
-    grpcClient.directDebit(
-      DirectDebitRequest(
-        creditedAccount,
-        debitedAmount,
-        feesAmount,
-        currency,
-        statementDescriptor,
-        externalReference
-      )
+    withAuthorization(
+      grpcClient.directDebit(),
+      token
     )
+      .invoke(
+        DirectDebitRequest(
+          creditedAccount,
+          debitedAmount,
+          feesAmount,
+          currency,
+          statementDescriptor,
+          externalReference
+        )
+      )
   }
 
-  def loadDirectDebitTransaction(directDebitTransactionId: String): Future[TransactionResponse] = {
-    grpcClient.loadDirectDebitTransaction(
-      LoadDirectDebitTransactionRequest(directDebitTransactionId)
+  def loadDirectDebitTransaction(
+    directDebitTransactionId: String,
+    token: Option[String] = None
+  ): Future[TransactionResponse] = {
+    withAuthorization(
+      grpcClient.loadDirectDebitTransaction(),
+      token
     )
+      .invoke(
+        LoadDirectDebitTransactionRequest(directDebitTransactionId)
+      )
   }
 
   def registerRecurringPayment(
@@ -146,41 +203,64 @@ trait PaymentClient extends GrpcClient {
     frequency: Option[RecurringPayment.RecurringPaymentFrequency],
     fixedNextAmount: Option[Boolean],
     nextDebitedAmount: Option[Int],
-    nextFeesAmount: Option[Int]
+    nextFeesAmount: Option[Int],
+    token: Option[String] = None
   ): Future[Option[String]] = {
-    grpcClient.registerRecurringPayment(
-      RegisterRecurringPaymentRequest(
-        debitedAccount,
-        firstDebitedAmount,
-        firstFeesAmount,
-        currency,
-        `type`,
-        startDate,
-        endDate,
-        frequency match {
-          case Some(f) => f
-          case _ =>
-            RegisterRecurringPaymentRequest.RecurringPaymentFrequency.UNKNOWN_PAYMENT_FREQUENCY
-        },
-        fixedNextAmount,
-        nextDebitedAmount,
-        nextFeesAmount
-      )
-    ) map (_.recurringPaymentRegistrationId)
+    withAuthorization(
+      grpcClient.registerRecurringPayment(),
+      token
+    )
+      .invoke(
+        RegisterRecurringPaymentRequest(
+          debitedAccount,
+          firstDebitedAmount,
+          firstFeesAmount,
+          currency,
+          `type`,
+          startDate,
+          endDate,
+          frequency match {
+            case Some(f) => f
+            case _ =>
+              RegisterRecurringPaymentRequest.RecurringPaymentFrequency.UNKNOWN_PAYMENT_FREQUENCY
+          },
+          fixedNextAmount,
+          nextDebitedAmount,
+          nextFeesAmount
+        )
+      ) map (_.recurringPaymentRegistrationId)
   }
 
-  def cancelMandate(externalUuid: String): Future[Boolean] = {
-    grpcClient.cancelMandate(CancelMandateRequest(externalUuid)) map (_.succeeded)
+  def cancelMandate(externalUuid: String, token: Option[String] = None): Future[Boolean] = {
+    withAuthorization(
+      grpcClient.cancelMandate(),
+      token
+    )
+      .invoke(CancelMandateRequest(externalUuid)) map (_.succeeded)
   }
 
-  def loadBankAccountOwner(externalUuid: String): Future[BankAccountOwner] = {
-    grpcClient.loadBankAccountOwner(LoadBankAccountOwnerRequest(externalUuid)) map (response =>
+  def loadBankAccountOwner(
+    externalUuid: String,
+    token: Option[String] = None
+  ): Future[BankAccountOwner] = {
+    withAuthorization(
+      grpcClient.loadBankAccountOwner(),
+      token
+    )
+      .invoke(LoadBankAccountOwnerRequest(externalUuid)) map (response =>
       BankAccountOwner(response.ownerName, response.ownerAddress)
     )
   }
 
-  def loadLegalUserDetails(externalUuid: String): Future[LegalUserDetails] = {
-    grpcClient.loadLegalUser(LoadLegalUserRequest(externalUuid)) map (response =>
+  def loadLegalUserDetails(
+    externalUuid: String,
+    token: Option[String] = None
+  ): Future[LegalUserDetails] = {
+    withAuthorization(
+      grpcClient.loadLegalUser(),
+      token
+    )
+      .invoke(LoadLegalUserRequest(externalUuid)) map (response =>
       LegalUserDetails(
         response.legalUserType,
         response.legalName,
@@ -188,6 +268,38 @@ trait PaymentClient extends GrpcClient {
         response.legalRepresentativeAddress,
         response.headQuartersAddress
       )
+    )
+  }
+
+  def generateClientTokens(
+    clientId: String,
+    clientSecret: String,
+    scope: Option[String] = None
+  ): Future[Option[Tokens]] = {
+    grpcClient
+      .generateClientTokens()
+      .invoke(
+        GenerateClientTokensRequest(clientId, clientSecret, scope)
+      ) map (response =>
+      response.clientTokens match {
+        case r: ClientTokensResponse.ClientTokens.Tokens =>
+          r.tokens
+        case _ => None
+      }
+    )
+  }
+
+  def refreshClientTokens(refreshToken: String): Future[Option[Tokens]] = {
+    grpcClient
+      .refreshClientTokens()
+      .invoke(
+        RefreshClientTokensRequest(refreshToken)
+      ) map (response =>
+      response.clientTokens match {
+        case r: ClientTokensResponse.ClientTokens.Tokens =>
+          r.tokens
+        case _ => None
+      }
     )
   }
 }

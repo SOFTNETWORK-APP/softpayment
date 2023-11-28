@@ -17,14 +17,14 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
   import app.softnetwork.serialization._
 
   val createOrUpdateBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.post
+    requiredSessionEndpoint.post
       .in(PaymentSettings.BankRoute)
       .in(jsonBody[BankAccountCommand].description("Legal or natural user bank account"))
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[BankAccountCreatedOrUpdated].description("Bank account created or updated"))
       )
-      .serverLogic(session => { bank =>
+      .serverLogic(principal => { bank =>
         import bank._
         var externalUuid: String = ""
         val updatedUser: Option[PaymentAccount.User] = {
@@ -32,12 +32,12 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
             case Left(naturalUser) =>
               var updatedNaturalUser = {
                 if (naturalUser.externalUuid.trim.isEmpty) {
-                  naturalUser.withExternalUuid(session.id)
+                  naturalUser.withExternalUuid(principal._2.id)
                 } else {
                   naturalUser
                 }
               }
-              session.profile match {
+              principal._2.profile match {
                 case Some(profile) if updatedNaturalUser.profile.isEmpty =>
                   updatedNaturalUser = updatedNaturalUser.withProfile(profile)
                 case _ =>
@@ -47,9 +47,10 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
             case Right(legalUser) =>
               var updatedLegalRepresentative = legalUser.legalRepresentative
               if (updatedLegalRepresentative.externalUuid.trim.isEmpty) {
-                updatedLegalRepresentative = updatedLegalRepresentative.withExternalUuid(session.id)
+                updatedLegalRepresentative =
+                  updatedLegalRepresentative.withExternalUuid(principal._2.id)
               }
-              session.profile match {
+              principal._2.profile match {
                 case Some(profile) if updatedLegalRepresentative.profile.isEmpty =>
                   updatedLegalRepresentative = updatedLegalRepresentative.withProfile(profile)
                 case _ =>
@@ -64,10 +65,11 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
         }
         run(
           CreateOrUpdateBankAccount(
-            externalUuidWithProfile(session),
+            externalUuidWithProfile(principal._2),
             bankAccount.withExternalUuid(externalUuid),
             updatedUser,
-            acceptedTermsOfPSP
+            acceptedTermsOfPSP,
+            clientId = principal._1.map(_.clientId)
           )
         ).map {
           case r: BankAccountCreatedOrUpdated => Right(r)
@@ -77,7 +79,7 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       .description("Create or update legal or natural user bank account")
 
   val loadBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.get
+    requiredSessionEndpoint.get
       .in(PaymentSettings.BankRoute)
       .out(
         statusCode(StatusCode.Ok).and(
@@ -85,10 +87,10 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
             .description("Authenticated user bank account")
         )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ => {
           run(
-            LoadBankAccount(externalUuidWithProfile(session))
+            LoadBankAccount(externalUuidWithProfile(principal._2))
           ).map {
             case r: BankAccountLoaded => Right(r.bankAccount.view)
             case other                => Left(error(other))
@@ -98,14 +100,14 @@ trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       .description("Load authenticated user bank account")
 
   val deleteBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.delete
+    requiredSessionEndpoint.delete
       .in(PaymentSettings.BankRoute)
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[BankAccountDeleted.type])
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ =>
-          run(DeleteBankAccount(externalUuidWithProfile(session), Some(false))).map {
+          run(DeleteBankAccount(externalUuidWithProfile(principal._2), Some(false))).map {
             case BankAccountDeleted => Right(BankAccountDeleted)
             case other              => Left(error(other))
           }

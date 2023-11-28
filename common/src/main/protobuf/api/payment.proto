@@ -26,6 +26,8 @@ service PaymentServiceApi {
     rpc CancelMandate (CancelMandateRequest) returns (CancelMandateResponse) {}
     rpc LoadBankAccountOwner (LoadBankAccountOwnerRequest) returns (LoadBankAccountOwnerResponse) {}
     rpc LoadLegalUser(LoadLegalUserRequest) returns (LoadLegalUserResponse) {}
+    rpc GenerateClientTokens (GenerateClientTokensRequest) returns (ClientTokensResponse) {}
+    rpc RefreshClientTokens (RefreshClientTokensRequest) returns (ClientTokensResponse) {}
 }
 
 message CreateOrUpdatePaymentAccountRequest {
@@ -181,4 +183,29 @@ message LoadLegalUserResponse {
     string siret = 3;
     app.softnetwork.payment.model.Address legalRepresentativeAddress = 4;
     app.softnetwork.payment.model.Address headQuartersAddress = 5;
+}
+
+message Tokens {
+    string access_token = 1;
+    string token_type = 2;
+    int64 expires_in = 3;
+    string refresh_token = 4;
+//    google.protobuf.StringValue scope = 5;
+}
+
+message ClientTokensResponse {
+    oneof clientTokens {
+        Tokens tokens = 1;
+        string error = 2;
+    }
+}
+
+message GenerateClientTokensRequest {
+    string client_id = 1;
+    string client_secret = 2;
+    google.protobuf.StringValue scope = 3;
+}
+
+message RefreshClientTokensRequest {
+    string refresh_token = 1;
 }

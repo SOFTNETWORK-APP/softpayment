@@ -1,30 +1,25 @@
 package app.softnetwork.payment.persistence.typed
 
-import akka.actor.typed.ActorRef
+import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.account.handlers.{DefaultGenerator, Generator}
-import app.softnetwork.account.message
-import app.softnetwork.account.message.{
-  AccountCommand,
-  AccountCommandResult,
-  AccountCreatedEvent,
-  AccountNotFound,
-  BasicAccountProfileUpdatedEvent,
-  ProfileUpdatedEvent
-}
+import app.softnetwork.account.message._
 import app.softnetwork.account.model.{BasicAccount, BasicAccountProfile, Principal, PrincipalType}
 import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.payment.message.AccountMessages
 import app.softnetwork.payment.message.AccountMessages.SoftPaymentSignup
 import app.softnetwork.payment.message.SoftPaymentAccountEvents.{
   SoftPaymentAccountCreatedEvent,
-  SoftPaymentAccountProviderRegisteredEvent
+  SoftPaymentAccountProviderRegisteredEvent,
+  SoftPaymentAccountTokenRefreshedEvent,
+  SoftPaymentAccountTokenRegisteredEvent
 }
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.persistence.typed._
 import app.softnetwork.scheduler.message.SchedulerEvents.ExternalSchedulerEvent
+import app.softnetwork.security.sha256
 
 import java.time.Instant
 
@@ -32,7 +27,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
   _: Generator =>
   override protected def createAccount(
     entityId: String,
-    cmd: message.SignUp
+    cmd: SignUp
   )(implicit context: ActorContext[AccountCommand]): Option[SoftPaymentAccount] = {
     cmd match {
       case SoftPaymentSignup(_, _, provider, _, _) =>
@@ -41,7 +36,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
             SoftPaymentAccount(BasicAccount(cmd, Some(entityId)))
               .map(account =>
                 account
-                  .withClient(client.withClientApiKey(client.generateApiKey()))
+                  .withClients(Seq(client.withClientApiKey(client.generateApiKey())))
                   .withSecondaryPrincipals(
                     account.secondaryPrincipals.filterNot(
                       _.`type` == PrincipalType.Other
@@ -86,11 +81,12 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
   )(implicit
     context: ActorContext[AccountCommand]
   ): Effect[ExternalSchedulerEvent, Option[SoftPaymentAccount]] = {
+    implicit val system: ActorSystem[_] = context.system
     command match {
       case AccountMessages.RegisterProvider(provider) =>
         state match {
           case Some(account) =>
-            if (account.client.isDefined) {
+            if (account.clients.exists(_.provider.providerId == provider.providerId)) {
               Effect.none.thenRun { _ =>
                 AccountMessages.ProviderAlreadyRegistered ~> replyTo
               }
@@ -98,6 +94,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
               PaymentProviders.paymentProvider(provider).client match {
                 case Some(client) =>
                   val updatedClient = client.withClientApiKey(client.generateApiKey())
+                  accountKeyDao.addAccountKey(updatedClient.clientId, entityId)
                   Effect
                     .persist(
                       SoftPaymentAccountProviderRegisteredEvent(
@@ -118,25 +115,176 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
             }
         }
 
-      case AccountMessages.LoadProvider(clientId) =>
+      case AccountMessages.LoadClient(clientId) =>
         state match {
           case Some(account) =>
-            account.client match {
+            account.clients.find(_.clientId == clientId) match {
               case Some(client) =>
-                if (client.clientId == clientId) {
-                  Effect.none.thenRun { _ =>
-                    AccountMessages.ProviderLoaded(client.provider) ~> replyTo
-                  }
-                } else {
-                  Effect.none.thenRun { _ =>
-                    AccountMessages.ProviderNotFound ~> replyTo
-                  }
+                Effect.none.thenRun { _ =>
+                  AccountMessages.ClientLoaded(client) ~> replyTo
                 }
               case _ =>
                 Effect.none.thenRun { _ =>
-                  AccountMessages.ProviderNotFound ~> replyTo
+                  AccountMessages.ClientNotFound ~> replyTo
                 }
             }
+          case _ =>
+            Effect.none.thenRun { _ =>
+              AccountNotFound ~> replyTo
+            }
+        }
+
+      case AccountMessages.ListApiKeys =>
+        state match {
+          case Some(account) =>
+            Effect.none.thenRun { _ =>
+              AccountMessages.ApiKeysLoaded(account.apiKeys) ~> replyTo
+            }
+          case _ =>
+            Effect.none.thenRun { _ =>
+              AccountNotFound ~> replyTo
+            }
+        }
+
+      case AccountMessages.GenerateClientToken(
+            clientId,
+            clientSecret,
+            scope
+          ) => // grant_type=client_credentials
+        state match {
+          case Some(account) if account.status.isActive =>
+            account.clients.find(_.clientId == clientId) match {
+              case Some(client) if client.accessToken.exists(!_.expired) =>
+                Effect.none.thenRun(_ => AccessTokenAlreadyExists ~> replyTo)
+
+              case Some(client) if client.clientApiKey.isEmpty =>
+                Effect.none.thenRun(_ => AccountMessages.ClientNotFound ~> replyTo)
+
+              case Some(client) =>
+                if (client.getClientApiKey == clientSecret) {
+                  val accessToken =
+                    generator.generateAccessToken(
+                      account.primaryPrincipal.value,
+                      scope
+                    )
+                  accountKeyDao.addAccountKey(accessToken.token, entityId)
+                  accountKeyDao.addAccountKey(accessToken.refreshToken, entityId)
+                  Effect
+                    .persist(
+                      SoftPaymentAccountTokenRegisteredEvent(
+                        client.withAccessToken(
+                          accessToken.copy(
+                            token = sha256(accessToken.token),
+                            refreshToken = sha256(accessToken.refreshToken)
+                          )
+                        ),
+                        Instant.now()
+                      )
+                    )
+                    .thenRun { _ =>
+                      AccessTokenGenerated(accessToken) ~> replyTo
+                    }
+                } else {
+                  Effect.none.thenRun { _ =>
+                    AccountMessages.ClientNotFound ~> replyTo
+                  }
+                }
+
+              case _ =>
+                Effect.none.thenRun { _ =>
+                  AccountMessages.ClientNotFound ~> replyTo
+                }
+            }
+
+          case Some(account) if account.status.isDisabled =>
+            Effect.none.thenRun(_ => AccountDisabled ~> replyTo)
+
+          case Some(account) if account.status.isDeleted =>
+            Effect.none.thenRun(_ => AccountDeleted(account) ~> replyTo)
+
+          case _ =>
+            Effect.none.thenRun { _ =>
+              AccountNotFound ~> replyTo
+            }
+        }
+
+      case AccountMessages.RefreshClientToken(refreshToken) =>
+        state match {
+          case Some(account) if account.status.isActive =>
+            account.clients.find(
+              _.accessToken.map(_.refreshToken).getOrElse("") == sha256(refreshToken)
+            ) match {
+              case Some(client) =>
+                val previousToken = client.getAccessToken
+                val accessToken =
+                  generator.generateAccessToken(
+                    account.primaryPrincipal.value,
+                    previousToken.scope
+                  )
+                accountKeyDao.removeAccountKey(previousToken.token)
+                accountKeyDao.removeAccountKey(previousToken.refreshToken)
+                accountKeyDao.addAccountKey(accessToken.token, entityId)
+                accountKeyDao.addAccountKey(accessToken.refreshToken, entityId)
+                Effect
+                  .persist(
+                    SoftPaymentAccountTokenRefreshedEvent(
+                      client.withAccessToken(
+                        accessToken.copy(
+                          token = sha256(accessToken.token),
+                          refreshToken = sha256(accessToken.refreshToken)
+                        )
+                      ),
+                      Instant.now()
+                    )
+                  )
+                  .thenRun { _ =>
+                    AccessTokenGenerated(accessToken) ~> replyTo
+                  }
+
+              case _ =>
+                Effect.none.thenRun { _ =>
+                  AccountMessages.ClientNotFound ~> replyTo
+                }
+            }
+
+          case Some(account) if account.status.isDisabled =>
+            Effect.none.thenRun(_ => AccountDisabled ~> replyTo)
+
+          case Some(account) if account.status.isDeleted =>
+            Effect.none.thenRun(_ => AccountDeleted(account) ~> replyTo)
+
+          case _ =>
+            Effect.none.thenRun { _ =>
+              AccountNotFound ~> replyTo
+            }
+        }
+
+      case AccountMessages.OAuthClient(token) =>
+        state match {
+          case Some(account) if account.status.isActive =>
+            account.clients.find(
+              _.accessToken.map(_.token).getOrElse("") == sha256(token)
+            ) match {
+              case Some(client) if client.getAccessToken.expired =>
+                Effect.none.thenRun(_ => TokenExpired ~> replyTo)
+
+              case Some(client) =>
+                Effect.none.thenRun { _ =>
+                  AccountMessages.OAuthClientSucceededResult(client) ~> replyTo
+                }
+
+              case _ =>
+                Effect.none.thenRun { _ =>
+                  AccountMessages.ClientNotFound ~> replyTo
+                }
+            }
+
+          case Some(account) if account.status.isDisabled =>
+            Effect.none.thenRun(_ => AccountDisabled ~> replyTo)
+
+          case Some(account) if account.status.isDeleted =>
+            Effect.none.thenRun(_ => AccountDeleted(account) ~> replyTo)
+
           case _ =>
             Effect.none.thenRun { _ =>
               AccountNotFound ~> replyTo
@@ -160,7 +308,26 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
   )(implicit context: ActorContext[_]): Option[SoftPaymentAccount] = {
     event match {
       case SoftPaymentAccountProviderRegisteredEvent(client, lastUpdated) =>
-        state.map(_.withClient(client).withLastUpdated(lastUpdated))
+        state.map(account => {
+          account
+            .withClients(account.clients.filterNot(_.clientId == client.clientId) :+ client)
+            .withLastUpdated(lastUpdated)
+        })
+
+      case SoftPaymentAccountTokenRegisteredEvent(client, lastUpdated) =>
+        state.map(account => {
+          account
+            .withClients(account.clients.filterNot(_.clientId == client.clientId) :+ client)
+            .withLastUpdated(lastUpdated)
+        })
+
+      case SoftPaymentAccountTokenRefreshedEvent(client, lastUpdated) =>
+        state.map(account => {
+          account
+            .withClients(account.clients.filterNot(_.clientId == client.clientId) :+ client)
+            .withLastUpdated(lastUpdated)
+        })
+
       case _ => super.handleEvent(state, event)
     }
   }

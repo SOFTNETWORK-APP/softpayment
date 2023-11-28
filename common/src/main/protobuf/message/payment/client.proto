@@ -34,3 +34,17 @@ message SoftPaymentAccountProviderRegisteredEvent {
   required app.softnetwork.payment.model.SoftPaymentAccount.Client client = 1;
   required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
 }
+
+message SoftPaymentAccountTokenRegisteredEvent {
+  option (scalapb.message).extends = "ProtobufEvent";
+  option (scalapb.message).extends = "SoftPaymentAccountEvent";
+  required app.softnetwork.payment.model.SoftPaymentAccount.Client client = 1;
+  required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
+}
+
+message SoftPaymentAccountTokenRefreshedEvent {
+  option (scalapb.message).extends = "ProtobufEvent";
+  option (scalapb.message).extends = "SoftPaymentAccountEvent";
+  required app.softnetwork.payment.model.SoftPaymentAccount.Client client = 1;
+  required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
+}

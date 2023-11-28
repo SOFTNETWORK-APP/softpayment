@@ -8,6 +8,7 @@ import app.softnetwork.account.model.{
 }
 import app.softnetwork.account.service.{AccountService, OAuthService}
 import app.softnetwork.api.server.ApiRoute
+import app.softnetwork.payment.handlers.{MockSoftPaymentAccountDao, SoftPaymentAccountDao}
 import app.softnetwork.payment.launch.PaymentRoutes
 import app.softnetwork.payment.service.{
   GenericPaymentService,
@@ -37,6 +38,7 @@ trait PaymentRoutesTestKit extends PaymentRoutes with SessionServiceRoutes {
       override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
+      override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
     }
 
   implicit def sessionConfig: SessionConfig
@@ -52,7 +54,7 @@ trait PaymentRoutesTestKit extends PaymentRoutes with SessionServiceRoutes {
       ): SessionManager[Session] = self.manager
       override protected def sessionType: Session.SessionType = self.sessionType
       override def log: Logger = LoggerFactory getLogger getClass.getName
-      override implicit def sessionConfig: SessionConfig = self.sessionConfig
+//      override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
       override protected val manifestWrapper: ManifestW = ManifestW()
@@ -65,9 +67,10 @@ trait PaymentRoutesTestKit extends PaymentRoutes with SessionServiceRoutes {
       ): SessionManager[Session] = self.manager
       override protected def sessionType: Session.SessionType = self.sessionType
       override def log: Logger = LoggerFactory getLogger getClass.getName
-      override implicit def sessionConfig: SessionConfig = self.sessionConfig
+//      override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
+      override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
     }
 
   override def apiRoutes: ActorSystem[_] => List[ApiRoute] =

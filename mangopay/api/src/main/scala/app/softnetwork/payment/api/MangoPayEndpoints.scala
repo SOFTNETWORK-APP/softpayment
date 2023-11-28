@@ -43,7 +43,7 @@ trait MangoPayEndpoints extends PaymentEndpoints {
         sessionConfig: SessionConfig
       ): SessionManager[Session] = self.manager
       override protected def sessionType: Session.SessionType = self.sessionType
-      override implicit def sessionConfig: SessionConfig = self.sessionConfig
+//      override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override protected val manifestWrapper: ManifestW = ManifestW()
     }
 
@@ -56,7 +56,7 @@ trait MangoPayEndpoints extends PaymentEndpoints {
         sessionConfig: SessionConfig
       ): SessionManager[Session] = self.manager
       override protected def sessionType: Session.SessionType = self.sessionType
-      override implicit def sessionConfig: SessionConfig = self.sessionConfig
+//      override implicit def sessionConfig: SessionConfig = self.sessionConfig
     }
 
   override def endpoints: ActorSystem[_] => List[Endpoint] = system =>

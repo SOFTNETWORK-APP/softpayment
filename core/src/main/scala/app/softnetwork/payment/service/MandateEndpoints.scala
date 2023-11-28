@@ -17,7 +17,7 @@ trait MandateEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
   import app.softnetwork.serialization._
 
   val createMandate: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.post
+    requiredSessionEndpoint.post
       .in(PaymentSettings.MandateRoute)
       .out(
         oneOf[PaymentResult](
@@ -32,9 +32,9 @@ trait MandateEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
           )
         )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ =>
-          run(CreateMandate(externalUuidWithProfile(session))).map {
+          run(CreateMandate(externalUuidWithProfile(principal._2))).map {
             case MandateCreated                 => Right(MandateCreated)
             case r: MandateConfirmationRequired => Right(r)
             case other                          => Left(error(other))
@@ -43,15 +43,15 @@ trait MandateEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
       .description("Create a mandate for the authenticated payment account")
 
   val cancelMandate: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.delete
+    requiredSessionEndpoint.delete
       .in(PaymentSettings.MandateRoute)
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[MandateCanceled.type].description("Mandate canceled"))
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ =>
-          run(CancelMandate(externalUuidWithProfile(session))).map {
+          run(CancelMandate(externalUuidWithProfile(principal._2))).map {
             case MandateCanceled => Right(MandateCanceled)
             case other           => Left(error(other))
           }

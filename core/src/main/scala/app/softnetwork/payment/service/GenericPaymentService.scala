@@ -38,6 +38,7 @@ trait GenericPaymentService
     with StrictLogging
     with BasicPaymentService
     with ServiceWithSessionDirectives[PaymentCommand, PaymentResult]
+    with ClientSessionDirectives
     with ApiRoute { _: GenericPaymentHandler with SessionMaterials =>
 
   implicit def serialization: Serialization.type = jackson.Serialization
@@ -69,7 +70,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      requiredSession(sc, gt) { session =>
+      requiredClientSession { (client, session) =>
         pathEnd {
           get {
             run(LoadCards(externalUuidWithProfile(session))) completeWith {
@@ -96,7 +97,7 @@ trait GenericPaymentService
                   updatedUser = updatedUser.withProfile(profile)
                 case _ =>
               }
-              run(cmd.copy(user = updatedUser)) completeWith {
+              run(cmd.copy(user = updatedUser, clientId = client.map(_.clientId))) completeWith {
                 case r: CardPreRegistered =>
                   complete(
                     HttpResponse(
@@ -125,7 +126,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      requiredSession(sc, gt) { session =>
+      requiredClientSession { (_, session) =>
         get {
           pathEnd {
             run(LoadPaymentAccount(externalUuidWithProfile(session))) completeWith {
@@ -364,7 +365,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      requiredSession(sc, gt) { session =>
+      requiredClientSession { (client, session) =>
         pathEnd {
           get {
             run(LoadBankAccount(externalUuidWithProfile(session))) completeWith {
@@ -422,7 +423,8 @@ trait GenericPaymentService
                   externalUuidWithProfile(session),
                   bankAccount.withExternalUuid(externalUuid),
                   updatedUser,
-                  acceptedTermsOfPSP
+                  acceptedTermsOfPSP,
+                  client.map(_.clientId)
                 )
               ) completeWith {
                 case r: BankAccountCreatedOrUpdated =>
@@ -446,7 +448,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      requiredSession(sc, gt) { session =>
+      requiredClientSession { (_, session) =>
         pathEnd {
           get {
             run(GetUboDeclaration(externalUuidWithProfile(session))) completeWith {
@@ -486,7 +488,7 @@ trait GenericPaymentService
             // check anti CSRF token
             hmacTokenCsrfProtection(checkHeader) {
               // check if a session exists
-              requiredSession(sc, gt) { session =>
+              requiredClientSession { (_, session) =>
                 pathEnd {
                   get {
                     run(
@@ -544,7 +546,7 @@ trait GenericPaymentService
       // check anti CSRF token
       hmacTokenCsrfProtection(checkHeader) {
         // check if a session exists
-        requiredSession(sc, gt) { session =>
+        requiredClientSession { (_, session) =>
           post {
             run(CreateMandate(externalUuidWithProfile(session))) completeWith {
               case r: MandateConfirmationRequired =>
@@ -567,7 +569,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      requiredSession(sc, gt) { session =>
+      requiredClientSession { (_, session) =>
         get {
           pathPrefix(Segment) { recurringPaymentRegistrationId =>
             run(

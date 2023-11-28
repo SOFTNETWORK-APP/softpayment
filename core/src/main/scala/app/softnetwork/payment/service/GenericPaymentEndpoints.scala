@@ -32,11 +32,11 @@ trait GenericPaymentEndpoints
   def hooks: Full[Unit, Unit, (String, String), Unit, Unit, Any, Future]
 
   val loadPaymentAccount: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.get
+    requiredSessionEndpoint.get
       .out(jsonBody[PaymentAccountView].description("Authenticated user payment account"))
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ => {
-          run(LoadPaymentAccount(externalUuidWithProfile(session))).map {
+          run(LoadPaymentAccount(externalUuidWithProfile(principal._2))).map {
             case r: PaymentAccountLoaded => Right(r.paymentAccount.view)
             case other                   => Left(error(other))
           }

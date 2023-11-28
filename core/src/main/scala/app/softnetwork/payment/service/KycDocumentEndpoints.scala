@@ -18,7 +18,7 @@ trait KycDocumentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
   import app.softnetwork.serialization._
 
   val loadKycDocument: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.get
+    requiredSessionEndpoint.get
       .in(PaymentSettings.KycRoute)
       .in(
         query[String]("documentType")
@@ -34,14 +34,14 @@ trait KycDocumentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
               .description("Kyc document validation report")
           )
       )
-      .serverLogic(session => { documentType =>
+      .serverLogic(principal => { documentType =>
         val maybeKycDocumentType: Option[KycDocument.KycDocumentType] =
           KycDocument.KycDocumentType.enumCompanion.fromName(documentType)
         maybeKycDocumentType match {
           case None =>
             Future.successful(Left(ApiErrors.BadRequest("wrong kyc document type")))
           case Some(kycDocumentType) =>
-            run(LoadKycDocumentStatus(externalUuidWithProfile(session), kycDocumentType)).map {
+            run(LoadKycDocumentStatus(externalUuidWithProfile(principal._2), kycDocumentType)).map {
               case r: KycDocumentStatusLoaded => Right(r.report)
               case other                      => Left(error(other))
             }
@@ -50,7 +50,7 @@ trait KycDocumentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
       .description("Load Kyc document validation report")
 
   val addKycDocument: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.post
+    requiredSessionEndpoint.post
       .in(PaymentSettings.KycRoute)
       .in(
         query[String]("documentType")
@@ -67,14 +67,14 @@ trait KycDocumentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           )
         )
       )
-      .serverLogic(session => { case (documentType, pages) =>
+      .serverLogic(principal => { case (documentType, pages) =>
         val maybeKycDocumentType: Option[KycDocument.KycDocumentType] =
           KycDocument.KycDocumentType.enumCompanion.fromName(documentType)
         maybeKycDocumentType match {
           case None =>
             Future.successful(Left(ApiErrors.BadRequest("wrong kyc document type")))
           case Some(kycDocumentType) =>
-            run(AddKycDocument(externalUuidWithProfile(session), pages.bytes, kycDocumentType))
+            run(AddKycDocument(externalUuidWithProfile(principal._2), pages.bytes, kycDocumentType))
               .map {
                 case r: KycDocumentAdded => Right(r)
                 case other               => Left(error(other))

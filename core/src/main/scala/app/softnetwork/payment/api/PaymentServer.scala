@@ -1,7 +1,7 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.{GenericPaymentHandler, SoftPaymentAccountDao}
 import app.softnetwork.payment.message.PaymentMessages.{
   BankAccountLoaded,
   CancelMandate,
@@ -344,6 +344,44 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
           None
         )
       case _ => LoadLegalUserResponse()
+    }
+  }
+
+  def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
+
+  override def generateClientTokens(
+    in: GenerateClientTokensRequest
+  ): Future[ClientTokensResponse] = {
+    import in._
+    softPaymentAccountDao.generateClientToken(clientId, clientSecret, scope) map {
+      case Some(tokens) =>
+        import tokens._
+        ClientTokensResponse.defaultInstance.withTokens(
+          Tokens(
+            access_token,
+            token_type,
+            expires_in,
+            refresh_token
+          )
+        )
+      case _ => ClientTokensResponse.defaultInstance.withError("unknown")
+    }
+  }
+
+  override def refreshClientTokens(in: RefreshClientTokensRequest): Future[ClientTokensResponse] = {
+    import in._
+    softPaymentAccountDao.refreshClientToken(refreshToken) map {
+      case Some(tokens) =>
+        import tokens._
+        ClientTokensResponse.defaultInstance.withTokens(
+          Tokens(
+            access_token,
+            token_type,
+            expires_in,
+            refresh_token
+          )
+        )
+      case _ => ClientTokensResponse.defaultInstance.withError("unknown")
     }
   }
 }

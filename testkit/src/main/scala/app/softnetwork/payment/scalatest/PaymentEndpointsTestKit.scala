@@ -5,6 +5,7 @@ import app.softnetwork.account.message
 import app.softnetwork.account.message.BasicAccountSignUp
 import app.softnetwork.account.service.{AccountServiceEndpoints, OAuthServiceEndpoints}
 import app.softnetwork.api.server.Endpoint
+import app.softnetwork.payment.handlers.{MockSoftPaymentAccountDao, SoftPaymentAccountDao}
 import app.softnetwork.payment.launch.PaymentEndpoints
 import app.softnetwork.payment.service.{
   GenericPaymentEndpoints,
@@ -43,6 +44,7 @@ trait PaymentEndpointsTestKit extends PaymentEndpoints with SessionEndpointsRout
       override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
+      override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
     }
 
   override def endpoints: ActorSystem[_] => List[Endpoint] =
@@ -56,7 +58,7 @@ trait PaymentEndpointsTestKit extends PaymentEndpoints with SessionEndpointsRout
         ): SessionManager[Session] = self.manager
         override protected def sessionType: Session.SessionType = self.sessionType
         override def log: Logger = LoggerFactory getLogger getClass.getName
-        override implicit def sessionConfig: SessionConfig = self.sessionConfig
+//        override implicit def sessionConfig: SessionConfig = self.sessionConfig
         override implicit def system: ActorSystem[_] = sys
         override lazy val ec: ExecutionContext = sys.executionContext
         override protected val manifestWrapper: ManifestW = ManifestW()
@@ -69,8 +71,9 @@ trait PaymentEndpointsTestKit extends PaymentEndpoints with SessionEndpointsRout
       ): SessionManager[Session] = self.manager
       override protected def sessionType: Session.SessionType = self.sessionType
       override def log: Logger = LoggerFactory getLogger getClass.getName
-      override implicit def sessionConfig: SessionConfig = self.sessionConfig
+//      override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
+      override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
     }
 }

@@ -17,7 +17,7 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
   import app.softnetwork.serialization._
 
   val registerRecurringPayment: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.post
+    requiredSessionEndpoint.post
       .in(PaymentSettings.RecurringPaymentRoute)
       .in(jsonBody[RegisterRecurringPayment].description("Recurring payment to register"))
       .out(
@@ -38,9 +38,9 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
           )
         )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         cmd =>
-          run(cmd.copy(debitedAccount = externalUuidWithProfile(session))).map {
+          run(cmd.copy(debitedAccount = externalUuidWithProfile(principal._2))).map {
             case r: RecurringPaymentRegistered  => Right(r)
             case r: MandateConfirmationRequired => Right(r)
             case other                          => Left(error(other))
@@ -49,7 +49,7 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
       .description("Register a recurring payment for the authenticated payment account")
 
   val loadRecurringPayment: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.get
+    requiredSessionEndpoint.get
       .in(PaymentSettings.RecurringPaymentRoute)
       .in(path[String])
       .out(
@@ -58,11 +58,11 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
             .description("Recurring payment successfully loaded")
         )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         recurringPaymentRegistrationId =>
           run(
             LoadRecurringPayment(
-              externalUuidWithProfile(session),
+              externalUuidWithProfile(principal._2),
               recurringPaymentRegistrationId
             )
           ).map {
@@ -73,7 +73,7 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
       .description("Load the recurring payment of the authenticated payment account")
 
   val updateRecurringCardPaymentRegistration: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.put
+    requiredSessionEndpoint.put
       .in(PaymentSettings.RecurringPaymentRoute)
       .in(
         jsonBody[UpdateRecurringCardPaymentRegistration].description(
@@ -87,9 +87,9 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
               .description("Recurring card payment successfully updated")
           )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         cmd =>
-          run(cmd.copy(debitedAccount = externalUuidWithProfile(session))).map {
+          run(cmd.copy(debitedAccount = externalUuidWithProfile(principal._2))).map {
             case r: RecurringCardPaymentRegistrationUpdated => Right(r.result)
             case other                                      => Left(error(other))
           }
@@ -99,18 +99,18 @@ trait RecurringPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHan
       )
 
   val deleteRecurringPayment: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.delete
+    requiredSessionEndpoint.delete
       .in(PaymentSettings.RecurringPaymentRoute)
       .in(path[String])
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[RecurringPayment.RecurringCardPaymentResult])
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         recurringPaymentRegistrationId =>
           run(
             UpdateRecurringCardPaymentRegistration(
-              externalUuidWithProfile(session),
+              externalUuidWithProfile(principal._2),
               recurringPaymentRegistrationId,
               None,
               Some(RecurringPayment.RecurringCardPaymentStatus.ENDED)

@@ -1,5 +1,6 @@
 package app.softnetwork.payment.config
 
+import com.softwaremill.session.SessionConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
@@ -33,6 +34,9 @@ trait PaymentSettings extends StrictLogging {
     config.getString("payment.event-streams.external-to-payment-account-tag")
 
   val AkkaNodeRole: String = config.getString("payment.akka-node-role")
+
+  val ClientSessionConfig: SessionConfig =
+    SessionConfig.fromConfig(config.getConfig("payment.client").withFallback(config))
 }
 
 object PaymentSettings extends PaymentSettings

@@ -3,6 +3,7 @@ package app.softnetwork.payment.service
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
+import app.softnetwork.payment.model.SoftPaymentAccount
 import org.softnetwork.session.model.Session
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
@@ -19,7 +20,7 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
 
   def payment(payment: Payment): PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    Session,
+    (Option[SoftPaymentAccount.Client], Session),
     (Option[String], Option[String], Option[String], Option[String], Payment),
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
@@ -27,7 +28,7 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
     Any,
     Future
   ] =
-    secureEndpoint
+    requiredSessionEndpoint
       .in(header[Option[String]](HeaderNames.AcceptLanguage))
       .in(header[Option[String]](HeaderNames.Accept))
       .in(header[Option[String]](HeaderNames.UserAgent))
@@ -67,13 +68,13 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           )
         )
       )
-      .serverLogic(session => { case (language, accept, userAgent, ipAddress, payment) =>
+      .serverLogic(principal => { case (language, accept, userAgent, ipAddress, payment) =>
         val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
         import payment._
         run(
           PreAuthorizeCard(
             orderUuid,
-            externalUuidWithProfile(session),
+            externalUuidWithProfile(principal._2),
             debitedAmount,
             currency,
             registrationId,
@@ -155,14 +156,14 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           )
         )
       )
-      .serverLogic(session => {
+      .serverLogic(principal => {
         case (language, accept, userAgent, ipAddress, payment, creditedAccount) =>
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
           import payment._
           run(
             PayIn(
               orderUuid,
-              externalUuidWithProfile(session),
+              externalUuidWithProfile(principal._2),
               debitedAmount,
               currency,
               creditedAccount,
@@ -268,14 +269,14 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
           )
         )
       )
-      .serverLogic(session => {
+      .serverLogic(principal => {
         case (language, accept, userAgent, ipAddress, payment, recurringPaymentRegistrationId) =>
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
           import payment._
           run(
             PayInFirstRecurring(
               recurringPaymentRegistrationId,
-              externalUuidWithProfile(session),
+              externalUuidWithProfile(principal._2),
               if (browserInfo.isDefined) Some(ipAddress) else None,
               browserInfo,
               statementDescriptor

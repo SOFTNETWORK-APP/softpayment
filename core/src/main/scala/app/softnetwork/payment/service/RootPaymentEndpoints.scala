@@ -5,9 +5,9 @@ import app.softnetwork.api.server.ApiErrors
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
+import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.service.{ServiceWithSessionEndpoints, SessionMaterials}
-import com.softwaremill.session.SessionConfig
 import org.json4s.Formats
 import org.softnetwork.session.model.Session
 import sttp.model.headers.CookieValueWithMeta
@@ -20,12 +20,11 @@ import scala.language.implicitConversions
 
 trait RootPaymentEndpoints
     extends BasicPaymentService
-    with ServiceWithSessionEndpoints[PaymentCommand, PaymentResult] {
+    with ServiceWithSessionEndpoints[PaymentCommand, PaymentResult]
+    with ClientSessionEndpoints {
   _: GenericPaymentHandler with SessionMaterials =>
 
   override implicit def formats: Formats = paymentFormats
-
-  implicit def sessionConfig: SessionConfig
 
   override implicit def ts: ActorSystem[_] = system
 
@@ -35,9 +34,9 @@ trait RootPaymentEndpoints
     endpoint
       .in(PaymentSettings.PaymentPath)
 
-  lazy val secureEndpoint: PartialServerEndpointWithSecurityOutput[
+  lazy val requiredSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    Session,
+    (Option[SoftPaymentAccount.Client], Session),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
@@ -48,8 +47,27 @@ trait RootPaymentEndpoints
     ApiErrors
       .withApiErrorVariants(
         hmacTokenCsrfProtection(checkMode) {
-          requiredSession(sc, st)
+          requiredClientSession
         }
       )
       .in(PaymentSettings.PaymentPath)
+
+  lazy val optionalSessionEndpoint: PartialServerEndpointWithSecurityOutput[
+    (Seq[Option[String]], Option[String], Method, Option[String]),
+    (Option[SoftPaymentAccount.Client], Option[Session]),
+    Unit,
+    Any,
+    (Seq[Option[String]], Option[CookieValueWithMeta]),
+    Unit,
+    Any,
+    Future
+  ] =
+    ApiErrors
+      .withApiErrorVariants(
+        hmacTokenCsrfProtection(checkMode) {
+          optionalClientSession
+        }
+      )
+      .in(PaymentSettings.PaymentPath)
+
 }

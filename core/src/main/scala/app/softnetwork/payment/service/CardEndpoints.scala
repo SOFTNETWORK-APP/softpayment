@@ -17,16 +17,16 @@ trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
   import app.softnetwork.serialization._
 
   val loadCards: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.get
+    requiredSessionEndpoint.get
       .in(PaymentSettings.CardRoute)
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[Seq[CardView]].description("Authenticated user cards")
         )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ => {
-          run(LoadCards(externalUuidWithProfile(session))).map {
+          run(LoadCards(externalUuidWithProfile(principal._2))).map {
             case r: CardsLoaded => Right(r.cards.map(_.view))
             case other          => Left(error(other))
           }
@@ -35,7 +35,7 @@ trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
       .description("Load authenticated user cards")
 
   val preRegisterCard: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.post
+    requiredSessionEndpoint.post
       .in(PaymentSettings.CardRoute)
       .in(jsonBody[PreRegisterCard])
       .out(
@@ -44,20 +44,20 @@ trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
             .description("Card pre registration data")
         )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         cmd => {
           var updatedUser =
             if (cmd.user.externalUuid.trim.isEmpty) {
-              cmd.user.withExternalUuid(session.id)
+              cmd.user.withExternalUuid(principal._2.id)
             } else {
               cmd.user
             }
-          session.profile match {
+          principal._2.profile match {
             case Some(profile) if updatedUser.profile.isEmpty =>
               updatedUser = updatedUser.withProfile(profile)
             case _ =>
           }
-          run(cmd.copy(user = updatedUser)).map {
+          run(cmd.copy(user = updatedUser, clientId = principal._1.map(_.clientId))).map {
             case r: CardPreRegistered => Right(r.cardPreRegistration)
             case other                => Left(error(other))
           }
@@ -66,15 +66,15 @@ trait CardEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
       .description("Pre register card")
 
   val disableCard: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.delete
+    requiredSessionEndpoint.delete
       .in(PaymentSettings.CardRoute)
       .in(query[String]("cardId").description("Card id to disable"))
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[CardDisabled.type])
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         cardId => {
-          run(DisableCard(externalUuidWithProfile(session), cardId)).map {
+          run(DisableCard(externalUuidWithProfile(principal._2), cardId)).map {
             case CardDisabled => Right(CardDisabled)
             case other        => Left(error(other))
           }

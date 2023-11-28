@@ -53,6 +53,7 @@ message SoftPaymentAccount {
     repeated string fraudEmails = 11;
     optional string vatNumber = 12;
     optional Address address = 13;
+    optional app.softnetwork.account.model.AccessToken accessToken = 14;
   }
 
   option (scalapb.message).extends = "ProtobufDomainObject";
@@ -80,5 +81,5 @@ message SoftPaymentAccount {
   optional bool fromAnonymous = 19;
   repeated app.softnetwork.account.model.Application applications = 20;
 
-  optional Client client = 21;
+  repeated Client clients = 21;
 }
