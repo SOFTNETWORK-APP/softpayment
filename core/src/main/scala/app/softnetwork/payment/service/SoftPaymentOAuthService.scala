@@ -26,7 +26,7 @@ trait SoftPaymentOAuthService
     with ClientSessionDirectives {
   _: SessionMaterials =>
 
-  implicit def sessionConfig: SessionConfig = ClientSessionConfig
+  final implicit def sessionConfig: SessionConfig = ClientSessionConfig
 
   override implicit lazy val formats: Formats = paymentFormats
 
@@ -105,7 +105,7 @@ trait SoftPaymentOAuthService
           .result()
       ) {
         authenticateOAuth2Async(AccountSettings.Realm, oauthClient) { client =>
-          setSession(sc(clientSessionManager(client.clientId)), st, client.asInstanceOf[Session]) {
+          setSession(sc(clientSessionManager(client)), st, client.asInstanceOf[Session]) {
             complete(StatusCodes.OK)
           }
         }

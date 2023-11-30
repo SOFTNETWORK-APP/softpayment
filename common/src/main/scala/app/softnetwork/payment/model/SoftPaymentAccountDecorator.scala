@@ -1,6 +1,7 @@
 package app.softnetwork.payment.model
 
 import app.softnetwork.account.model.{BasicAccountProfile, Profile}
+import app.softnetwork.session.model.ApiKey
 
 trait SoftPaymentAccountDecorator { _: SoftPaymentAccount =>
 
@@ -10,8 +11,3 @@ trait SoftPaymentAccountDecorator { _: SoftPaymentAccount =>
   lazy val apiKeys: Seq[ApiKey] =
     this.clients.map(client => ApiKey(client.clientId, client.clientApiKey))
 }
-
-case class ApiKey(
-  clientId: String,
-  clientApiKey: Option[String] = None
-)

@@ -146,6 +146,25 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
             }
         }
 
+      case AccountMessages.LoadApiKey(clientId) =>
+        state match {
+          case Some(account) =>
+            account.apiKeys.find(_.clientId == clientId) match {
+              case Some(apiKey) =>
+                Effect.none.thenRun { _ =>
+                  AccountMessages.ApiKeyLoaded(apiKey) ~> replyTo
+                }
+              case _ =>
+                Effect.none.thenRun { _ =>
+                  AccountMessages.ApiKeyNotFound ~> replyTo
+                }
+            }
+          case _ =>
+            Effect.none.thenRun { _ =>
+              AccountNotFound ~> replyTo
+            }
+        }
+
       case AccountMessages.GenerateClientToken(
             clientId,
             clientSecret,

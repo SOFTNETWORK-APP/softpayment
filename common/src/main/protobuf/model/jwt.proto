@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+import "scalapb/scalapb.proto";
+import "google/protobuf/wrappers.proto";
+
+package app.softnetwork.session.model;
+
+option (scalapb.options) = {
+  single_file: true
+  flat_package: true
+  import: "app.softnetwork.persistence.model._"
+  import: "app.softnetwork.serialization._"
+  import: "app.softnetwork.session.model._"
+  preserve_unknown_fields: false
+};
+
+message JwtClaims {
+  option (scalapb.message).extends = "SessionData";
+  option (scalapb.message).extends = "JwtClaimsDecorator";
+  option (scalapb.message).companion_extends = "JwtClaimsCompanion";
+  map<string, string> data = 1 [(scalapb.field).map_type="collection.immutable.Map", (scalapb.field).scala_name = "additionalClaims"];
+  bool refreshable = 2;
+  google.protobuf.StringValue iss = 3;
+  google.protobuf.StringValue sub = 4;
+  google.protobuf.StringValue aud = 5;
+  google.protobuf.Int64Value exp = 6;
+  google.protobuf.Int64Value nbf = 7;
+  google.protobuf.Int64Value iat = 8;
+  google.protobuf.StringValue jti = 9;
+}
+
+message ApiKey {
+  option (scalapb.message).extends = "ProtobufDomainObject";
+  string clientId = 1;
+  google.protobuf.StringValue clientSecret = 2;
+}

@@ -32,6 +32,7 @@ message SoftPaymentAccount {
         STRIPE = 1;
       }
 
+      option (scalapb.message).extends = "ProviderDecorator";
       required string providerId = 1;
       required string providerApiKey = 2;
       required ProviderType providerType = 3 [default = MANGOPAY];

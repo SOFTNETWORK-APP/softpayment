@@ -9,7 +9,8 @@ import app.softnetwork.account.message.{
 }
 import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.payment.annotation.InternalApi
-import app.softnetwork.payment.model.{ApiKey, SoftPaymentAccount}
+import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.session.model.ApiKey
 
 object AccountMessages {
   case class SoftPaymentSignup(
@@ -24,6 +25,8 @@ object AccountMessages {
 
   @InternalApi
   private[payment] case class LoadClient(clientId: String) extends LookupAccountCommand
+
+  case class LoadApiKey(clientId: String) extends LookupAccountCommand
 
   case object ListApiKeys extends AccountCommand
 
@@ -43,6 +46,8 @@ object AccountMessages {
 
   case class ApiKeysLoaded(apiKeys: Seq[ApiKey]) extends AccountCommandResult
 
+  case class ApiKeyLoaded(apiKey: ApiKey) extends AccountCommandResult
+
   case class OAuthClientSucceededResult(client: SoftPaymentAccount.Client)
       extends AccountCommandResult
 
@@ -51,4 +56,6 @@ object AccountMessages {
   case object ProviderNotRegistered extends AccountErrorMessage("provider.not.registered")
 
   case object ClientNotFound extends AccountErrorMessage("client.not.found")
+
+  case object ApiKeyNotFound extends AccountErrorMessage("api.key.not.found")
 }

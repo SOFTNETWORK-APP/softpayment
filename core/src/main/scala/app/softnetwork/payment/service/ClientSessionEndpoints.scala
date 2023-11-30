@@ -28,6 +28,11 @@ trait ClientSessionEndpoints extends SessionEndpoints with ClientSession {
 
   import TapirSessionOptions._
 
+  protected def clientInput: EndpointInput[Option[String]] =
+    auth
+      .bearer[Option[String]](WWWAuthenticateChallenge.bearer(AccountSettings.Realm))
+      .description("OAuth2 bearer token")
+
   @InternalApi
   private[payment] def requiredClientSession: PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
@@ -76,18 +81,13 @@ trait ClientSessionEndpoints extends SessionEndpoints with ClientSession {
   ], Unit, Any, Future] = {
     val partial = sc.session(gt, required)
     partial.endpoint
-      .prependSecurityIn(
-        auth.bearer[Option[String]](WWWAuthenticateChallenge.bearer(AccountSettings.Realm))
-      )
+      .prependSecurityIn(clientInput)
       .mapSecurityIn(inputs => Seq(inputs._1) ++ inputs._2)(seq =>
         (seq.head, seq.slice(1, seq.size))
       )
       .out(partial.securityOutput)
       .serverSecurityLogicWithOutput { inputs =>
-        (inputs.head match {
-          case Some(token) => softPaymentAccountDao.oauthClient(token)
-          case _           => Future.successful(None)
-        }) flatMap { client =>
+        toClient(inputs.head) flatMap { client =>
           implicit val manager: SessionManager[Session] = clientSessionManager(client)
           sessionType match {
             case Session.SessionType.OneOffCookie | Session.SessionType.OneOffHeader => // oneOff

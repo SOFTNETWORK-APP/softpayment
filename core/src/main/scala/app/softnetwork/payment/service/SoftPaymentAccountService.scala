@@ -13,7 +13,7 @@ import org.json4s.Formats
 trait SoftPaymentAccountService extends BasicAccountService with SoftPaymentAccountTypeKey {
   _: SessionMaterials =>
 
-  implicit def sessionConfig: SessionConfig = ClientSessionConfig
+  final implicit def sessionConfig: SessionConfig = ClientSessionConfig
 
   override implicit lazy val formats: Formats = paymentFormats
 

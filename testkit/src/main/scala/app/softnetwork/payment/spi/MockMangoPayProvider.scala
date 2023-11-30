@@ -1242,7 +1242,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     Some(
       SoftPaymentAccount.Client.defaultInstance
         .withProvider(provider)
-        .withClientId(s"${generateUUID()}.${provider.providerType.name.toLowerCase}")
+        .withClientId(provider.clientId)
     )
 
   /** @return

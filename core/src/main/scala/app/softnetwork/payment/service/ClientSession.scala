@@ -4,10 +4,12 @@ import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.config.PaymentSettings.ClientSessionConfig
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.session.model.JwtClaims
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session._
 import org.softnetwork.session.model.Session
 
+import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
@@ -30,17 +32,17 @@ trait ClientSession extends Completion { _: SessionMaterials =>
   def encodeClient(
     client: SoftPaymentAccount.Client
   ): String = {
-    clientSessionManager(client.clientId).clientSessionManager.encode(client)
+    clientSessionManager(client).clientSessionManager.encode(client)
   }
 
   def decodeClient(data: String): Option[Session] =
     manager(ClientSessionConfig).clientSessionManager.decode(data).toOption
 
-  def clientSessionManager(clientId: String): SessionManager[Session] = {
+  def clientSessionManager(client: SoftPaymentAccount.Client): SessionManager[Session] = {
     implicit val innerSessionConfig: SessionConfig =
       ClientSessionConfig.copy(
-        jwt = ClientSessionConfig.jwt.copy(subject = Some(clientId)),
-        sessionEncryptData = true
+        jwt = ClientSessionConfig.jwt.copy(subject = Some(client.clientId)),
+        serverSecret = client.getClientApiKey
       )
     manager(innerSessionConfig)
   }
@@ -80,4 +82,25 @@ trait ClientSession extends Completion { _: SessionMaterials =>
       case _ => manager
     }
   }
+
+  protected def toClient(token: Option[String]): Future[Option[SoftPaymentAccount.Client]] = {
+    token match {
+      case Some(value) =>
+        softPaymentAccountDao.oauthClient(value) flatMap {
+          case Some(client) => Future.successful(Some(client))
+          case _ =>
+            val jwt = JwtClaims(value)
+            if (jwt.iss.contains(sessionConfig.jwt.issuer.getOrElse("")) && jwt.sub.isDefined) {
+              softPaymentAccountDao.loadClient(jwt.sub.get) flatMap {
+                case Some(client) => Future.successful(Some(client))
+                case _            => Future.successful(None)
+              }
+            } else {
+              Future.successful(None)
+            }
+        }
+      case _ => Future.successful(None)
+    }
+  }
+
 }
