@@ -4,7 +4,7 @@ import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.SoftPaymentAccount
-import org.softnetwork.session.model.Session
+import org.softnetwork.session.model.JwtClaims
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.{HeaderNames, Method, StatusCode}
@@ -20,7 +20,7 @@ trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler 
 
   def payment(payment: Payment): PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], Session),
+    (Option[SoftPaymentAccount.Client], JwtClaims),
     (Option[String], Option[String], Option[String], Option[String], Payment),
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

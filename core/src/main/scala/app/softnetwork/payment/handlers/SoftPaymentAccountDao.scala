@@ -15,14 +15,13 @@ import app.softnetwork.payment.message.AccountMessages
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.persistence.typed.SoftPaymentAccountBehavior
 import app.softnetwork.persistence.typed.CommandTypeKey
-import app.softnetwork.session.handlers.ApiKeyDao
-import app.softnetwork.session.model.ApiKey
+import org.softnetwork.session.model.ApiKey
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
-trait SoftPaymentAccountDao extends AccountDao with ApiKeyDao { _: AccountHandler =>
+trait SoftPaymentAccountDao extends AccountDao { _: AccountHandler =>
   @InternalApi
   private[payment] def loadProvider(
     clientId: String
@@ -91,7 +90,7 @@ trait SoftPaymentAccountDao extends AccountDao with ApiKeyDao { _: AccountHandle
     }
   }
 
-  override def loadApiKey(
+  def loadApiKey(
     clientId: String
   )(implicit system: ActorSystem[_]): Future[Option[ApiKey]] = {
     implicit val ec: ExecutionContext = system.executionContext

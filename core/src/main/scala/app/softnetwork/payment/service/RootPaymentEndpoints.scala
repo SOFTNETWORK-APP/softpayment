@@ -9,7 +9,7 @@ import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.service.{ServiceWithSessionEndpoints, SessionMaterials}
 import org.json4s.Formats
-import org.softnetwork.session.model.Session
+import org.softnetwork.session.model.JwtClaims
 import sttp.model.headers.CookieValueWithMeta
 import sttp.model.Method
 import sttp.tapir.server.PartialServerEndpointWithSecurityOutput
@@ -20,9 +20,9 @@ import scala.language.implicitConversions
 
 trait RootPaymentEndpoints
     extends BasicPaymentService
-    with ServiceWithSessionEndpoints[PaymentCommand, PaymentResult]
+    with ServiceWithSessionEndpoints[PaymentCommand, PaymentResult, JwtClaims]
     with ClientSessionEndpoints {
-  _: GenericPaymentHandler with SessionMaterials =>
+  _: GenericPaymentHandler with SessionMaterials[JwtClaims] =>
 
   override implicit def formats: Formats = paymentFormats
 
@@ -36,7 +36,7 @@ trait RootPaymentEndpoints
 
   lazy val requiredSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], Session),
+    (Option[SoftPaymentAccount.Client], JwtClaims),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
@@ -54,7 +54,7 @@ trait RootPaymentEndpoints
 
   lazy val optionalSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], Option[Session]),
+    (Option[SoftPaymentAccount.Client], Option[JwtClaims]),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

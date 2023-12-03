@@ -7,11 +7,12 @@ import app.softnetwork.account.config.AccountSettings
 import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.session.service.{SessionMaterials, SessionService}
-import org.softnetwork.session.model.Session
+import org.softnetwork.session.model.JwtClaims
 
 import scala.concurrent.Future
 
-trait ClientSessionDirectives extends SessionService with ClientSession { _: SessionMaterials =>
+trait ClientSessionDirectives extends SessionService[JwtClaims] with ClientSession {
+  _: SessionMaterials[JwtClaims] =>
 
   @InternalApi
   private[payment] def clientDirective: Directive1[Option[SoftPaymentAccount.Client]] =
@@ -19,7 +20,7 @@ trait ClientSessionDirectives extends SessionService with ClientSession { _: Ses
 
   @InternalApi
   private[payment] def requiredClientSession(
-    body: (Option[SoftPaymentAccount.Client], Session) => Route
+    body: (Option[SoftPaymentAccount.Client], JwtClaims) => Route
   ): Route =
     clientDirective { client =>
       requiredSession(sc(clientSessionManager(client)), gt) { session =>
@@ -29,7 +30,7 @@ trait ClientSessionDirectives extends SessionService with ClientSession { _: Ses
 
   @InternalApi
   private[payment] def optionalClientSession(
-    body: (Option[SoftPaymentAccount.Client], Option[Session]) => Route
+    body: (Option[SoftPaymentAccount.Client], Option[JwtClaims]) => Route
   ): Route =
     clientDirective { client =>
       optionalSession(sc(clientSessionManager(client)), gt) { session =>

@@ -1,7 +1,7 @@
 package app.softnetwork.payment.model
 
 import app.softnetwork.account.model.{BasicAccountProfile, Profile}
-import app.softnetwork.session.model.ApiKey
+import org.softnetwork.session.model.ApiKey
 
 trait SoftPaymentAccountDecorator { _: SoftPaymentAccount =>
 

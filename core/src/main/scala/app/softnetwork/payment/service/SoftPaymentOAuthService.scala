@@ -18,13 +18,13 @@ import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.SessionConfig
 import org.json4s.Formats
-import org.softnetwork.session.model.Session
+import org.softnetwork.session.model.JwtClaims
 
 trait SoftPaymentOAuthService
-    extends OAuthService
+    extends OAuthService[JwtClaims]
     with SoftPaymentAccountTypeKey
     with ClientSessionDirectives {
-  _: SessionMaterials =>
+  _: SessionMaterials[JwtClaims] =>
 
   final implicit def sessionConfig: SessionConfig = ClientSessionConfig
 
@@ -105,7 +105,7 @@ trait SoftPaymentOAuthService
           .result()
       ) {
         authenticateOAuth2Async(AccountSettings.Realm, oauthClient) { client =>
-          setSession(sc(clientSessionManager(client)), st, client.asInstanceOf[Session]) {
+          setSession(sc(clientSessionManager(client)), st, client.asInstanceOf[JwtClaims]) {
             complete(StatusCodes.OK)
           }
         }

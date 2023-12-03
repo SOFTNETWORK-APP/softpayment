@@ -24,6 +24,7 @@ import app.softnetwork.session.httpCookieToTapirCookieWithMeta
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.{CookieST, HeaderST, SessionConfig}
 import org.json4s.Formats
+import org.softnetwork.session.model.JwtClaims
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.headers.WWWAuthenticateChallenge
@@ -34,13 +35,13 @@ import sttp.tapir.server.ServerEndpoint
 import scala.concurrent.Future
 
 trait SoftPaymentOAuthServiceEndpoints
-    extends OAuthServiceEndpoints
+    extends OAuthServiceEndpoints[JwtClaims]
     with SoftPaymentAccountTypeKey
-    with ClientSession { _: SessionMaterials =>
+    with ClientSession { _: SessionMaterials[JwtClaims] =>
 
   import app.softnetwork.serialization.serialization
 
-  implicit def sessionConfig: SessionConfig = ClientSessionConfig
+  final implicit def sessionConfig: SessionConfig = ClientSessionConfig
 
   override implicit lazy val formats: Formats = paymentFormats
 

@@ -37,14 +37,13 @@ import app.softnetwork.persistence.query.{
 }
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.scheduler.scalatest.SchedulerTestKit
-import app.softnetwork.session.service.SessionMaterials
 import org.scalatest.Suite
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotificationsTestKit {
-  _: Suite with SessionMaterials =>
+  _: Suite =>
 
   /** @return
     *   roles associated with this node
@@ -100,6 +99,8 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
     transactionId: String,
     registerCard: Boolean,
     printReceipt: Boolean
+  )(implicit
+    ec: ExecutionContext
   ): Future[Either[PayInFailed, Either[PaymentRedirection, PaidIn]]] = {
     MockPaymentHandler !? PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt) map {
       case result: PaymentRedirection => Right(Left(result))
@@ -115,6 +116,8 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
     preAuthorizationId: String,
     registerCard: Boolean = true,
     printReceipt: Boolean = false
+  )(implicit
+    ec: ExecutionContext
   ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
     MockPaymentHandler !? PreAuthorizeCardFor3DS(
       orderUuid,
@@ -132,7 +135,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
   def payInFirstRecurringFor3DS(
     recurringPayInRegistrationId: String,
     transactionId: String
-  ): Future[
+  )(implicit ec: ExecutionContext): Future[
     Either[FirstRecurringCardPaymentFailed, Either[PaymentRedirection, FirstRecurringPaidIn]]
   ] = {
     MockPaymentHandler !? PayInFirstRecurringFor3DS(
@@ -156,7 +159,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
   def updateKycDocumentStatus(
     kycDocumentId: String,
     status: Option[KycDocument.KycDocumentStatus] = None
-  ): Future[Either[PaymentError, KycDocumentStatusUpdated]] = {
+  )(implicit ec: ExecutionContext): Future[Either[PaymentError, KycDocumentStatusUpdated]] = {
     MockPaymentHandler !? UpdateKycDocumentStatus(kycDocumentId, status) map {
       case result: KycDocumentStatusUpdated => Right(result)
       case error: PaymentError              => Left(error)
@@ -167,7 +170,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
   def updateUboDeclarationStatus(
     uboDeclarationId: String,
     status: Option[UboDeclaration.UboDeclarationStatus] = None
-  ): Future[Boolean] = {
+  )(implicit ec: ExecutionContext): Future[Boolean] = {
     MockPaymentHandler !? UpdateUboDeclarationStatus(uboDeclarationId, status) map {
       case UboDeclarationStatusUpdated => true
       case _                           => false
@@ -177,7 +180,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
   def updateMandateStatus(
     mandateId: String,
     status: Option[BankAccount.MandateStatus] = None
-  ): Future[Either[PaymentError, MandateStatusUpdated]] = {
+  )(implicit ec: ExecutionContext): Future[Either[PaymentError, MandateStatusUpdated]] = {
     MockPaymentHandler !? UpdateMandateStatus(mandateId, status) map {
       case result: MandateStatusUpdated => Right(result)
       case error: PaymentError          => Left(error)
@@ -185,14 +188,14 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
     }
   }
 
-  def validateRegularUser(userId: String): Future[Boolean] = {
+  def validateRegularUser(userId: String)(implicit ec: ExecutionContext): Future[Boolean] = {
     MockPaymentHandler !? ValidateRegularUser(userId) map {
       case RegularUserValidated => true
       case _                    => false
     }
   }
 
-  def invalidateRegularUser(userId: String): Future[Boolean] = {
+  def invalidateRegularUser(userId: String)(implicit ec: ExecutionContext): Future[Boolean] = {
     MockPaymentHandler !? InvalidateRegularUser(userId) map {
       case RegularUserInvalidated => true
       case _                      => false

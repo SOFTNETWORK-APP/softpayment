@@ -4,27 +4,28 @@ import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.config.PaymentSettings.ClientSessionConfig
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import app.softnetwork.payment.model.SoftPaymentAccount
-import app.softnetwork.session.model.JwtClaims
 import app.softnetwork.session.service.SessionMaterials
+import org.softnetwork.session.model.JwtClaims
 import com.softwaremill.session._
-import org.softnetwork.session.model.Session
 
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
-trait ClientSession extends Completion { _: SessionMaterials =>
+trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
 
   def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
 
   implicit def sessionConfig: SessionConfig
 
-  implicit def toSession(client: SoftPaymentAccount.Client): Session = {
-    var session = Session(client.clientId)
-    session += (Session.adminKey, "false")
-    session += (Session.anonymousKey, "false")
-    session += ("iss", ClientSessionConfig.jwt.issuer.getOrElse(""))
-    session += ("sub", client.clientId)
+  implicit def toSession(client: SoftPaymentAccount.Client): JwtClaims = {
+    var session = JwtClaims.newSession
+      .withAdmin(false)
+      .withAnonymous(false)
+      .copy(
+        iss = ClientSessionConfig.jwt.issuer,
+        sub = Some(client.clientId)
+      )
     session += ("scope", client.accessToken.flatMap(_.scope).getOrElse(""))
     session
   }
@@ -35,16 +36,16 @@ trait ClientSession extends Completion { _: SessionMaterials =>
     clientSessionManager(client).clientSessionManager.encode(client)
   }
 
-  def decodeClient(data: String): Option[Session] =
-    manager(ClientSessionConfig).clientSessionManager.decode(data).toOption
+  def decodeClient(data: String): Option[JwtClaims] =
+    manager(ClientSessionConfig, JwtClaims).clientSessionManager.decode(data).toOption
 
-  def clientSessionManager(client: SoftPaymentAccount.Client): SessionManager[Session] = {
+  def clientSessionManager(client: SoftPaymentAccount.Client): SessionManager[JwtClaims] = {
     implicit val innerSessionConfig: SessionConfig =
       ClientSessionConfig.copy(
         jwt = ClientSessionConfig.jwt.copy(subject = Some(client.clientId)),
         serverSecret = client.getClientApiKey
       )
-    manager(innerSessionConfig)
+    manager(innerSessionConfig, JwtClaims)
   }
 
   def clientCookieName: String = ClientSessionConfig.sessionCookieConfig.name
@@ -55,7 +56,7 @@ trait ClientSession extends Completion { _: SessionMaterials =>
   def getFromClientHeaderName: String =
     ClientSessionConfig.sessionHeaderConfig.getFromClientHeaderName
 
-  def sessionManager(clientId: Option[String]): SessionManager[Session] = {
+  def sessionManager(clientId: Option[String]): SessionManager[JwtClaims] = {
     clientId match {
       case Some(id) =>
         softPaymentAccountDao.loadClient(id) complete () match {
@@ -66,7 +67,7 @@ trait ClientSession extends Completion { _: SessionMaterials =>
     }
   }
 
-  def clientSessionManager(client: Option[SoftPaymentAccount.Client]): SessionManager[Session] = {
+  def clientSessionManager(client: Option[SoftPaymentAccount.Client]): SessionManager[JwtClaims] = {
     client match {
       case Some(c) =>
         implicit val innerSessionConfig: SessionConfig =
@@ -78,7 +79,7 @@ trait ClientSession extends Completion { _: SessionMaterials =>
             sessionEncryptData = true,
             serverSecret = c.getClientApiKey
           )
-        manager(innerSessionConfig)
+        manager(innerSessionConfig, JwtClaims)
       case _ => manager
     }
   }

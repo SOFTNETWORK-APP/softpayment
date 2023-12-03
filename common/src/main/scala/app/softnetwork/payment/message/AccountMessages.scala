@@ -10,7 +10,7 @@ import app.softnetwork.account.message.{
 import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.model.SoftPaymentAccount
-import app.softnetwork.session.model.ApiKey
+import org.softnetwork.session.model.ApiKey
 
 object AccountMessages {
   case class SoftPaymentSignup(

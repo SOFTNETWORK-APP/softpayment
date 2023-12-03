@@ -11,11 +11,15 @@ import app.softnetwork.payment.model._
 import app.softnetwork.session.scalatest.SessionTestKit
 import app.softnetwork.session.service.SessionMaterials
 import org.scalatest.Suite
+import org.softnetwork.session.model.JwtClaims
 
 import java.nio.file.Paths
 
-trait PaymentRouteTestKit extends SessionTestKit with PaymentTestKit with PaymentGrpcServices {
-  _: Suite with ApiRoutes with SessionMaterials =>
+trait PaymentRouteTestKit
+    extends SessionTestKit[JwtClaims]
+    with PaymentTestKit
+    with PaymentGrpcServices {
+  _: Suite with ApiRoutes with SessionMaterials[JwtClaims] =>
 
   import app.softnetwork.serialization._
 

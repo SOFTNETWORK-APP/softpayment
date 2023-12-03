@@ -8,13 +8,14 @@ import app.softnetwork.account.model.{
   DefaultAccountView,
   DefaultProfileView
 }
-import app.softnetwork.api.server.{ApiRoute, ApiRoutes}
+import app.softnetwork.api.server.ApiRoute
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.payment.service.GenericPaymentService
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.CsrfCheck
 import org.json4s.Formats
+import org.softnetwork.session.model.JwtClaims
 
 trait PaymentRoutes
     extends AccountRoutes[
@@ -22,7 +23,8 @@ trait PaymentRoutes
       BasicAccountProfile,
       DefaultProfileView,
       DefaultAccountDetailsView,
-      DefaultAccountView[DefaultProfileView, DefaultAccountDetailsView]
+      DefaultAccountView[DefaultProfileView, DefaultAccountDetailsView],
+      JwtClaims
     ] { _: PaymentGuardian with SchemaProvider with CsrfCheck =>
 
   override implicit def formats: Formats = paymentFormats

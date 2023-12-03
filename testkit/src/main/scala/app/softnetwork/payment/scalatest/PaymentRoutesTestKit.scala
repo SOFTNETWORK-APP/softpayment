@@ -17,28 +17,35 @@ import app.softnetwork.payment.service.{
   MockSoftPaymentOAuthService
 }
 import app.softnetwork.persistence.schema.SchemaProvider
+import app.softnetwork.session.model.SessionDataCompanion
 import app.softnetwork.session.scalatest.{SessionServiceRoutes, SessionTestKit}
 import app.softnetwork.session.service.SessionMaterials
-import com.softwaremill.session.{SessionConfig, SessionManager}
+import com.softwaremill.session.{RefreshTokenStorage, SessionConfig, SessionManager}
 import org.slf4j.{Logger, LoggerFactory}
-import org.softnetwork.session.model.Session
+import org.softnetwork.session.model.{JwtClaims, Session}
 
 import scala.concurrent.ExecutionContext
 
-trait PaymentRoutesTestKit extends PaymentRoutes with SessionServiceRoutes {
-  self: PaymentTestKit with SessionTestKit with SchemaProvider with SessionMaterials =>
+trait PaymentRoutesTestKit extends PaymentRoutes with SessionServiceRoutes[JwtClaims] {
+  self: PaymentTestKit
+    with SessionTestKit[JwtClaims]
+    with SchemaProvider
+    with SessionMaterials[JwtClaims] =>
 
   override def paymentService: ActorSystem[_] => GenericPaymentService = sys =>
-    new MockPaymentService with SessionMaterials {
+    new MockPaymentService with SessionMaterials[JwtClaims] {
       override implicit def manager(implicit
-        sessionConfig: SessionConfig
-      ): SessionManager[Session] = self.manager
+        sessionConfig: SessionConfig,
+        companion: SessionDataCompanion[JwtClaims]
+      ): SessionManager[JwtClaims] = self.manager
       override protected def sessionType: Session.SessionType = self.sessionType
       override def log: Logger = LoggerFactory getLogger getClass.getName
       override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
       override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
+      override implicit def refreshTokenStorage: RefreshTokenStorage[JwtClaims] =
+        self.refreshTokenStorage
     }
 
   implicit def sessionConfig: SessionConfig
@@ -46,31 +53,39 @@ trait PaymentRoutesTestKit extends PaymentRoutes with SessionServiceRoutes {
   override def accountService: ActorSystem[_] => AccountService[
     DefaultProfileView,
     DefaultAccountDetailsView,
-    DefaultAccountView[DefaultProfileView, DefaultAccountDetailsView]
+    DefaultAccountView[DefaultProfileView, DefaultAccountDetailsView],
+    JwtClaims
   ] = sys =>
-    new MockSoftPaymentAccountService with SessionMaterials {
+    new MockSoftPaymentAccountService with SessionMaterials[JwtClaims] {
       override implicit def manager(implicit
-        sessionConfig: SessionConfig
-      ): SessionManager[Session] = self.manager
+        sessionConfig: SessionConfig,
+        companion: SessionDataCompanion[JwtClaims]
+      ): SessionManager[JwtClaims] = self.manager
       override protected def sessionType: Session.SessionType = self.sessionType
       override def log: Logger = LoggerFactory getLogger getClass.getName
-//      override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
       override protected val manifestWrapper: ManifestW = ManifestW()
+      override implicit def refreshTokenStorage: RefreshTokenStorage[JwtClaims] =
+        self.refreshTokenStorage
+      override implicit def companion: SessionDataCompanion[JwtClaims] = self.companion
     }
 
-  override def oauthService: ActorSystem[_] => OAuthService = sys =>
-    new MockSoftPaymentOAuthService with SessionMaterials {
+  override def oauthService: ActorSystem[_] => OAuthService[JwtClaims] = sys =>
+    new MockSoftPaymentOAuthService with SessionMaterials[JwtClaims] {
       override implicit def manager(implicit
-        sessionConfig: SessionConfig
-      ): SessionManager[Session] = self.manager
+        sessionConfig: SessionConfig,
+        companion: SessionDataCompanion[JwtClaims]
+      ): SessionManager[JwtClaims] = self.manager
       override protected def sessionType: Session.SessionType = self.sessionType
       override def log: Logger = LoggerFactory getLogger getClass.getName
 //      override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
       override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
+      override implicit def refreshTokenStorage: RefreshTokenStorage[JwtClaims] =
+        self.refreshTokenStorage
+      override implicit def companion: SessionDataCompanion[JwtClaims] = self.companion
     }
 
   override def apiRoutes: ActorSystem[_] => List[ApiRoute] =

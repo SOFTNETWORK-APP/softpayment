@@ -20,9 +20,10 @@ import app.softnetwork.payment.message.PaymentMessages.{
 import app.softnetwork.payment.model.{BankAccount, KycDocument, UboDeclaration}
 import app.softnetwork.session.service.SessionMaterials
 import com.mangopay.core.enumerations.EventType
+import org.softnetwork.session.model.JwtClaims
 
 trait MangoPayPaymentService extends GenericPaymentService with MangoPayPaymentHandler {
-  _: SessionMaterials =>
+  _: SessionMaterials[JwtClaims] =>
 
   def completeWithKycDocumentUpdatedResult(
     eventType: String,

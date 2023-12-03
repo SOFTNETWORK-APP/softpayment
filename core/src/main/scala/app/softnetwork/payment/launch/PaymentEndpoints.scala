@@ -11,9 +11,15 @@ import app.softnetwork.payment.service.GenericPaymentEndpoints
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.CsrfCheck
 import org.json4s.Formats
+import org.softnetwork.session.model.JwtClaims
 
 trait PaymentEndpoints
-    extends AccountEndpoints[SoftPaymentAccount, BasicAccountProfile, BasicAccountSignUp] {
+    extends AccountEndpoints[
+      SoftPaymentAccount,
+      BasicAccountProfile,
+      BasicAccountSignUp,
+      JwtClaims
+    ] {
   _: PaymentGuardian with SchemaProvider with CsrfCheck =>
 
   override implicit def formats: Formats = paymentFormats

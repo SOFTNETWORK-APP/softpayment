@@ -9,9 +9,12 @@ import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.SessionConfig
 import org.json4s.Formats
+import org.softnetwork.session.model.JwtClaims
 
-trait SoftPaymentAccountService extends BasicAccountService with SoftPaymentAccountTypeKey {
-  _: SessionMaterials =>
+trait SoftPaymentAccountService
+    extends BasicAccountService[JwtClaims]
+    with SoftPaymentAccountTypeKey {
+  _: SessionMaterials[JwtClaims] =>
 
   final implicit def sessionConfig: SessionConfig = ClientSessionConfig
 

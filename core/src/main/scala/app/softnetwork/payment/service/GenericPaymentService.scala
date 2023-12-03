@@ -26,6 +26,7 @@ import app.softnetwork.api.server._
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
 import com.softwaremill.session.SessionConfig
+import org.softnetwork.session.model.JwtClaims
 
 import java.io.ByteArrayOutputStream
 import scala.concurrent.Await
@@ -37,9 +38,9 @@ trait GenericPaymentService
     with Json4sSupport
     with StrictLogging
     with BasicPaymentService
-    with ServiceWithSessionDirectives[PaymentCommand, PaymentResult]
+    with ServiceWithSessionDirectives[PaymentCommand, PaymentResult, JwtClaims]
     with ClientSessionDirectives
-    with ApiRoute { _: GenericPaymentHandler with SessionMaterials =>
+    with ApiRoute { _: GenericPaymentHandler with SessionMaterials[JwtClaims] =>
 
   implicit def serialization: Serialization.type = jackson.Serialization
 

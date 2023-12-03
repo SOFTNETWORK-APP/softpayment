@@ -4,6 +4,7 @@ import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
 import app.softnetwork.session.service.SessionMaterials
+import org.softnetwork.session.model.JwtClaims
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.Part
@@ -23,7 +24,7 @@ trait GenericPaymentEndpoints
     with UboDeclarationEndpoints
     with RecurringPaymentEndpoints
     with MandateEndpoints {
-  _: GenericPaymentHandler with SessionMaterials =>
+  _: GenericPaymentHandler with SessionMaterials[JwtClaims] =>
 
   import app.softnetwork.serialization._
 

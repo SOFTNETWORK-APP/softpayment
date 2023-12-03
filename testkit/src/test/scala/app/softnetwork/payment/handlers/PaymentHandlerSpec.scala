@@ -10,7 +10,6 @@ import app.softnetwork.payment.scalatest.PaymentTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
 import app.softnetwork.session.config.Settings
-import app.softnetwork.session.service.BasicSessionMaterials
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
 import org.softnetwork.session.model.Session
@@ -22,13 +21,12 @@ import scala.util.{Failure, Success}
 class PaymentHandlerSpec
     extends MockPaymentHandler
     with AnyWordSpecLike
-    with PaymentGrpcServer
     with PaymentTestKit
-    with BasicSessionMaterials {
+    with PaymentGrpcServer {
 
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
-  override implicit lazy val ts: ActorSystem[_] = typedSystem()
+  implicit lazy val ts: ActorSystem[_] = typedSystem()
 
   override protected def sessionType: Session.SessionType =
     Settings.Session.SessionContinuityAndTransport
