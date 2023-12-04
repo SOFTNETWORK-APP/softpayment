@@ -11,7 +11,6 @@ import app.softnetwork.account.message.{
 }
 import app.softnetwork.account.service.OAuthServiceEndpoints
 import app.softnetwork.api.server.ApiErrors
-import app.softnetwork.payment.config.PaymentSettings.ClientSessionConfig
 import app.softnetwork.payment.handlers.SoftPaymentAccountTypeKey
 import app.softnetwork.payment.message.AccountMessages.{
   GenerateClientToken,
@@ -20,6 +19,7 @@ import app.softnetwork.payment.message.AccountMessages.{
   RefreshClientToken
 }
 import app.softnetwork.payment.serialization.paymentFormats
+import app.softnetwork.session.config.Settings
 import app.softnetwork.session.httpCookieToTapirCookieWithMeta
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.{CookieST, HeaderST, SessionConfig}
@@ -41,7 +41,7 @@ trait SoftPaymentOAuthServiceEndpoints
 
   import app.softnetwork.serialization.serialization
 
-  final implicit def sessionConfig: SessionConfig = ClientSessionConfig
+  implicit def sessionConfig: SessionConfig = Settings.Session.DefaultSessionConfig
 
   override implicit lazy val formats: Formats = paymentFormats
 

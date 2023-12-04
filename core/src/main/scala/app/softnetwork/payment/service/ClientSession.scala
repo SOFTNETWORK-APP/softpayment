@@ -1,7 +1,6 @@
 package app.softnetwork.payment.service
 
 import app.softnetwork.concurrent.Completion
-import app.softnetwork.payment.config.PaymentSettings.ClientSessionConfig
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.session.service.SessionMaterials
@@ -23,7 +22,6 @@ trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
       .withAdmin(false)
       .withAnonymous(false)
       .copy(
-        iss = ClientSessionConfig.jwt.issuer,
         sub = Some(client.clientId)
       )
     session += ("scope", client.accessToken.flatMap(_.scope).getOrElse(""))
@@ -37,24 +35,24 @@ trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
   }
 
   def decodeClient(data: String): Option[JwtClaims] =
-    manager(ClientSessionConfig, JwtClaims).clientSessionManager.decode(data).toOption
+    manager(sessionConfig, JwtClaims).clientSessionManager.decode(data).toOption
 
   def clientSessionManager(client: SoftPaymentAccount.Client): SessionManager[JwtClaims] = {
     implicit val innerSessionConfig: SessionConfig =
-      ClientSessionConfig.copy(
-        jwt = ClientSessionConfig.jwt.copy(subject = Some(client.clientId)),
+      sessionConfig.copy(
+        jwt = sessionConfig.jwt.copy(subject = Some(client.clientId)),
         serverSecret = client.getClientApiKey
       )
     manager(innerSessionConfig, JwtClaims)
   }
 
-  def clientCookieName: String = ClientSessionConfig.sessionCookieConfig.name
+  def clientCookieName: String = sessionConfig.sessionCookieConfig.name
 
   def sendToClientHeaderName: String =
-    ClientSessionConfig.sessionHeaderConfig.sendToClientHeaderName
+    sessionConfig.sessionHeaderConfig.sendToClientHeaderName
 
   def getFromClientHeaderName: String =
-    ClientSessionConfig.sessionHeaderConfig.getFromClientHeaderName
+    sessionConfig.sessionHeaderConfig.getFromClientHeaderName
 
   def sessionManager(clientId: Option[String]): SessionManager[JwtClaims] = {
     clientId match {
@@ -73,7 +71,6 @@ trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
         implicit val innerSessionConfig: SessionConfig =
           sessionConfig.copy(
             jwt = sessionConfig.jwt.copy(
-              issuer = ClientSessionConfig.jwt.issuer,
               subject = Some(c.clientId)
             ),
             sessionEncryptData = true,
