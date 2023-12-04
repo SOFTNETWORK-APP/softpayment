@@ -1,5 +1,6 @@
 package app.softnetwork.payment.spi
 
+import app.softnetwork.payment.config.MangoPay
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
 import app.softnetwork.payment.model.PaymentUser.PaymentUserType
 import app.softnetwork.payment.model.RecurringPayment.RecurringCardPaymentState
@@ -1727,4 +1728,6 @@ class MockMangoPayProviderFactory extends PaymentProviderSpi {
     new MockMangoPayProvider {
       override implicit def provider: Provider = p
     }
+
+  override def softPaymentProvider: Provider = MangoPay.softPaymentProvider
 }

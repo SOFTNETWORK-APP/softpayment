@@ -60,8 +60,6 @@ trait MangoPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends Payme
     : ActorSystem[_] => AccountBehavior[SoftPaymentAccount, BasicAccountProfile] = _ =>
     SoftPaymentAccountBehavior
 
-  override def accountDao: AccountDao = SoftPaymentAccountDao
-
   override def internalAccountEvents2AccountProcessorStream
     : ActorSystem[_] => InternalAccountEvents2AccountProcessorStream = sys =>
     new InternalAccountEvents2AccountProcessorStream

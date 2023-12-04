@@ -99,6 +99,17 @@ trait SoftPaymentAccountDao extends AccountDao { _: AccountHandler =>
       case _                                    => None
     }
   }
+
+  def registerProviderAccount(provider: SoftPaymentAccount.Client.Provider)(implicit
+    system: ActorSystem[_]
+  ): Future[Option[SoftPaymentAccount]] = {
+    implicit val ec: ExecutionContext = system.executionContext
+    !?(AccountMessages.RegisterProviderAccount(provider)) map {
+      case result: AccountMessages.ProviderAccountRegistered => Some(result.account)
+      case _                                                 => None
+    }
+  }
+
 }
 
 trait SoftPaymentAccountTypeKey extends CommandTypeKey[AccountCommand] {

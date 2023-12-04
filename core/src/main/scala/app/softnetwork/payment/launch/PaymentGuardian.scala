@@ -1,9 +1,11 @@
 package app.softnetwork.payment.launch
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.account.handlers.AccountDao
 import app.softnetwork.account.launch.AccountGuardian
 import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.payment.PaymentCoreBuildInfo
+import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.persistence.data.paymentKvDao
 import app.softnetwork.payment.persistence.query.{
@@ -11,11 +13,14 @@ import app.softnetwork.payment.persistence.query.{
   Scheduler2PaymentProcessorStream
 }
 import app.softnetwork.payment.persistence.typed.GenericPaymentBehavior
+import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.persistence.typed.Singleton
 import app.softnetwork.session.CsrfCheck
+
+import scala.concurrent.ExecutionContext
 
 trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountProfile] {
   _: SchemaProvider with CsrfCheck =>
@@ -52,4 +57,26 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
 
   override def systemVersion(): String =
     sys.env.getOrElse("VERSION", PaymentCoreBuildInfo.version)
+
+  def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
+
+  final override def accountDao: AccountDao = softPaymentAccountDao
+
+  def registerProvidersAccount: ActorSystem[_] => Unit = system => {
+    PaymentProviders.defaultPaymentProviders.foreach(provider => {
+      implicit val ec: ExecutionContext = system.executionContext
+      softPaymentAccountDao.registerProviderAccount(provider)(system) map {
+        case Some(account) =>
+          system.log.info(s"Registered provider account for ${provider.providerId}: $account")
+        case _ =>
+          system.log.warn(s"Failed to register provider account for ${provider.providerId}")
+      }
+    })
+  }
+
+  override def initSystem: ActorSystem[_] => Unit = system => {
+    registerProvidersAccount(system)
+    super.initSystem(system)
+  }
+
 }

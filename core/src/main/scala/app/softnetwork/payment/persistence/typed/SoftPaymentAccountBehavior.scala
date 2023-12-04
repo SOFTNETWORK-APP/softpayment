@@ -310,6 +310,28 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
             }
         }
 
+      case AccountMessages.RegisterProviderAccount(provider) =>
+        state match {
+          case Some(account) =>
+            accountKeyDao.addAccountKey(provider.clientId, entityId)
+            Effect
+              .persist(
+                SoftPaymentAccountProviderRegisteredEvent(
+                  provider.client,
+                  Instant.now()
+                )
+              )
+              .thenRun(state =>
+                AccountMessages.ProviderAccountRegistered(state.getOrElse(account)) ~> replyTo
+              )
+          case _ =>
+            val account = provider.account
+            accountKeyDao.addAccountKey(provider.clientId, entityId)
+            Effect.persist(SoftPaymentAccountCreatedEvent(account)).thenRun { state =>
+              AccountMessages.ProviderAccountRegistered(state.getOrElse(account)) ~> replyTo
+            }
+        }
+
       case _ => super.handleCommand(entityId, state, command, replyTo, timers)
     }
   }

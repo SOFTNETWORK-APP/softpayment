@@ -11,7 +11,8 @@ import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.{
   MockPaymentHandler,
   MockSoftPaymentAccountDao,
-  MockSoftPaymentAccountHandler
+  MockSoftPaymentAccountHandler,
+  SoftPaymentAccountDao
 }
 import app.softnetwork.payment.launch.PaymentGuardian
 import app.softnetwork.payment.message.PaymentMessages.{
@@ -57,8 +58,6 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
   override def accountBehavior
     : ActorSystem[_] => AccountBehavior[SoftPaymentAccount, BasicAccountProfile] = _ =>
     MockSoftPaymentAccountBehavior
-
-  override def accountDao: AccountDao = MockSoftPaymentAccountDao
 
   def loadApiKey(clientId: String): Future[Option[ApiKey]] =
     MockPaymentBehavior.softPaymentAccountDao.loadApiKey(clientId)
@@ -220,5 +219,8 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
   override def initSystem: ActorSystem[_] => Unit = system => {
     initAccountSystem(system)
     initSchedulerSystem(system)
+    registerProvidersAccount(system)
   }
+
+  override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
 }

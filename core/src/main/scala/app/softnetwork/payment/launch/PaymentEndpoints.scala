@@ -12,7 +12,6 @@ import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.CsrfCheck
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import org.json4s.Formats
-import org.softnetwork.session.model.JwtClaims
 
 trait PaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     extends AccountEndpoints[

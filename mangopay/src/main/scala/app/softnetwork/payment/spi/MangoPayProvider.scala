@@ -2599,4 +2599,7 @@ class MangoPayProviderFactory extends PaymentProviderSpi {
     new MangoPayProvider {
       override implicit val provider: SoftPaymentAccount.Client.Provider = p
     }
+
+  override def softPaymentProvider: SoftPaymentAccount.Client.Provider =
+    MangoPay.softPaymentProvider
 }

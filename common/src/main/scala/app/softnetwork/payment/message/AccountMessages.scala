@@ -10,6 +10,7 @@ import app.softnetwork.account.message.{
 import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.persistence.message.EntityCommand
 import org.softnetwork.session.model.ApiKey
 
 object AccountMessages {
@@ -22,6 +23,12 @@ object AccountMessages {
   ) extends SignUp
 
   case class RegisterProvider(provider: SoftPaymentAccount.Client.Provider) extends AccountCommand
+
+  case class RegisterProviderAccount(provider: SoftPaymentAccount.Client.Provider)
+      extends AccountCommand
+      with EntityCommand {
+    override def id: String = provider.clientId
+  }
 
   @InternalApi
   private[payment] case class LoadClient(clientId: String) extends LookupAccountCommand
@@ -42,6 +49,8 @@ object AccountMessages {
 
   case class ProviderRegistered(client: SoftPaymentAccount.Client) extends AccountCommandResult
 
+  case class ProviderAccountRegistered(account: SoftPaymentAccount) extends AccountCommandResult
+
   case class ClientLoaded(client: SoftPaymentAccount.Client) extends AccountCommandResult
 
   case class ApiKeysLoaded(apiKeys: Seq[ApiKey]) extends AccountCommandResult
@@ -54,6 +63,9 @@ object AccountMessages {
   case object ProviderAlreadyRegistered extends AccountErrorMessage("provider.already.registered")
 
   case object ProviderNotRegistered extends AccountErrorMessage("provider.not.registered")
+
+  case object ProviderAccountNotRegistered
+      extends AccountErrorMessage("provider.account.not.registered")
 
   case object ClientNotFound extends AccountErrorMessage("client.not.found")
 

@@ -7,4 +7,5 @@ trait PaymentProviderSpi {
 
   def paymentProvider(p: SoftPaymentAccount.Client.Provider): PaymentProvider
 
+  def softPaymentProvider: SoftPaymentAccount.Client.Provider
 }

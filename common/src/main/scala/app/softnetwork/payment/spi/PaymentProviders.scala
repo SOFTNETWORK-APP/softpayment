@@ -15,6 +15,9 @@ object PaymentProviders {
   private[this] def paymentProviderKey(provider: SoftPaymentAccount.Client.Provider) =
     s"${provider.providerType}-${provider.providerId}"
 
+  def defaultPaymentProviders: Seq[SoftPaymentAccount.Client.Provider] =
+    paymentProviderFactories.iterator().asScala.map(_.softPaymentProvider).toSeq
+
   def paymentProvider(
     provider: SoftPaymentAccount.Client.Provider
   ): PaymentProvider = {
