@@ -1,12 +1,12 @@
 package app.softnetwork.payment.service
 
 import app.softnetwork.payment.handlers.MockSoftPaymentAccountTypeKey
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
-import org.softnetwork.session.model.JwtClaims
 
-trait MockSoftPaymentAccountService
-    extends SoftPaymentAccountService
+trait MockSoftPaymentAccountService[SD <: SessionData with SessionDataDecorator[SD]]
+    extends SoftPaymentAccountService[SD]
     with MockSoftPaymentAccountTypeKey {
-  _: SessionMaterials[JwtClaims] =>
+  _: SessionMaterials[SD] =>
 
 }

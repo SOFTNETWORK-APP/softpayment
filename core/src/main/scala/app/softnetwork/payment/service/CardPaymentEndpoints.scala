@@ -4,7 +4,7 @@ import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.SoftPaymentAccount
-import org.softnetwork.session.model.JwtClaims
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.{HeaderNames, Method, StatusCode}
@@ -14,13 +14,14 @@ import sttp.tapir.server.{PartialServerEndpointWithSecurityOutput, ServerEndpoin
 
 import scala.concurrent.Future
 
-trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
+trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
+  _: RootPaymentEndpoints[SD] with GenericPaymentHandler =>
 
   import app.softnetwork.serialization._
 
   def payment(payment: Payment): PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], JwtClaims),
+    (Option[SoftPaymentAccount.Client], SD),
     (Option[String], Option[String], Option[String], Option[String], Payment),
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

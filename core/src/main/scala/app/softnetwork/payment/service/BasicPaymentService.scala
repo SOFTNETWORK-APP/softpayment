@@ -3,9 +3,8 @@ package app.softnetwork.payment.service
 import app.softnetwork.api.server.ApiErrors
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.model.{computeExternalUuidWithProfile, BrowserInfo}
+import app.softnetwork.payment.model.BrowserInfo
 import app.softnetwork.persistence.service.Service
-import org.softnetwork.session.model.JwtClaims
 
 import java.util.TimeZone
 import scala.concurrent.Future
@@ -36,9 +35,6 @@ trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
       case r: PaymentError               => ApiErrors.BadRequest(r.message)
       case _                             => ApiErrors.BadRequest("Unknown")
     }
-
-  protected[payment] def externalUuidWithProfile(session: JwtClaims): String =
-    computeExternalUuidWithProfile(session.id, session.profile)
 
   protected[payment] def extractBrowserInfo(
     language: Option[String],

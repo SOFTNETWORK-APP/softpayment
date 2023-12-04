@@ -12,32 +12,26 @@ import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentRouteTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
-import app.softnetwork.session.handlers.JwtClaimsRefreshTokenDao
-import app.softnetwork.session.model.SessionDataCompanion
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
-import com.softwaremill.session.RefreshTokenStorage
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
-import org.softnetwork.session.model.JwtClaims
 
 import java.net.{InetAddress, URLEncoder}
 import java.time.LocalDate
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
-trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit {
-  _: ApiRoutes with SessionMaterials[JwtClaims] =>
+trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
+    extends AnyWordSpecLike
+    with PaymentRouteTestKit[SD] {
+  _: ApiRoutes with SessionMaterials[SD] =>
 
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
   import app.softnetwork.serialization._
 
   lazy val paymentClient: PaymentClient = PaymentClient(ts)
-
-  override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
-
-  override implicit def refreshTokenStorage: RefreshTokenStorage[JwtClaims] =
-    JwtClaimsRefreshTokenDao(ts)
 
   "Payment service" must {
     "pre register card" in {

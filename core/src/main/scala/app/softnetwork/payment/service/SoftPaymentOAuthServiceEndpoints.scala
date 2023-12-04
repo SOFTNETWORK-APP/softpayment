@@ -21,10 +21,10 @@ import app.softnetwork.payment.message.AccountMessages.{
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.config.Settings
 import app.softnetwork.session.httpCookieToTapirCookieWithMeta
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.{CookieST, HeaderST, SessionConfig}
 import org.json4s.Formats
-import org.softnetwork.session.model.JwtClaims
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.headers.WWWAuthenticateChallenge
@@ -34,10 +34,10 @@ import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
-trait SoftPaymentOAuthServiceEndpoints
-    extends OAuthServiceEndpoints[JwtClaims]
+trait SoftPaymentOAuthServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
+    extends OAuthServiceEndpoints[SD]
     with SoftPaymentAccountTypeKey
-    with ClientSession { _: SessionMaterials[JwtClaims] =>
+    with ClientSession[SD] { _: SessionMaterials[SD] =>
 
   import app.softnetwork.serialization.serialization
 

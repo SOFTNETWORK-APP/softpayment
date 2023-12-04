@@ -7,9 +7,9 @@ import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.serialization.paymentFormats
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.{ServiceWithSessionEndpoints, SessionMaterials}
 import org.json4s.Formats
-import org.softnetwork.session.model.JwtClaims
 import sttp.model.headers.CookieValueWithMeta
 import sttp.model.Method
 import sttp.tapir.server.PartialServerEndpointWithSecurityOutput
@@ -18,11 +18,11 @@ import sttp.tapir.Endpoint
 import scala.concurrent.Future
 import scala.language.implicitConversions
 
-trait RootPaymentEndpoints
+trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     extends BasicPaymentService
-    with ServiceWithSessionEndpoints[PaymentCommand, PaymentResult, JwtClaims]
-    with ClientSessionEndpoints {
-  _: GenericPaymentHandler with SessionMaterials[JwtClaims] =>
+    with ServiceWithSessionEndpoints[PaymentCommand, PaymentResult, SD]
+    with ClientSessionEndpoints[SD] {
+  _: GenericPaymentHandler with SessionMaterials[SD] =>
 
   override implicit def formats: Formats = paymentFormats
 
@@ -36,7 +36,7 @@ trait RootPaymentEndpoints
 
   lazy val requiredSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], JwtClaims),
+    (Option[SoftPaymentAccount.Client], SD),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
@@ -54,7 +54,7 @@ trait RootPaymentEndpoints
 
   lazy val optionalSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], Option[JwtClaims]),
+    (Option[SoftPaymentAccount.Client], Option[SD]),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

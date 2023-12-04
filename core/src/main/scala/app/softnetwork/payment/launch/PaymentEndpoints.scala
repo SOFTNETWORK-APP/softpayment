@@ -10,21 +10,22 @@ import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.payment.service.GenericPaymentEndpoints
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.CsrfCheck
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import org.json4s.Formats
 import org.softnetwork.session.model.JwtClaims
 
-trait PaymentEndpoints
+trait PaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     extends AccountEndpoints[
       SoftPaymentAccount,
       BasicAccountProfile,
       BasicAccountSignUp,
-      JwtClaims
+      SD
     ] {
   _: PaymentGuardian with SchemaProvider with CsrfCheck =>
 
   override implicit def formats: Formats = paymentFormats
 
-  def paymentEndpoints: ActorSystem[_] => GenericPaymentEndpoints
+  def paymentEndpoints: ActorSystem[_] => GenericPaymentEndpoints[SD]
 
   override def endpoints: ActorSystem[_] => List[Endpoint] =
     system =>

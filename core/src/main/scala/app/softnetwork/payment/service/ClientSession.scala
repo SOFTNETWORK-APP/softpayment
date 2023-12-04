@@ -2,28 +2,30 @@ package app.softnetwork.payment.service
 
 import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.{computeExternalUuidWithProfile, SoftPaymentAccount}
+import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
-import org.softnetwork.session.model.JwtClaims
+import org.softnetwork.session.model.{ApiKey, JwtClaims}
 import com.softwaremill.session._
 
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
-trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
+trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Completion {
+  self: SessionMaterials[SD] =>
 
   def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
 
   implicit def sessionConfig: SessionConfig
 
-  implicit def toSession(client: SoftPaymentAccount.Client): JwtClaims = {
-    var session = JwtClaims.newSession
+  implicit def companion: SessionDataCompanion[SD]
+
+  implicit def toSession(client: SoftPaymentAccount.Client): SD = {
+    var session = companion.newSession
       .withAdmin(false)
       .withAnonymous(false)
-      .copy(
-        sub = Some(client.clientId)
-      )
+      .withClientId(client.clientId)
     session += ("scope", client.accessToken.flatMap(_.scope).getOrElse(""))
     session
   }
@@ -34,16 +36,17 @@ trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
     clientSessionManager(client).clientSessionManager.encode(client)
   }
 
-  def decodeClient(data: String): Option[JwtClaims] =
-    manager(sessionConfig, JwtClaims).clientSessionManager.decode(data).toOption
+  def decodeClient(data: String): Option[SD] = manager.clientSessionManager.decode(data).toOption
 
-  def clientSessionManager(client: SoftPaymentAccount.Client): SessionManager[JwtClaims] = {
+  def clientSessionManager(client: SoftPaymentAccount.Client): SessionManager[SD] = {
     implicit val innerSessionConfig: SessionConfig =
       sessionConfig.copy(
-        jwt = sessionConfig.jwt.copy(subject = Some(client.clientId)),
+        jwt = sessionConfig.jwt.copy(
+          subject = Some(client.clientId)
+        ),
         serverSecret = client.getClientApiKey
       )
-    manager(innerSessionConfig, JwtClaims)
+    manager(innerSessionConfig, companion)
   }
 
   def clientCookieName: String = sessionConfig.sessionCookieConfig.name
@@ -54,7 +57,7 @@ trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
   def getFromClientHeaderName: String =
     sessionConfig.sessionHeaderConfig.getFromClientHeaderName
 
-  def sessionManager(clientId: Option[String]): SessionManager[JwtClaims] = {
+  def sessionManager(clientId: Option[String]): SessionManager[SD] = {
     clientId match {
       case Some(id) =>
         softPaymentAccountDao.loadClient(id) complete () match {
@@ -65,7 +68,7 @@ trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
     }
   }
 
-  def clientSessionManager(client: Option[SoftPaymentAccount.Client]): SessionManager[JwtClaims] = {
+  def clientSessionManager(client: Option[SoftPaymentAccount.Client]): SessionManager[SD] = {
     client match {
       case Some(c) =>
         implicit val innerSessionConfig: SessionConfig =
@@ -73,13 +76,15 @@ trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
             jwt = sessionConfig.jwt.copy(
               subject = Some(c.clientId)
             ),
-            sessionEncryptData = true,
             serverSecret = c.getClientApiKey
           )
-        manager(innerSessionConfig, JwtClaims)
+        manager(innerSessionConfig, companion)
       case _ => manager
     }
   }
+
+  def loadApiKey(clientId: String): Future[Option[ApiKey]] =
+    softPaymentAccountDao.loadApiKey(clientId)
 
   protected def toClient(token: Option[String]): Future[Option[SoftPaymentAccount.Client]] = {
     token match {
@@ -100,5 +105,8 @@ trait ClientSession extends Completion { self: SessionMaterials[JwtClaims] =>
       case _ => Future.successful(None)
     }
   }
+
+  protected[payment] def externalUuidWithProfile(session: SD): String =
+    computeExternalUuidWithProfile(session.id, session.profile)
 
 }

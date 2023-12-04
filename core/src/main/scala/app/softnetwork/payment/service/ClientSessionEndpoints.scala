@@ -3,8 +3,8 @@ package app.softnetwork.payment.service
 import app.softnetwork.account.config.AccountSettings
 import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.{SessionEndpoints, SessionMaterials}
-import org.softnetwork.session.model.JwtClaims
 import com.softwaremill.session.{
   CookieOrHeaderST,
   CookieST,
@@ -21,8 +21,10 @@ import sttp.tapir.server.PartialServerEndpointWithSecurityOutput
 
 import scala.concurrent.Future
 
-trait ClientSessionEndpoints extends SessionEndpoints[JwtClaims] with ClientSession {
-  _: SessionMaterials[JwtClaims] =>
+trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
+    extends SessionEndpoints[SD]
+    with ClientSession[SD] {
+  _: SessionMaterials[SD] =>
 
   implicit def formats: Formats
 
@@ -36,7 +38,7 @@ trait ClientSessionEndpoints extends SessionEndpoints[JwtClaims] with ClientSess
   @InternalApi
   private[payment] def requiredClientSession: PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPaymentAccount.Client], JwtClaims), Unit, Unit, Seq[
+  ], (Option[SoftPaymentAccount.Client], SD), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = clientSession(Some(true))
@@ -57,7 +59,7 @@ trait ClientSessionEndpoints extends SessionEndpoints[JwtClaims] with ClientSess
   @InternalApi
   private[payment] def optionalClientSession: PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPaymentAccount.Client], Option[JwtClaims]), Unit, Unit, Seq[
+  ], (Option[SoftPaymentAccount.Client], Option[SD]), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = clientSession(Some(false))
@@ -76,7 +78,7 @@ trait ClientSessionEndpoints extends SessionEndpoints[JwtClaims] with ClientSess
     required: Option[Boolean]
   ): PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPaymentAccount.Client], SessionResult[JwtClaims]), Unit, Unit, Seq[
+  ], (Option[SoftPaymentAccount.Client], SessionResult[SD]), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = sc.session(gt, required)
@@ -88,7 +90,7 @@ trait ClientSessionEndpoints extends SessionEndpoints[JwtClaims] with ClientSess
       .out(partial.securityOutput)
       .serverSecurityLogicWithOutput { inputs =>
         toClient(inputs.head) flatMap { client =>
-          implicit val manager: SessionManager[JwtClaims] = clientSessionManager(client)
+          implicit val manager: SessionManager[SD] = clientSessionManager(client)
           sessionType match {
             case Session.SessionType.OneOffCookie | Session.SessionType.OneOffHeader => // oneOff
               (gt match {
@@ -141,11 +143,6 @@ trait ClientSessionEndpoints extends SessionEndpoints[JwtClaims] with ClientSess
                 case Right(r) => Future.successful(Right((r._1, (client, r._2))))
               }
           }
-//          case None =>
-//            partial.securityLogic(new FutureMonad())(inputs.tail).map {
-//              case Left(l)  => Left(l)
-//              case Right(r) => Right((r._1, (None, r._2)))
-//            }
         }
       }
   }

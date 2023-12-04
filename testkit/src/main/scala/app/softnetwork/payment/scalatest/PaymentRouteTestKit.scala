@@ -8,18 +8,18 @@ import app.softnetwork.api.server.config.ServerSettings.RootPath
 import app.softnetwork.payment.api.PaymentGrpcServices
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.scalatest.SessionTestKit
 import app.softnetwork.session.service.SessionMaterials
 import org.scalatest.Suite
-import org.softnetwork.session.model.JwtClaims
 
 import java.nio.file.Paths
 
-trait PaymentRouteTestKit
-    extends SessionTestKit[JwtClaims]
+trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
+    extends SessionTestKit[SD]
     with PaymentTestKit
     with PaymentGrpcServices {
-  _: Suite with ApiRoutes with SessionMaterials[JwtClaims] =>
+  _: Suite with ApiRoutes with SessionMaterials[SD] =>
 
   import app.softnetwork.serialization._
 

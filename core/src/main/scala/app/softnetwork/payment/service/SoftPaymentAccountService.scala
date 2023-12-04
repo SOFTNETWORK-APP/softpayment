@@ -6,15 +6,15 @@ import app.softnetwork.account.service.BasicAccountService
 import app.softnetwork.payment.handlers.SoftPaymentAccountTypeKey
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.config.Settings
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.SessionConfig
 import org.json4s.Formats
-import org.softnetwork.session.model.JwtClaims
 
-trait SoftPaymentAccountService
-    extends BasicAccountService[JwtClaims]
+trait SoftPaymentAccountService[SD <: SessionData with SessionDataDecorator[SD]]
+    extends BasicAccountService[SD]
     with SoftPaymentAccountTypeKey {
-  _: SessionMaterials[JwtClaims] =>
+  _: SessionMaterials[SD] =>
 
   implicit def sessionConfig: SessionConfig = Settings.Session.DefaultSessionConfig
 

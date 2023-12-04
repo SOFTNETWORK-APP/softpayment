@@ -25,22 +25,22 @@ import org.json4s.jackson.Serialization
 import app.softnetwork.api.server._
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import com.softwaremill.session.SessionConfig
-import org.softnetwork.session.model.JwtClaims
 
 import java.io.ByteArrayOutputStream
 import scala.concurrent.Await
 import scala.language.implicitConversions
 
-trait GenericPaymentService
+trait GenericPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     extends Directives
     with DefaultComplete
     with Json4sSupport
     with StrictLogging
     with BasicPaymentService
-    with ServiceWithSessionDirectives[PaymentCommand, PaymentResult, JwtClaims]
-    with ClientSessionDirectives
-    with ApiRoute { _: GenericPaymentHandler with SessionMaterials[JwtClaims] =>
+    with ServiceWithSessionDirectives[PaymentCommand, PaymentResult, SD]
+    with ClientSessionDirectives[SD]
+    with ApiRoute { _: GenericPaymentHandler with SessionMaterials[SD] =>
 
   implicit def serialization: Serialization.type = jackson.Serialization
 

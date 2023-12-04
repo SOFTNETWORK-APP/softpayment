@@ -9,11 +9,14 @@ import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.scheduler.api.{SchedulerApi, SchedulerServiceApiHandler}
 import app.softnetwork.scheduler.handlers.SchedulerHandler
 import app.softnetwork.scheduler.persistence.query.Entity2SchedulerProcessorStream
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import com.typesafe.config.Config
 
 import scala.concurrent.Future
 
-trait MangoPayWithSchedulerApi extends MangoPayApi with SchedulerApi { _: SchemaProvider =>
+trait MangoPayWithSchedulerApi[SD <: SessionData with SessionDataDecorator[SD]]
+    extends MangoPayApi[SD]
+    with SchedulerApi { _: SchemaProvider =>
 
   override def entity2SchedulerProcessorStream: ActorSystem[_] => Entity2SchedulerProcessorStream =
     sys =>

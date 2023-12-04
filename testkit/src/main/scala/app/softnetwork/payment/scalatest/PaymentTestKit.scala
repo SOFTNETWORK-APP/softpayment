@@ -39,6 +39,7 @@ import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.scheduler.scalatest.SchedulerTestKit
 import org.scalatest.Suite
 import org.slf4j.{Logger, LoggerFactory}
+import org.softnetwork.session.model.ApiKey
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -58,6 +59,9 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
     MockSoftPaymentAccountBehavior
 
   override def accountDao: AccountDao = MockSoftPaymentAccountDao
+
+  def loadApiKey(clientId: String): Future[Option[ApiKey]] =
+    MockPaymentBehavior.softPaymentAccountDao.loadApiKey(clientId)
 
   override def paymentCommandProcessorStream
     : ActorSystem[_] => GenericPaymentCommandProcessorStream = sys =>

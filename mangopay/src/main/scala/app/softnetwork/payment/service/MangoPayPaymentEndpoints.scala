@@ -4,15 +4,17 @@ import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.MangoPayPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.{BankAccount, KycDocument, UboDeclaration}
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
 import com.mangopay.core.enumerations.EventType
-import org.softnetwork.session.model.JwtClaims
 import sttp.tapir.server.ServerEndpoint.Full
 
 import scala.concurrent.Future
 
-trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaymentHandler {
-  _: SessionMaterials[JwtClaims] =>
+trait MangoPayPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
+    extends GenericPaymentEndpoints[SD]
+    with MangoPayPaymentHandler {
+  _: SessionMaterials[SD] =>
 
   /** should be implemented by each payment provider
     */

@@ -6,13 +6,15 @@ import akka.http.scaladsl.server.directives.Credentials
 import app.softnetwork.account.config.AccountSettings
 import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.{SessionMaterials, SessionService}
-import org.softnetwork.session.model.JwtClaims
 
 import scala.concurrent.Future
 
-trait ClientSessionDirectives extends SessionService[JwtClaims] with ClientSession {
-  _: SessionMaterials[JwtClaims] =>
+trait ClientSessionDirectives[SD <: SessionData with SessionDataDecorator[SD]]
+    extends SessionService[SD]
+    with ClientSession[SD] {
+  _: SessionMaterials[SD] =>
 
   @InternalApi
   private[payment] def clientDirective: Directive1[Option[SoftPaymentAccount.Client]] =
@@ -20,7 +22,7 @@ trait ClientSessionDirectives extends SessionService[JwtClaims] with ClientSessi
 
   @InternalApi
   private[payment] def requiredClientSession(
-    body: (Option[SoftPaymentAccount.Client], JwtClaims) => Route
+    body: (Option[SoftPaymentAccount.Client], SD) => Route
   ): Route =
     clientDirective { client =>
       requiredSession(sc(clientSessionManager(client)), gt) { session =>
@@ -30,7 +32,7 @@ trait ClientSessionDirectives extends SessionService[JwtClaims] with ClientSessi
 
   @InternalApi
   private[payment] def optionalClientSession(
-    body: (Option[SoftPaymentAccount.Client], Option[JwtClaims]) => Route
+    body: (Option[SoftPaymentAccount.Client], Option[SD]) => Route
   ): Route =
     clientDirective { client =>
       optionalSession(sc(clientSessionManager(client)), gt) { session =>
