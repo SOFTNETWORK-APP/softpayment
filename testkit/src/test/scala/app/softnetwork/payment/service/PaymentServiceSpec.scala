@@ -9,6 +9,7 @@ import app.softnetwork.payment.data._
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
+import app.softnetwork.payment.persistence.typed.MockPaymentBehavior
 import app.softnetwork.payment.scalatest.PaymentRouteTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
@@ -33,9 +34,17 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
   lazy val paymentClient: PaymentClient = PaymentClient(ts)
 
+  def clientId: String = MockPaymentBehavior.defaultProvider.clientId
+
+  lazy val customerSession: SD with SessionDataDecorator[SD] =
+    companion.newSession.withId(customerUuid).withProfile(Some("customer")).withClientId(clientId)
+
+  lazy val sellerSession: SD with SessionDataDecorator[SD] =
+    companion.newSession.withId(sellerUuid).withProfile(Some("seller")).withClientId(clientId)
+
   "Payment service" must {
     "pre register card" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Get(s"/$RootPath/$PaymentPath/$CardRoute")
       ) ~> routes ~> check {
@@ -108,7 +117,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "not create bank account with wrong iban" in {
-      createSession(sellerUuid, Some("seller"))
+      createNewSession(sellerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$BankRoute",
@@ -334,7 +343,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay in / out with pre authorized card" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$PreAuthorizeCardRoute",
@@ -377,7 +386,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay in / out with 3ds" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder
@@ -430,7 +439,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay in / out with PayPal" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder
@@ -479,7 +488,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "create mandate" in {
-      createSession(sellerUuid, Some("seller"))
+      createNewSession(sellerSession)
       withHeaders(
         Post(s"/$RootPath/$PaymentPath/$MandateRoute")
       ) ~> routes ~> check {
@@ -558,7 +567,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "register recurring card payment" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$RecurringPaymentRoute",
@@ -635,7 +644,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "cancel mandate" in {
-      createSession(sellerUuid, Some("seller"))
+      createNewSession(sellerSession)
       withHeaders(
         Delete(s"/$RootPath/$PaymentPath/$MandateRoute")
       ) ~> routes ~> check {
@@ -667,7 +676,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "disable card" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Delete(s"/$RootPath/$PaymentPath/$CardRoute?cardId=$cardId")
       ) ~> routes ~> check {

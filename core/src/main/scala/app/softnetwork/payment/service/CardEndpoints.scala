@@ -59,7 +59,12 @@ trait CardEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               updatedUser = updatedUser.withProfile(profile)
             case _ =>
           }
-          run(cmd.copy(user = updatedUser, clientId = principal._1.map(_.clientId))).map {
+          run(
+            cmd.copy(
+              user = updatedUser,
+              clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
+            )
+          ).map {
             case r: CardPreRegistered => Right(r.cardPreRegistration)
             case other                => Left(error(other))
           }

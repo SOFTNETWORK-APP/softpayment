@@ -2,7 +2,7 @@ ThisBuild / organization := "app.softnetwork"
 
 name := "payment"
 
-ThisBuild / version := "0.5.0"
+ThisBuild / version := "0.6.0"
 
 ThisBuild / scalaVersion := "2.12.18"
 
@@ -49,6 +49,13 @@ lazy val mangopay = project.in(file("mangopay"))
     core % "compile->compile;test->test;it->it"
   )
 
+lazy val stripe = project.in(file("stripe"))
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .dependsOn(
+    core % "compile->compile;test->test;it->it"
+  )
+
 lazy val api = project.in(file("mangopay/api"))
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
@@ -65,6 +72,6 @@ lazy val testkit = project.in(file("testkit"))
   )
 
 lazy val root = project.in(file("."))
-  .aggregate(common, core, mangopay, testkit, api)
+  .aggregate(common, core, mangopay, stripe, testkit, api)
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)

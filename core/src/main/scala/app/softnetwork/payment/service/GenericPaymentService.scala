@@ -98,7 +98,12 @@ trait GenericPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                   updatedUser = updatedUser.withProfile(profile)
                 case _ =>
               }
-              run(cmd.copy(user = updatedUser, clientId = client.map(_.clientId))) completeWith {
+              run(
+                cmd.copy(
+                  user = updatedUser,
+                  clientId = client.map(_.clientId).orElse(session.clientId)
+                )
+              ) completeWith {
                 case r: CardPreRegistered =>
                   complete(
                     HttpResponse(
@@ -425,7 +430,7 @@ trait GenericPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                   bankAccount.withExternalUuid(externalUuid),
                   updatedUser,
                   acceptedTermsOfPSP,
-                  client.map(_.clientId)
+                  client.map(_.clientId).orElse(session.clientId)
                 )
               ) completeWith {
                 case r: BankAccountCreatedOrUpdated =>

@@ -2,7 +2,6 @@ package app.softnetwork.payment.scalatest
 
 import akka.actor.typed.ActorSystem
 import app.softnetwork.account.config.AccountSettings
-import app.softnetwork.account.handlers.AccountDao
 import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.account.persistence.query.AccountEventProcessorStreams.InternalAccountEvents2AccountProcessorStream
 import app.softnetwork.account.persistence.typed.AccountBehavior

@@ -71,7 +71,7 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             bankAccount.withExternalUuid(externalUuid),
             updatedUser,
             acceptedTermsOfPSP,
-            clientId = principal._1.map(_.clientId)
+            clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
           )
         ).map {
           case r: BankAccountCreatedOrUpdated => Right(r)

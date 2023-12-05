@@ -1729,5 +1729,6 @@ class MockMangoPayProviderFactory extends PaymentProviderSpi {
       override implicit def provider: Provider = p
     }
 
-  override def softPaymentProvider: Provider = MangoPay.softPaymentProvider
+  override def softPaymentProvider: Provider =
+    MangoPay.softPaymentProvider.withProviderType(providerType)
 }
