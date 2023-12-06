@@ -2,11 +2,12 @@ package app.softnetwork.payment.cli
 
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
+import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.PaymentClientBuildInfo
 import app.softnetwork.payment.cli.tokens.{Tokens, TokensConfig}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.ExecutionContext
+import scala.util.{Failure, Success}
 
 object Main extends StrictLogging {
 
@@ -16,7 +17,7 @@ object Main extends StrictLogging {
   }
 }
 
-class Main() extends StrictLogging {
+class Main extends Completion with StrictLogging {
   val configs: List[CliConfig[_]] = List(
     TokensConfig
   )
@@ -43,12 +44,12 @@ class Main() extends StrictLogging {
   }
   // scalastyle:on println
 
-  def help(args: List[String]): Unit = {
+  private def help(args: List[String]): Unit = {
     args match {
       case Nil | "help" :: Nil =>
         printUsage()
         System.exit(0)
-      case "help" :: command :: any =>
+      case "help" :: command :: _ =>
         printUsage(command)
         System.exit(0)
       case _ =>
@@ -58,25 +59,28 @@ class Main() extends StrictLogging {
   def run(args: Array[String])(implicit system: ActorSystem[_]): Unit = {
     help(args.toList)
     args.toList match {
-      case command :: any =>
+      case command :: list =>
         configs.find(_.command == command) match {
           case None =>
             println(s"ERROR: Unknown command --> $command")
             printUsage()
             System.exit(1)
-          case Some(config) =>
+          case Some(_) =>
             command match {
               case "tokens" =>
-                TokensConfig.parse(any) match {
+                TokensConfig.parse(list) match {
                   case None =>
                     println(s"ERROR: Invalid arguments for command --> $command")
                     printUsage(command)
                     System.exit(1)
                   case Some(conf) =>
-                    implicit def ec: ExecutionContext = system.executionContext
-                    Tokens.run(conf) onComplete { result =>
-                      println(result)
-                      System.exit(0)
+                    Tokens.run(conf) complete () match {
+                      case Success(result) =>
+                        println(result)
+                        System.exit(0)
+                      case Failure(f) =>
+                        logger.error(s"Failed to run command $command", f)
+                        System.exit(1)
                     }
                 }
               case _ =>
