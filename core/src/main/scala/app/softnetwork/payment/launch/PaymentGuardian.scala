@@ -7,7 +7,12 @@ import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.api.server.GrpcService
 import app.softnetwork.payment.PaymentCoreBuildInfo
-import app.softnetwork.payment.api.{PaymentGrpcService, PaymentServer}
+import app.softnetwork.payment.api.{
+  ClientGrpcService,
+  ClientServer,
+  PaymentGrpcService,
+  PaymentServer
+}
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.persistence.data.paymentKvDao
@@ -71,9 +76,12 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
 
   def paymentServer: ActorSystem[_] => PaymentServer = system => PaymentServer(system)
 
+  def clientServer: ActorSystem[_] => ClientServer = system => ClientServer(system)
+
   def paymentGrpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
     Seq(
-      new PaymentGrpcService(paymentServer(system), softPaymentAccountDao)
+      new PaymentGrpcService(paymentServer(system), softPaymentAccountDao),
+      new ClientGrpcService(clientServer(system))
     )
 
   def registerProvidersAccount: ActorSystem[_] => Unit = system => {

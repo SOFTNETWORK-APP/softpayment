@@ -9,11 +9,12 @@ import app.softnetwork.payment.handlers.{
 }
 import org.slf4j.{Logger, LoggerFactory}
 
-trait MockPaymentServer extends PaymentServer with MockPaymentHandler
+trait MockClientServer extends ClientServer with MockPaymentHandler
 
-object MockPaymentServer {
-  def apply(sys: ActorSystem[_]): MockPaymentServer = {
-    new MockPaymentServer {
+object MockClientServer {
+  def apply(sys: ActorSystem[_]): MockClientServer = {
+    new MockClientServer {
+      override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
       lazy val log: Logger = LoggerFactory getLogger getClass.getName
       override implicit val system: ActorSystem[_] = sys
     }

@@ -6,7 +6,13 @@ import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.account.persistence.query.AccountEventProcessorStreams.InternalAccountEvents2AccountProcessorStream
 import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.notification.scalatest.AllNotificationsTestKit
-import app.softnetwork.payment.api.{MockPaymentServer, PaymentClientTestKit, PaymentServer}
+import app.softnetwork.payment.api.{
+  ClientServer,
+  MockClientServer,
+  MockPaymentServer,
+  PaymentClientTestKit,
+  PaymentServer
+}
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.{
   MockPaymentHandler,
@@ -60,6 +66,8 @@ trait PaymentTestKit
     MockSoftPaymentAccountBehavior
 
   override def paymentServer: ActorSystem[_] => PaymentServer = system => MockPaymentServer(system)
+
+  override def clientServer: ActorSystem[_] => ClientServer = system => MockClientServer(system)
 
   def loadApiKey(clientId: String): Future[Option[ApiKey]] =
     MockPaymentBehavior.softPaymentAccountDao.loadApiKey(clientId)

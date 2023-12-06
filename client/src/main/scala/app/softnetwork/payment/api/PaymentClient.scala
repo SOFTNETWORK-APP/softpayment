@@ -273,37 +273,6 @@ trait PaymentClient extends GrpcClient {
     )
   }
 
-  def generateClientTokens(
-    clientId: String,
-    clientSecret: String,
-    scope: Option[String] = None
-  ): Future[Option[Tokens]] = {
-    grpcClient
-      .generateClientTokens()
-      .invoke(
-        GenerateClientTokensRequest(clientId, clientSecret, scope)
-      ) map (response =>
-      response.clientTokens match {
-        case r: ClientTokensResponse.ClientTokens.Tokens =>
-          r.tokens
-        case _ => None
-      }
-    )
-  }
-
-  def refreshClientTokens(refreshToken: String): Future[Option[Tokens]] = {
-    grpcClient
-      .refreshClientTokens()
-      .invoke(
-        RefreshClientTokensRequest(refreshToken)
-      ) map (response =>
-      response.clientTokens match {
-        case r: ClientTokensResponse.ClientTokens.Tokens =>
-          r.tokens
-        case _ => None
-      }
-    )
-  }
 }
 
 object PaymentClient extends GrpcClientFactory[PaymentClient] {
