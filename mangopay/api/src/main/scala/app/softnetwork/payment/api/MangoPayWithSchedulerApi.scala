@@ -1,18 +1,16 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import app.softnetwork.api.server.GrpcService
 import app.softnetwork.persistence.jdbc.query.{JdbcJournalProvider, JdbcOffsetProvider}
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
 import app.softnetwork.persistence.schema.SchemaProvider
-import app.softnetwork.scheduler.api.{SchedulerApi, SchedulerServiceApiHandler}
+import app.softnetwork.scheduler.api.SchedulerApi
 import app.softnetwork.scheduler.handlers.SchedulerHandler
 import app.softnetwork.scheduler.persistence.query.Entity2SchedulerProcessorStream
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import com.typesafe.config.Config
-
-import scala.concurrent.Future
 
 trait MangoPayWithSchedulerApi[SD <: SessionData with SessionDataDecorator[SD]]
     extends MangoPayApi[SD]
@@ -39,9 +37,6 @@ trait MangoPayWithSchedulerApi[SD <: SessionData with SessionDataDecorator[SD]]
     initSchedulerSystem(system)
   }*/
 
-  override def grpcServices
-    : ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] = system =>
-    Seq(
-      PaymentServiceApiHandler.partial(PaymentServer(system))(system)
-    ) :+ SchedulerServiceApiHandler.partial(schedulerServer(system))(system)
+  override def grpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
+    paymentGrpcServices(system) ++ schedulerGrpcServices(system)
 }

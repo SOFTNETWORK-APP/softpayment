@@ -3398,7 +3398,11 @@ trait PaymentBehavior
     state: Option[PaymentAccount],
     user: PaymentAccount.User,
     clientId: Option[String]
-  )(implicit system: ActorSystem[_], log: Logger, paymentClientSettings: PaymentClientSettings): Option[PaymentAccount] = {
+  )(implicit
+    system: ActorSystem[_],
+    log: Logger,
+    paymentClientSettings: PaymentClientSettings
+  ): Option[PaymentAccount] = {
     val pa = PaymentAccount.defaultInstance.withUser(user).copy(clientId = clientId)
     val uuid = pa.externalUuidWithProfile
     state match {
