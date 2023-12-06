@@ -6,6 +6,7 @@ import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.account.persistence.query.AccountEventProcessorStreams.InternalAccountEvents2AccountProcessorStream
 import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.notification.scalatest.AllNotificationsTestKit
+import app.softnetwork.payment.api.{MockPaymentServer, PaymentClientTestKit, PaymentServer}
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.{
   MockPaymentHandler,
@@ -14,20 +15,16 @@ import app.softnetwork.payment.handlers.{
   SoftPaymentAccountDao
 }
 import app.softnetwork.payment.launch.PaymentGuardian
-import app.softnetwork.payment.message.PaymentMessages.{
-  KycDocumentStatusNotUpdated,
-  UboDeclarationStatusUpdated,
-  _
-}
+import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.persistence.query.{
-  GenericPaymentCommandProcessorStream,
+  PaymentCommandProcessorStream,
   Scheduler2PaymentProcessorStream
 }
 import app.softnetwork.payment.persistence.typed.{
-  GenericPaymentBehavior,
   MockPaymentBehavior,
-  MockSoftPaymentAccountBehavior
+  MockSoftPaymentAccountBehavior,
+  PaymentBehavior
 }
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.{
@@ -37,13 +34,18 @@ import app.softnetwork.persistence.query.{
 }
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.scheduler.scalatest.SchedulerTestKit
+import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.Suite
 import org.slf4j.{Logger, LoggerFactory}
 import org.softnetwork.session.model.ApiKey
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotificationsTestKit {
+trait PaymentTestKit
+    extends SchedulerTestKit
+    with PaymentGuardian
+    with AllNotificationsTestKit
+    with PaymentClientTestKit {
   _: Suite =>
 
   /** @return
@@ -51,26 +53,41 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian with AllNotif
     */
   override def roles: Seq[String] = super.roles :+ AkkaNodeRole :+ AccountSettings.AkkaNodeRole
 
-  override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
-    MockPaymentBehavior
+  override def paymentBehavior: ActorSystem[_] => PaymentBehavior = _ => MockPaymentBehavior
 
   override def accountBehavior
     : ActorSystem[_] => AccountBehavior[SoftPaymentAccount, BasicAccountProfile] = _ =>
     MockSoftPaymentAccountBehavior
 
+  override def paymentServer: ActorSystem[_] => PaymentServer = system => MockPaymentServer(system)
+
   def loadApiKey(clientId: String): Future[Option[ApiKey]] =
     MockPaymentBehavior.softPaymentAccountDao.loadApiKey(clientId)
 
-  override def paymentCommandProcessorStream
-    : ActorSystem[_] => GenericPaymentCommandProcessorStream = sys =>
-    new GenericPaymentCommandProcessorStream
-      with MockPaymentHandler
-      with InMemoryJournalProvider
-      with InMemoryOffsetProvider {
-      lazy val log: Logger = LoggerFactory getLogger getClass.getName
-      override val forTests: Boolean = true
-      override implicit def system: ActorSystem[_] = sys
-    }
+  def clientId: String = settings.clientId
+
+  override lazy val config: Config = akkaConfig
+    .withFallback(ConfigFactory.load("softnetwork-in-memory-persistence.conf"))
+    .withFallback(
+      ConfigFactory.parseString(
+        s"""
+         |payment.client-id = "$clientId"
+         |payment.api-key = "${settings.apiKey}"
+         |""".stripMargin
+      )
+    )
+    .withFallback(ConfigFactory.load())
+
+  override def paymentCommandProcessorStream: ActorSystem[_] => PaymentCommandProcessorStream =
+    sys =>
+      new PaymentCommandProcessorStream
+        with MockPaymentHandler
+        with InMemoryJournalProvider
+        with InMemoryOffsetProvider {
+        lazy val log: Logger = LoggerFactory getLogger getClass.getName
+        override val forTests: Boolean = true
+        override implicit def system: ActorSystem[_] = sys
+      }
 
   override def scheduler2PaymentProcessorStream
     : ActorSystem[_] => Scheduler2PaymentProcessorStream = sys =>

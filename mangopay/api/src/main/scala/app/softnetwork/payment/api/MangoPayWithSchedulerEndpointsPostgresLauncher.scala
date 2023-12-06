@@ -2,7 +2,7 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
-import app.softnetwork.payment.service.{GenericPaymentEndpoints, MangoPayPaymentEndpoints}
+import app.softnetwork.payment.service.{MangoPayPaymentServiceEndpoints, PaymentServiceEndpoints}
 import app.softnetwork.persistence.jdbc.schema.{JdbcSchemaProvider, JdbcSchemaTypes}
 import app.softnetwork.persistence.schema.SchemaType
 import app.softnetwork.session.CsrfCheckHeader
@@ -31,8 +31,8 @@ object MangoPayWithSchedulerEndpointsPostgresLauncher
 
   override protected def manager: SessionManager[JwtClaims] = SessionManagers.jwt
 
-  override def paymentEndpoints: ActorSystem[_] => GenericPaymentEndpoints[JwtClaims] = sys =>
-    new MangoPayPaymentEndpoints[JwtClaims] with JwtClaimsSessionMaterials {
+  override def paymentEndpoints: ActorSystem[_] => PaymentServiceEndpoints[JwtClaims] = sys =>
+    new MangoPayPaymentServiceEndpoints[JwtClaims] with JwtClaimsSessionMaterials {
       override implicit def system: ActorSystem[_] = sys
       override implicit lazy val ec: ExecutionContext = sys.executionContext
       override implicit def sessionConfig: SessionConfig = self.sessionConfig

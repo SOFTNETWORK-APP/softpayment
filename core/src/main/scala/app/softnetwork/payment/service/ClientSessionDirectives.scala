@@ -42,7 +42,7 @@ trait ClientSessionDirectives[SD <: SessionData with SessionDataDecorator[SD]]
 
   @InternalApi
   private[payment] def oauthClient: Credentials => Future[Option[SoftPaymentAccount.Client]] = {
-    case _ @Credentials.Provided(token) => toClient(Some(token))
+    case _ @Credentials.Provided(token) => softPaymentAccountDao.authenticateClient(Some(token))
     case _                              => Future.successful(None)
   }
 

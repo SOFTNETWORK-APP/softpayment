@@ -1,7 +1,7 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.service.{GenericPaymentService, MangoPayPaymentService}
+import app.softnetwork.payment.service.{MangoPayPaymentService, PaymentService}
 import app.softnetwork.persistence.jdbc.schema.{JdbcSchemaProvider, JdbcSchemaTypes}
 import app.softnetwork.persistence.schema.SchemaType
 import app.softnetwork.session.CsrfCheckHeader
@@ -29,7 +29,7 @@ object MangoPayRoutesPostgresLauncher
 
   override protected def manager: SessionManager[JwtClaims] = SessionManagers.jwt
 
-  override def paymentService: ActorSystem[_] => GenericPaymentService[JwtClaims] = sys =>
+  override def paymentService: ActorSystem[_] => PaymentService[JwtClaims] = sys =>
     new MangoPayPaymentService[JwtClaims] with JwtClaimsSessionMaterials {
       override implicit def system: ActorSystem[_] = sys
       override implicit lazy val ec: ExecutionContext = sys.executionContext

@@ -1,7 +1,7 @@
 package app.softnetwork.payment.handlers
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.api.{PaymentClient, PaymentGrpcServer}
+import app.softnetwork.payment.api.{PaymentClient, PaymentGrpcServerTestKit}
 import app.softnetwork.payment.data._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.PaymentAccount.User
@@ -22,7 +22,7 @@ class PaymentHandlerSpec
     extends MockPaymentHandler
     with AnyWordSpecLike
     with PaymentTestKit
-    with PaymentGrpcServer {
+    with PaymentGrpcServerTestKit {
 
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
@@ -38,7 +38,8 @@ class PaymentHandlerSpec
       !?(
         PreRegisterCard(
           orderUuid,
-          naturalUser.withProfile("customer")
+          naturalUser.withProfile("customer"),
+          clientId = Some(clientId)
         )
       ) await {
         case cardPreRegistered: CardPreRegistered =>
@@ -158,7 +159,8 @@ class PaymentHandlerSpec
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           BankAccount(None, ownerName, ownerAddress, iban, ""),
-          Some(User.NaturalUser(naturalUser.withExternalUuid(sellerUuid).withProfile("seller")))
+          Some(User.NaturalUser(naturalUser.withExternalUuid(sellerUuid).withProfile("seller"))),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -204,7 +206,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -250,7 +253,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -277,7 +281,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -308,7 +313,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await { case r: BankAccountCreatedOrUpdated =>
         assert(!r.kycUpdated && !r.documentsUpdated && r.userUpdated)
@@ -335,7 +341,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await { case r: BankAccountCreatedOrUpdated =>
         assert(!r.kycUpdated && !r.documentsUpdated && r.userUpdated)
@@ -415,7 +422,8 @@ class PaymentHandlerSpec
               legalUser.withLegalRepresentative(legalUser.legalRepresentative.withProfile("seller"))
             )
           ),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -465,7 +473,8 @@ class PaymentHandlerSpec
                 )
             )
           ),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -541,7 +550,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -590,7 +600,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -605,7 +616,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount.withBic(""),
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -624,7 +636,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -969,7 +982,8 @@ class PaymentHandlerSpec
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
           BankAccount(None, ownerName, ownerAddress, iban, bic),
-          Some(User.NaturalUser(naturalUser.withExternalUuid(vendorUuid).withProfile("vendor")))
+          Some(User.NaturalUser(naturalUser.withExternalUuid(vendorUuid).withProfile("vendor"))),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>

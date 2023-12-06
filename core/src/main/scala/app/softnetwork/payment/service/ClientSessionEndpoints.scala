@@ -89,7 +89,7 @@ trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
       )
       .out(partial.securityOutput)
       .serverSecurityLogicWithOutput { inputs =>
-        toClient(inputs.head) flatMap { client =>
+        softPaymentAccountDao.authenticateClient(inputs.head) flatMap { client =>
           implicit val manager: SessionManager[SD] = clientSessionManager(client)
           sessionType match {
             case Session.SessionType.OneOffCookie | Session.SessionType.OneOffHeader => // oneOff

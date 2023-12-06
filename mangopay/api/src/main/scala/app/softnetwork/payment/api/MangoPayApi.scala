@@ -1,32 +1,19 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import app.softnetwork.account.config.AccountSettings
-import app.softnetwork.account.handlers.AccountDao
-import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.account.persistence.query.AccountEventProcessorStreams.InternalAccountEvents2AccountProcessorStream
-import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.api.server.SwaggerEndpoint
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.payment.handlers.{
-  MangoPayPaymentHandler,
-  SoftPaymentAccountDao,
-  SoftPaymentAccountTypeKey
-}
+import app.softnetwork.payment.handlers.{PaymentHandler, SoftPaymentAccountTypeKey}
 import app.softnetwork.payment.launch.PaymentApplication
-import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.persistence.query.{
-  GenericPaymentCommandProcessorStream,
+  PaymentCommandProcessorStream,
   Scheduler2PaymentProcessorStream
 }
-import app.softnetwork.payment.persistence.typed.{
-  GenericPaymentBehavior,
-  MangoPayPaymentBehavior,
-  SoftPaymentAccountBehavior
-}
+import app.softnetwork.payment.persistence.typed.{PaymentBehavior, SoftPaymentAccountBehavior}
 import app.softnetwork.payment.service.{
-  MangoPayPaymentEndpoints,
+  MangoPayPaymentServiceEndpoints,
   SoftPaymentAccountServiceEndpoints,
   SoftPaymentOAuthServiceEndpoints
 }
@@ -48,17 +35,10 @@ import org.slf4j.{Logger, LoggerFactory}
 import org.softnetwork.session.model.Session
 import sttp.tapir.swagger.SwaggerUIOptions
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 trait MangoPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends PaymentApplication {
   self: SchemaProvider with CsrfCheck =>
-
-  override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
-    MangoPayPaymentBehavior
-
-  override def accountBehavior
-    : ActorSystem[_] => AccountBehavior[SoftPaymentAccount, BasicAccountProfile] = _ =>
-    SoftPaymentAccountBehavior
 
   override def internalAccountEvents2AccountProcessorStream
     : ActorSystem[_] => InternalAccountEvents2AccountProcessorStream = sys =>
@@ -71,33 +51,26 @@ trait MangoPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends Payme
       override implicit def system: ActorSystem[_] = sys
     }
 
-  override def paymentCommandProcessorStream
-    : ActorSystem[_] => GenericPaymentCommandProcessorStream = sys =>
-    new GenericPaymentCommandProcessorStream
-      with MangoPayPaymentHandler
-      with JdbcJournalProvider
-      with JdbcOffsetProvider {
-      override def config: Config = MangoPayApi.this.config
-      override implicit def system: ActorSystem[_] = sys
-    }
+  override def paymentCommandProcessorStream: ActorSystem[_] => PaymentCommandProcessorStream =
+    sys =>
+      new PaymentCommandProcessorStream
+        with PaymentHandler
+        with JdbcJournalProvider
+        with JdbcOffsetProvider {
+        override def config: Config = MangoPayApi.this.config
+        override implicit def system: ActorSystem[_] = sys
+      }
 
   override def scheduler2PaymentProcessorStream
     : ActorSystem[_] => Scheduler2PaymentProcessorStream = sys =>
     new Scheduler2PaymentProcessorStream
-      with MangoPayPaymentHandler
+      with PaymentHandler
       with JdbcJournalProvider
       with JdbcOffsetProvider {
       override def config: Config = MangoPayApi.this.config
-      override val tag: String = SchedulerSettings.tag(MangoPayPaymentBehavior.persistenceId)
+      override val tag: String = SchedulerSettings.tag(PaymentBehavior.persistenceId)
       override implicit def system: ActorSystem[_] = sys
     }
-
-  override def grpcServices
-    : ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] =
-    system =>
-      Seq(
-        PaymentServiceApiHandler.partial(MangoPayServer(system))(system)
-      )
 
   implicit def sessionConfig: SessionConfig = Settings.Session.DefaultSessionConfig
 
@@ -111,7 +84,7 @@ trait MangoPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends Payme
     Settings.Session.SessionContinuityAndTransport
 
   def paymentSwagger: ActorSystem[_] => SwaggerEndpoint = sys =>
-    new MangoPayPaymentEndpoints[SD] with SwaggerEndpoint with SessionMaterials[SD] {
+    new MangoPayPaymentServiceEndpoints[SD] with SwaggerEndpoint with SessionMaterials[SD] {
       override implicit def manager(implicit
         sessionConfig: SessionConfig,
         companion: SessionDataCompanion[SD]

@@ -4,7 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.{Directives, Route}
 import app.softnetwork.api.server.DefaultComplete
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.serialization._
 import app.softnetwork.payment.config.PaymentSettings
@@ -32,7 +32,7 @@ import java.io.ByteArrayOutputStream
 import scala.concurrent.Await
 import scala.language.implicitConversions
 
-trait GenericPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
+trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     extends Directives
     with DefaultComplete
     with Json4sSupport
@@ -40,7 +40,7 @@ trait GenericPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     with BasicPaymentService
     with ServiceWithSessionDirectives[PaymentCommand, PaymentResult, SD]
     with ClientSessionDirectives[SD]
-    with ApiRoute { _: GenericPaymentHandler with SessionMaterials[SD] =>
+    with ApiRoute { _: PaymentHandler with SessionMaterials[SD] =>
 
   implicit def serialization: Serialization.type = jackson.Serialization
 

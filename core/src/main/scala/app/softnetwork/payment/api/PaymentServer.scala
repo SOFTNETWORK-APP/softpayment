@@ -1,7 +1,7 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.handlers.{GenericPaymentHandler, SoftPaymentAccountDao}
+import app.softnetwork.payment.handlers.{PaymentHandler, SoftPaymentAccountDao}
 import app.softnetwork.payment.message.PaymentMessages.{
   BankAccountLoaded,
   CancelMandate,
@@ -23,7 +23,6 @@ import app.softnetwork.payment.message.PaymentMessages.{
   PaymentAccountCreated,
   PaymentAccountLoaded,
   PaymentAccountUpdated,
-  PaymentCommand,
   PaymentError,
   PreAuthorizationCanceled,
   RecurringPaymentRegistered,
@@ -37,13 +36,12 @@ import app.softnetwork.payment.message.PaymentMessages.{
 }
 import app.softnetwork.payment.model.RecurringPayment
 import app.softnetwork.payment.serialization._
-import app.softnetwork.persistence.typed.CommandTypeKey
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.implicitConversions
 
-trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
-  _: CommandTypeKey[PaymentCommand] =>
+trait PaymentServer extends PaymentServiceApi with PaymentHandler {
   implicit def system: ActorSystem[_]
 
   implicit lazy val ec: ExecutionContextExecutor = system.executionContext
@@ -382,6 +380,15 @@ trait PaymentServer extends PaymentServiceApi with GenericPaymentHandler {
           )
         )
       case _ => ClientTokensResponse.defaultInstance.withError("unknown")
+    }
+  }
+}
+
+object PaymentServer {
+  def apply(sys: ActorSystem[_]): PaymentServer = {
+    new PaymentServer {
+      lazy val log: Logger = LoggerFactory getLogger getClass.getName
+      override implicit val system: ActorSystem[_] = sys
     }
   }
 }

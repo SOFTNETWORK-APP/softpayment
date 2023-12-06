@@ -10,8 +10,8 @@ import app.softnetwork.account.service.{AccountService, OAuthService}
 import app.softnetwork.api.server.ApiRoute
 import app.softnetwork.payment.launch.PaymentRoutes
 import app.softnetwork.payment.service.{
-  GenericPaymentService,
   MangoPayPaymentService,
+  PaymentService,
   SoftPaymentAccountService,
   SoftPaymentOAuthService
 }
@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext
 trait MangoPayRoutes[SD <: SessionData with SessionDataDecorator[SD]] extends PaymentRoutes[SD] {
   self: MangoPayApi[SD] with SchemaProvider with CsrfCheck =>
 
-  override def paymentService: ActorSystem[_] => GenericPaymentService[SD] = sys =>
+  override def paymentService: ActorSystem[_] => PaymentService[SD] = sys =>
     new MangoPayPaymentService[SD] with SessionMaterials[SD] {
       override implicit def manager(implicit
         sessionConfig: SessionConfig,

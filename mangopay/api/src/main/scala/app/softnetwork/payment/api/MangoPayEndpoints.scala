@@ -6,8 +6,8 @@ import app.softnetwork.account.service.{AccountServiceEndpoints, OAuthServiceEnd
 import app.softnetwork.api.server.Endpoint
 import app.softnetwork.payment.launch.PaymentEndpoints
 import app.softnetwork.payment.service.{
-  GenericPaymentEndpoints,
-  MangoPayPaymentEndpoints,
+  MangoPayPaymentServiceEndpoints,
+  PaymentServiceEndpoints,
   SoftPaymentAccountServiceEndpoints,
   SoftPaymentOAuthServiceEndpoints
 }
@@ -24,8 +24,8 @@ trait MangoPayEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     extends PaymentEndpoints[SD] {
   self: MangoPayApi[SD] with SchemaProvider with CsrfCheck =>
 
-  override def paymentEndpoints: ActorSystem[_] => GenericPaymentEndpoints[SD] = sys =>
-    new MangoPayPaymentEndpoints[SD] with SessionMaterials[SD] {
+  override def paymentEndpoints: ActorSystem[_] => PaymentServiceEndpoints[SD] = sys =>
+    new MangoPayPaymentServiceEndpoints[SD] with SessionMaterials[SD] {
       override def log: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(getClass)
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext

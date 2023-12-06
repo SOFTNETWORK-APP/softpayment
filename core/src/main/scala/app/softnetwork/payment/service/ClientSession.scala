@@ -5,7 +5,7 @@ import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import app.softnetwork.payment.model.{computeExternalUuidWithProfile, SoftPaymentAccount}
 import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
-import org.softnetwork.session.model.{ApiKey, JwtClaims}
+import org.softnetwork.session.model.ApiKey
 import com.softwaremill.session._
 
 import scala.concurrent.Future
@@ -85,26 +85,6 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
 
   def loadApiKey(clientId: String): Future[Option[ApiKey]] =
     softPaymentAccountDao.loadApiKey(clientId)
-
-  protected def toClient(token: Option[String]): Future[Option[SoftPaymentAccount.Client]] = {
-    token match {
-      case Some(value) =>
-        softPaymentAccountDao.oauthClient(value) flatMap {
-          case Some(client) => Future.successful(Some(client))
-          case _ =>
-            val jwt = JwtClaims(value)
-            if (jwt.iss.contains(sessionConfig.jwt.issuer.getOrElse("")) && jwt.sub.isDefined) {
-              softPaymentAccountDao.loadClient(jwt.sub.get) flatMap {
-                case Some(client) => Future.successful(Some(client))
-                case _            => Future.successful(None)
-              }
-            } else {
-              Future.successful(None)
-            }
-        }
-      case _ => Future.successful(None)
-    }
-  }
 
   protected[payment] def externalUuidWithProfile(session: SD): String =
     computeExternalUuidWithProfile(session.id, session.profile)

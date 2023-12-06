@@ -1,7 +1,7 @@
 package app.softnetwork.payment.service
 
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -15,7 +15,7 @@ import sttp.tapir.server.{PartialServerEndpointWithSecurityOutput, ServerEndpoin
 import scala.concurrent.Future
 
 trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
-  _: RootPaymentEndpoints[SD] with GenericPaymentHandler =>
+  _: RootPaymentEndpoints[SD] with PaymentHandler =>
 
   import app.softnetwork.serialization._
 

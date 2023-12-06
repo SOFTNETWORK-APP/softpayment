@@ -11,10 +11,10 @@ import app.softnetwork.api.server.ApiRoute
 import app.softnetwork.payment.handlers.{MockSoftPaymentAccountDao, SoftPaymentAccountDao}
 import app.softnetwork.payment.launch.PaymentRoutes
 import app.softnetwork.payment.service.{
-  GenericPaymentService,
   MockPaymentService,
   MockSoftPaymentAccountService,
-  MockSoftPaymentOAuthService
+  MockSoftPaymentOAuthService,
+  PaymentService
 }
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
@@ -31,7 +31,7 @@ trait PaymentRoutesTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     with SessionServiceRoutes[SD] {
   self: PaymentTestKit with SessionTestKit[SD] with SchemaProvider with SessionMaterials[SD] =>
 
-  override def paymentService: ActorSystem[_] => GenericPaymentService[SD] = sys =>
+  override def paymentService: ActorSystem[_] => PaymentService[SD] = sys =>
     new MockPaymentService[SD] with SessionMaterials[SD] {
       override implicit def manager(implicit
         sessionConfig: SessionConfig,

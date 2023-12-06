@@ -7,7 +7,7 @@ import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.api.server.{ApiEndpoints, Endpoint}
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.serialization.paymentFormats
-import app.softnetwork.payment.service.GenericPaymentEndpoints
+import app.softnetwork.payment.service.PaymentServiceEndpoints
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.CsrfCheck
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -24,7 +24,7 @@ trait PaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   override implicit def formats: Formats = paymentFormats
 
-  def paymentEndpoints: ActorSystem[_] => GenericPaymentEndpoints[SD]
+  def paymentEndpoints: ActorSystem[_] => PaymentServiceEndpoints[SD]
 
   override def endpoints: ActorSystem[_] => List[Endpoint] =
     system =>

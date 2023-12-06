@@ -42,6 +42,6 @@ trait MangoPayWithSchedulerApi[SD <: SessionData with SessionDataDecorator[SD]]
   override def grpcServices
     : ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] = system =>
     Seq(
-      PaymentServiceApiHandler.partial(MangoPayServer(system))(system)
+      PaymentServiceApiHandler.partial(PaymentServer(system))(system)
     ) :+ SchedulerServiceApiHandler.partial(schedulerServer(system))(system)
 }

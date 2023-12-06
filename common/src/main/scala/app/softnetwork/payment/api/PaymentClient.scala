@@ -23,14 +23,18 @@ trait PaymentClient extends GrpcClient {
     )
 
   @InternalApi
+  private[payment] def paymentClientSettings: PaymentClientSettings = PaymentClientSettings(system)
+
+  @InternalApi
+  private[payment] lazy val generatedToken: String =
+    paymentClientSettings.generateToken()
+
+  @InternalApi
   private[payment] def withAuthorization[Req, Res](
     single: SingleResponseRequestBuilder[Req, Res],
     token: Option[String]
   ): SingleResponseRequestBuilder[Req, Res] = {
-    token match {
-      case Some(t) => single.addHeader("Authorization", s"Bearer $t")
-      case _       => single
-    }
+    oauth2(single, token.getOrElse(generatedToken))
   }
 
   def createOrUpdatePaymentAccount(
@@ -42,7 +46,9 @@ trait PaymentClient extends GrpcClient {
       token
     )
       .invoke(
-        CreateOrUpdatePaymentAccountRequest(Some(paymentAccount))
+        CreateOrUpdatePaymentAccountRequest(
+          Some(paymentAccount.withClientId(paymentClientSettings.clientId))
+        )
       ) map (_.succeeded)
   }
 

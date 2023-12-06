@@ -15,7 +15,9 @@ import app.softnetwork.payment.message.AccountMessages
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.persistence.typed.SoftPaymentAccountBehavior
 import app.softnetwork.persistence.typed.CommandTypeKey
-import org.softnetwork.session.model.ApiKey
+import app.softnetwork.session.model.JwtClaimsEncoder
+import com.softwaremill.session.SessionConfig
+import org.softnetwork.session.model.{ApiKey, JwtClaims}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -110,6 +112,48 @@ trait SoftPaymentAccountDao extends AccountDao { _: AccountHandler =>
     }
   }
 
+  def authenticateClient(
+    token: Option[String]
+  )(implicit system: ActorSystem[_]): Future[Option[SoftPaymentAccount.Client]] = {
+    token match {
+      case Some(value) =>
+        implicit val ec: ExecutionContext = system.executionContext
+        oauthClient(value) flatMap {
+          case Some(client) => Future.successful(Some(client))
+          case _ =>
+            val t = JwtClaims(value)
+            t.clientId match {
+              case Some(clientId) =>
+                loadApiKey(clientId) flatMap {
+                  case Some(apiKey) if apiKey.clientSecret.isDefined =>
+                    val config = SessionConfig.default(apiKey.getClientSecret)
+                    JwtClaimsEncoder
+                      .decode(
+                        value,
+                        config.copy(jwt =
+                          config.jwt.copy(
+                            issuer = t.issuer.orElse(config.jwt.issuer),
+                            subject = t.subject.orElse(config.jwt.subject),
+                            audience = t.aud.orElse(config.jwt.audience)
+                          )
+                        )
+                      )
+                      .toOption match {
+                      case Some(result) if result.signatureMatches =>
+                        loadClient(clientId) flatMap {
+                          case Some(client) => Future.successful(Some(client))
+                          case _            => Future.successful(None)
+                        }
+                      case _ => Future.successful(None)
+                    }
+                  case _ => Future.successful(None)
+                }
+              case _ => Future.successful(None)
+            }
+        }
+      case _ => Future.successful(None)
+    }
+  }
 }
 
 trait SoftPaymentAccountTypeKey extends CommandTypeKey[AccountCommand] {

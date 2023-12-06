@@ -7,10 +7,10 @@ import app.softnetwork.api.server.Endpoint
 import app.softnetwork.payment.handlers.{MockSoftPaymentAccountDao, SoftPaymentAccountDao}
 import app.softnetwork.payment.launch.PaymentEndpoints
 import app.softnetwork.payment.service.{
-  GenericPaymentEndpoints,
-  MockPaymentEndpoints,
+  MockPaymentServiceEndpoints,
   MockSoftPaymentAccountServiceEndpoints,
-  MockSoftPaymentOAuthServiceEndpoints
+  MockSoftPaymentOAuthServiceEndpoints,
+  PaymentServiceEndpoints
 }
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.scalatest.{SessionEndpointsRoutes, SessionTestKit}
@@ -34,8 +34,8 @@ trait PaymentEndpointsTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   implicit def sessionConfig: SessionConfig
 
-  override def paymentEndpoints: ActorSystem[_] => GenericPaymentEndpoints[SD] = sys =>
-    new MockPaymentEndpoints[SD] with SessionMaterials[SD] {
+  override def paymentEndpoints: ActorSystem[_] => PaymentServiceEndpoints[SD] = sys =>
+    new MockPaymentServiceEndpoints[SD] with SessionMaterials[SD] {
       override implicit def manager(implicit
         sessionConfig: SessionConfig,
         companion: SessionDataCompanion[SD]

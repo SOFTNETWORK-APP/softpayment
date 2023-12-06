@@ -3,7 +3,7 @@ package app.softnetwork.payment.persistence.query
 import akka.Done
 import akka.actor.typed.eventstream.EventStream.Publish
 import akka.persistence.typed.PersistenceId
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentEvents._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.config.PaymentSettings
@@ -11,8 +11,8 @@ import app.softnetwork.persistence.query.{EventProcessorStream, JournalProvider,
 
 import scala.concurrent.Future
 
-trait GenericPaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWithCommand] {
-  _: JournalProvider with OffsetProvider with GenericPaymentHandler =>
+trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWithCommand] {
+  _: JournalProvider with OffsetProvider with PaymentHandler =>
 
   override lazy val tag: String = PaymentSettings.ExternalToPaymentAccountTag
 

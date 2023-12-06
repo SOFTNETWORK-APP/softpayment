@@ -2,7 +2,7 @@ package app.softnetwork.payment.service
 
 import app.softnetwork.api.server.ApiErrors
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.{KycDocument, KycDocumentValidationReport}
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -15,7 +15,7 @@ import sttp.tapir.server.ServerEndpoint
 import scala.concurrent.Future
 
 trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
-  _: RootPaymentEndpoints[SD] with GenericPaymentHandler =>
+  _: RootPaymentEndpoints[SD] with PaymentHandler =>
 
   import app.softnetwork.serialization._
 

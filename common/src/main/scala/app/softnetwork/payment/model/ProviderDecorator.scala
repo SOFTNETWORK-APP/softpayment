@@ -10,7 +10,7 @@ trait ProviderDecorator { self: SoftPaymentAccount.Client.Provider =>
     PaymentProviders.paymentProvider(self).client match {
       case Some(value) => value.withClientApiKey(sha256(self.providerApiKey))
       case _ =>
-        throw new Exception(s"PaymentProvider not found for providerType: ${providerType}")
+        throw new Exception(s"PaymentProvider not found for providerType: $providerType")
     }
   }
 

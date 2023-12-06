@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, Multipart, StatusCodes}
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.api.server.config.ServerSettings.RootPath
-import app.softnetwork.payment.api.PaymentGrpcServices
+import app.softnetwork.payment.api.PaymentGrpcServicesTestKit
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -18,7 +18,7 @@ import java.nio.file.Paths
 trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     extends SessionTestKit[SD]
     with PaymentTestKit
-    with PaymentGrpcServices {
+    with PaymentGrpcServicesTestKit {
   _: Suite with ApiRoutes with SessionMaterials[SD] =>
 
   import app.softnetwork.serialization._

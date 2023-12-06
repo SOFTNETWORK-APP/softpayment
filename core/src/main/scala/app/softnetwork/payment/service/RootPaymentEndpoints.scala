@@ -3,7 +3,7 @@ package app.softnetwork.payment.service
 import akka.actor.typed.ActorSystem
 import app.softnetwork.api.server.ApiErrors
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.serialization.paymentFormats
@@ -22,7 +22,7 @@ trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     extends BasicPaymentService
     with ServiceWithSessionEndpoints[PaymentCommand, PaymentResult, SD]
     with ClientSessionEndpoints[SD] {
-  _: GenericPaymentHandler with SessionMaterials[SD] =>
+  _: PaymentHandler with SessionMaterials[SD] =>
 
   override implicit def formats: Formats = paymentFormats
 

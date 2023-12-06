@@ -1,7 +1,7 @@
 package app.softnetwork.payment.persistence.query
 
 import akka.actor.typed.eventstream.EventStream.Publish
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
   PaymentCommand,
   PaymentResult,
@@ -16,7 +16,7 @@ import scala.concurrent.Future
 
 trait Scheduler2PaymentProcessorStream
     extends Scheduler2EntityProcessorStream[PaymentCommand, PaymentResult] {
-  _: GenericPaymentHandler with JournalProvider with OffsetProvider =>
+  _: PaymentHandler with JournalProvider with OffsetProvider =>
 
   /** @param schedule
     *   - the schedule to trigger

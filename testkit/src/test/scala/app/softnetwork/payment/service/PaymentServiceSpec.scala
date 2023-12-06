@@ -9,7 +9,6 @@ import app.softnetwork.payment.data._
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
-import app.softnetwork.payment.persistence.typed.MockPaymentBehavior
 import app.softnetwork.payment.scalatest.PaymentRouteTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
@@ -33,8 +32,6 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
   import app.softnetwork.serialization._
 
   lazy val paymentClient: PaymentClient = PaymentClient(ts)
-
-  def clientId: String = MockPaymentBehavior.defaultProvider.clientId
 
   lazy val customerSession: SD with SessionDataDecorator[SD] =
     companion.newSession.withId(customerUuid).withProfile(Some("customer")).withClientId(clientId)

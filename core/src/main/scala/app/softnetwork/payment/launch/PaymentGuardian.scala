@@ -4,15 +4,18 @@ import akka.actor.typed.ActorSystem
 import app.softnetwork.account.handlers.AccountDao
 import app.softnetwork.account.launch.AccountGuardian
 import app.softnetwork.account.model.BasicAccountProfile
+import app.softnetwork.account.persistence.typed.AccountBehavior
+import app.softnetwork.api.server.GrpcService
 import app.softnetwork.payment.PaymentCoreBuildInfo
+import app.softnetwork.payment.api.{PaymentGrpcService, PaymentServer}
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.persistence.data.paymentKvDao
 import app.softnetwork.payment.persistence.query.{
-  GenericPaymentCommandProcessorStream,
+  PaymentCommandProcessorStream,
   Scheduler2PaymentProcessorStream
 }
-import app.softnetwork.payment.persistence.typed.GenericPaymentBehavior
+import app.softnetwork.payment.persistence.typed.{PaymentBehavior, SoftPaymentAccountBehavior}
 import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
@@ -27,11 +30,15 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
 
   import app.softnetwork.persistence.launch.PersistenceGuardian._
 
-  def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior
+  def paymentBehavior: ActorSystem[_] => PaymentBehavior = _ => PaymentBehavior
+
+  override def accountBehavior
+    : ActorSystem[_] => AccountBehavior[SoftPaymentAccount, BasicAccountProfile] = _ =>
+    SoftPaymentAccountBehavior
 
   def paymentEntities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
     Seq(
-      paymentAccountBehavior(sys)
+      paymentBehavior(sys)
     )
 
   /** initialize all entities
@@ -43,7 +50,7 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
     */
   override def singletons: ActorSystem[_] => Seq[Singleton[_]] = _ => Seq(paymentKvDao)
 
-  def paymentCommandProcessorStream: ActorSystem[_] => GenericPaymentCommandProcessorStream
+  def paymentCommandProcessorStream: ActorSystem[_] => PaymentCommandProcessorStream
 
   def scheduler2PaymentProcessorStream: ActorSystem[_] => Scheduler2PaymentProcessorStream
 
@@ -62,6 +69,13 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
 
   final override def accountDao: AccountDao = softPaymentAccountDao
 
+  def paymentServer: ActorSystem[_] => PaymentServer = system => PaymentServer(system)
+
+  def paymentGrpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
+    Seq(
+      new PaymentGrpcService(paymentServer(system), softPaymentAccountDao)
+    )
+
   def registerProvidersAccount: ActorSystem[_] => Unit = system => {
     PaymentProviders.defaultPaymentProviders.foreach(provider => {
       implicit val ec: ExecutionContext = system.executionContext
@@ -79,4 +93,18 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
     super.initSystem(system)
   }
 
+  override def banner: String =
+    """
+      |█████████              ██████   █████    ███████████                                                            █████
+      | ███░░░░░███            ███░░███ ░░███    ░░███░░░░░███                                                          ░░███
+      |░███    ░░░   ██████   ░███ ░░░  ███████   ░███    ░███  ██████   █████ ████ █████████████    ██████  ████████   ███████
+      |░░█████████  ███░░███ ███████   ░░░███░    ░██████████  ░░░░░███ ░░███ ░███ ░░███░░███░░███  ███░░███░░███░░███ ░░░███░
+      | ░░░░░░░░███░███ ░███░░░███░      ░███     ░███░░░░░░    ███████  ░███ ░███  ░███ ░███ ░███ ░███████  ░███ ░███   ░███
+      | ███    ░███░███ ░███  ░███       ░███ ███ ░███         ███░░███  ░███ ░███  ░███ ░███ ░███ ░███░░░   ░███ ░███   ░███ ███
+      |░░█████████ ░░██████   █████      ░░█████  █████       ░░████████ ░░███████  █████░███ █████░░██████  ████ █████  ░░█████
+      | ░░░░░░░░░   ░░░░░░   ░░░░░        ░░░░░  ░░░░░         ░░░░░░░░   ░░░░░███ ░░░░░ ░░░ ░░░░░  ░░░░░░  ░░░░ ░░░░░    ░░░░░
+      |                                                                   ███ ░███
+      |                                                                  ░░██████
+      |                                                                   ░░░░░░
+      |""".stripMargin
 }

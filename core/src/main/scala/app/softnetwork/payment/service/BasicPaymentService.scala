@@ -1,7 +1,7 @@
 package app.softnetwork.payment.service
 
 import app.softnetwork.api.server.ApiErrors
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.BrowserInfo
 import app.softnetwork.persistence.service.Service
@@ -11,7 +11,7 @@ import scala.concurrent.Future
 import scala.reflect.ClassTag
 
 trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
-  _: GenericPaymentHandler =>
+  _: PaymentHandler =>
 
   def run(command: PaymentCommandWithKey)(implicit
     tTag: ClassTag[PaymentCommand]

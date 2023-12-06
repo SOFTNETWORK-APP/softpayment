@@ -3,7 +3,7 @@ package app.softnetwork.payment.service
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import app.softnetwork.payment.config.PaymentSettings.HooksRoute
-import app.softnetwork.payment.handlers.MangoPayPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
   InvalidateRegularUser,
   KycDocumentStatusUpdated,
@@ -23,8 +23,8 @@ import app.softnetwork.session.service.SessionMaterials
 import com.mangopay.core.enumerations.EventType
 
 trait MangoPayPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
-    extends GenericPaymentService[SD]
-    with MangoPayPaymentHandler {
+    extends PaymentService[SD]
+    with PaymentHandler {
   _: SessionMaterials[SD] =>
 
   def completeWithKycDocumentUpdatedResult(

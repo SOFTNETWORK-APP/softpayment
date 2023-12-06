@@ -1,19 +1,26 @@
 package app.softnetwork.payment.handlers
 
 import akka.actor.typed.ActorSystem
+import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
 import app.softnetwork.kv.handlers.GenericKeyValueDao
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.persistence.typed.scaladsl.EntityPattern
 import app.softnetwork.payment.model._
+import app.softnetwork.payment.persistence.typed.PaymentBehavior
 import app.softnetwork.persistence._
 import app.softnetwork.persistence.typed.CommandTypeKey
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
-trait GenericPaymentHandler extends EntityPattern[PaymentCommand, PaymentResult] {
-  _: CommandTypeKey[PaymentCommand] =>
+trait PaymentTypeKey extends CommandTypeKey[PaymentCommand] {
+  override def TypeKey(implicit tTag: ClassTag[PaymentCommand]): EntityTypeKey[PaymentCommand] =
+    PaymentBehavior.TypeKey
+}
+
+trait PaymentHandler extends EntityPattern[PaymentCommand, PaymentResult] with PaymentTypeKey {
   lazy val keyValueDao: GenericKeyValueDao =
     PaymentKvDao //FIXME app.softnetwork.payment.persistence.data.paymentKvDao
 
@@ -46,7 +53,7 @@ trait GenericPaymentHandler extends EntityPattern[PaymentCommand, PaymentResult]
   }
 }
 
-trait GenericPaymentDao { _: GenericPaymentHandler =>
+trait PaymentDao { _: PaymentHandler =>
 
   protected[payment] def loadPaymentAccount(
     key: String
@@ -235,4 +242,8 @@ trait GenericPaymentDao { _: GenericPaymentHandler =>
         Left(TransferFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
+}
+
+object PaymentDao extends PaymentDao with PaymentHandler {
+  lazy val log: Logger = LoggerFactory.getLogger(getClass.getName)
 }
