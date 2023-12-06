@@ -4,14 +4,14 @@ import akka.actor.typed.ActorSystem
 import akka.grpc.GrpcClientSettings
 import akka.grpc.scaladsl.SingleResponseRequestBuilder
 import app.softnetwork.api.server.client.{GrpcClient, GrpcClientFactory}
-import app.softnetwork.payment.annotation.InternalApi
+import app.softnetwork.payment.api.config.PaymentClientSettings
+import app.softnetwork.payment.api.serialization._
 import app.softnetwork.payment.model.{
   BankAccountOwner,
   LegalUserDetails,
   PaymentAccount,
   RecurringPayment
 }
-import app.softnetwork.payment.serialization._
 
 import java.util.Date
 import scala.concurrent.Future
@@ -22,15 +22,11 @@ trait PaymentClient extends GrpcClient {
       GrpcClientSettings.fromConfig(name)
     )
 
-  @InternalApi
-  private[payment] def paymentClientSettings: PaymentClientSettings = PaymentClientSettings(system)
+  lazy val settings: PaymentClientSettings = PaymentClientSettings(system)
 
-  @InternalApi
-  private[payment] lazy val generatedToken: String =
-    paymentClientSettings.generateToken()
+  private lazy val generatedToken: String = settings.generateToken()
 
-  @InternalApi
-  private[payment] def withAuthorization[Req, Res](
+  private def withAuthorization[Req, Res](
     single: SingleResponseRequestBuilder[Req, Res],
     token: Option[String]
   ): SingleResponseRequestBuilder[Req, Res] = {
@@ -47,7 +43,7 @@ trait PaymentClient extends GrpcClient {
     )
       .invoke(
         CreateOrUpdatePaymentAccountRequest(
-          Some(paymentAccount.withClientId(paymentClientSettings.clientId))
+          Some(paymentAccount.withClientId(settings.clientId))
         )
       ) map (_.succeeded)
   }

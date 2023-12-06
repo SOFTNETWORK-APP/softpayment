@@ -1,5 +1,6 @@
 package app.softnetwork.payment.model
 
+import app.softnetwork.payment.model
 import app.softnetwork.validation.RegexValidator
 
 import scala.util.matching.Regex
@@ -16,7 +17,7 @@ trait LegalUserDecorator { self: LegalUser =>
   lazy val uboDeclarationValidated: Boolean = !uboDeclarationRequired ||
     uboDeclaration.exists(_.status.isUboDeclarationValidated)
 
-  lazy val view: LegalUserView = LegalUserView(self)
+  lazy val view: LegalUserView = model.LegalUserView(self)
 }
 
 object SiretValidator extends RegexValidator {

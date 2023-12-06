@@ -1,6 +1,7 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.payment.api.serialization._
 import app.softnetwork.payment.handlers.{PaymentHandler, SoftPaymentAccountDao}
 import app.softnetwork.payment.message.PaymentMessages.{
   BankAccountLoaded,

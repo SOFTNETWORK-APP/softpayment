@@ -1,5 +1,6 @@
 package app.softnetwork.payment.model
 
+import app.softnetwork.payment.model
 import app.softnetwork.security._
 import app.softnetwork.validation.RegexValidator
 import org.apache.commons.validator.routines.IBANValidator
@@ -65,7 +66,7 @@ trait BankAccountDecorator { self: BankAccount =>
 
   lazy val tag: String = externalUuid
 
-  lazy val view: BankAccountView = BankAccountView(self)
+  lazy val view: BankAccountView = model.BankAccountView(self)
 }
 
 case class BankAccountView(

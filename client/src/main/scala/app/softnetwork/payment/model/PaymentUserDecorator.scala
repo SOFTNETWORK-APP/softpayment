@@ -1,9 +1,11 @@
 package app.softnetwork.payment.model
 
+import app.softnetwork.payment.model
+
 trait PaymentUserDecorator { self: PaymentUser =>
   lazy val externalUuidWithProfile: String = computeExternalUuidWithProfile(externalUuid, profile)
 
-  lazy val view: PaymentUserView = PaymentUserView(self)
+  lazy val view: PaymentUserView = model.PaymentUserView(self)
 }
 
 case class PaymentUserView(

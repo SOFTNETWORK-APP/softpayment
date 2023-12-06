@@ -1,5 +1,7 @@
 package app.softnetwork.payment.model
 
+import app.softnetwork.payment.model
+
 import java.util.Locale
 
 trait AddressDecorator { self: Address =>
@@ -10,7 +12,7 @@ trait AddressDecorator { self: Address =>
     country.trim.isEmpty ||
     postalCode.trim.isEmpty
 
-  lazy val view: AddressView = AddressView(self)
+  lazy val view: AddressView = model.AddressView(self)
 
   override def equals(obj: Any): Boolean = obj match {
     case address: Address =>

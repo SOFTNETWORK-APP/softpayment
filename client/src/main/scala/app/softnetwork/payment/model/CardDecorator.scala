@@ -1,8 +1,9 @@
 package app.softnetwork.payment.model
 
+import app.softnetwork.payment.model
+
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import scala.util.{Failure, Success, Try}
 
 trait CardDecorator { self: Card =>
@@ -22,7 +23,7 @@ trait CardDecorator { self: Card =>
       .withLastName(lastName)
       .withBirthday(birthday)
 
-  lazy val view: CardView = CardView(self)
+  lazy val view: CardView = model.CardView(self)
 }
 
 case class CardView(

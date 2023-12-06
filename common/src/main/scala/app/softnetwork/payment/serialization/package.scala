@@ -67,26 +67,6 @@ package object serialization {
     }
   }
 
-  implicit def LegalUserTypeToLegalResponseUserType(
-    legalUserType: LegalUser.LegalUserType
-  ): LegalUserType = {
-    legalUserType match {
-      case LegalUser.LegalUserType.BUSINESS     => LegalUserType.BUSINESS
-      case LegalUser.LegalUserType.SOLETRADER   => LegalUserType.SOLETRADER
-      case LegalUser.LegalUserType.ORGANIZATION => LegalUserType.ORGANIZATION
-    }
-  }
-
-  implicit def LegalResponseUserTypeToLegalUserType(
-    legalUserType: LegalUserType
-  ): LegalUser.LegalUserType = {
-    legalUserType match {
-      case LegalUserType.BUSINESS     => LegalUser.LegalUserType.BUSINESS
-      case LegalUserType.SOLETRADER   => LegalUser.LegalUserType.SOLETRADER
-      case LegalUserType.ORGANIZATION => LegalUser.LegalUserType.ORGANIZATION
-    }
-  }
-
   implicit def accountToSoftPaymentAccount(account: Account): SoftPaymentAccount = {
     account match {
       case a: SoftPaymentAccount => a

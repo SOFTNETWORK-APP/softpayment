@@ -1,4 +1,4 @@
-package app.softnetwork.payment.api
+package app.softnetwork.payment.api.config
 
 import akka.actor.typed.ActorSystem
 import org.softnetwork.session.model.JwtClaims

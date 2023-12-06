@@ -1,7 +1,9 @@
 package app.softnetwork.payment.model
 
+import app.softnetwork.payment.model
+
 trait KycDocumentDecorator { self: KycDocument =>
-  lazy val view: KycDocumentView = KycDocumentView(self)
+  lazy val view: KycDocumentView = model.KycDocumentView(self)
 }
 
 case class KycDocumentView(

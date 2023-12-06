@@ -1,11 +1,10 @@
-package app.softnetwork.payment
+package app.softnetwork.payment.api
 
-import app.softnetwork.payment.model.RecurringPayment
+import app.softnetwork.payment.model.{LegalUser, RecurringPayment}
 
 import scala.language.implicitConversions
 
-package object api {
-
+package object serialization {
   implicit def recurringPaymentTypeToRegisterRecurringPaymentType(
     `type`: RecurringPayment.RecurringPaymentType
   ): RegisterRecurringPaymentRequest.RecurringPaymentType = {
@@ -77,4 +76,25 @@ package object api {
       case _ => None
     }
   }
+
+  implicit def LegalUserTypeToLegalResponseUserType(
+    legalUserType: LegalUser.LegalUserType
+  ): LegalUserType = {
+    legalUserType match {
+      case LegalUser.LegalUserType.BUSINESS     => LegalUserType.BUSINESS
+      case LegalUser.LegalUserType.SOLETRADER   => LegalUserType.SOLETRADER
+      case LegalUser.LegalUserType.ORGANIZATION => LegalUserType.ORGANIZATION
+    }
+  }
+
+  implicit def LegalResponseUserTypeToLegalUserType(
+    legalUserType: LegalUserType
+  ): LegalUser.LegalUserType = {
+    legalUserType match {
+      case LegalUserType.BUSINESS     => LegalUser.LegalUserType.BUSINESS
+      case LegalUserType.SOLETRADER   => LegalUser.LegalUserType.SOLETRADER
+      case LegalUserType.ORGANIZATION => LegalUser.LegalUserType.ORGANIZATION
+    }
+  }
+
 }

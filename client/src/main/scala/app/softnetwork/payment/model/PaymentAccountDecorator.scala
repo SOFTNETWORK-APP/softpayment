@@ -1,5 +1,6 @@
 package app.softnetwork.payment.model
 
+import app.softnetwork.payment
 import app.softnetwork.persistence._
 
 import java.time.Instant
@@ -109,7 +110,7 @@ trait PaymentAccountDecorator { self: PaymentAccount =>
   lazy val hasAcceptedTermsOfPSP: Boolean =
     !legalUser || getLegalUser.lastAcceptedTermsOfPSP.isDefined
 
-  lazy val view: PaymentAccountView = PaymentAccountView(self)
+  lazy val view: PaymentAccountView = payment.model.PaymentAccountView(self)
 }
 
 case class PaymentAccountView(

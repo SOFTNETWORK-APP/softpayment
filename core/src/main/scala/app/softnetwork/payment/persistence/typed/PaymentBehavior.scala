@@ -6,7 +6,7 @@ import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.kv.handlers.GenericKeyValueDao
 import app.softnetwork.payment.annotation.InternalApi
-import app.softnetwork.payment.api.PaymentClientSettings
+import app.softnetwork.payment.api.config.PaymentClientSettings
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.config.PaymentSettings.{AkkaNodeRole, PayInStatementDescriptor}
 import app.softnetwork.payment.handlers.{PaymentDao, PaymentKvDao, SoftPaymentAccountDao}

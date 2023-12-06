@@ -29,15 +29,23 @@ ThisBuild / libraryDependencies ++= Seq(
 
 Test / parallelExecution := false
 
-lazy val common = project.in(file("common"))
+lazy val client = project.in(file("client"))
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
   .enablePlugins(AkkaGrpcPlugin)
 
+lazy val common = project.in(file("common"))
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .enablePlugins(AkkaGrpcPlugin)
+  .dependsOn(
+    client % "compile->compile;test->test;it->it"
+  )
+
 lazy val core = project.in(file("core"))
   .configs(IntegrationTest)
   .settings(Defaults.itSettings, app.softnetwork.Info.infoSettings)
-  .enablePlugins(BuildInfoPlugin)
+  .enablePlugins(BuildInfoPlugin, AkkaGrpcPlugin)
   .dependsOn(
     common % "compile->compile;test->test;it->it"
   )
@@ -72,6 +80,6 @@ lazy val testkit = project.in(file("testkit"))
   )
 
 lazy val root = project.in(file("."))
-  .aggregate(common, core, mangopay, stripe, testkit, api)
+  .aggregate(client, common, core, mangopay, stripe, testkit, api)
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
