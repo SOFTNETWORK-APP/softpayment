@@ -1,5 +1,6 @@
 package app.softnetwork.payment.model
 
+import app.softnetwork.account.model.AccountStatus
 import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.security.sha256
 
@@ -19,5 +20,6 @@ trait ProviderDecorator { self: SoftPaymentAccount.Client.Provider =>
       .withUuid(clientId)
       .withAnonymous(true)
       .withClients(Seq(client))
+      .withStatus(AccountStatus.Active)
   }
 }
