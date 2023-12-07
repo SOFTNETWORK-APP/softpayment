@@ -22,7 +22,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 
-trait SoftPaymentAccountDao extends AccountDao { _: AccountHandler =>
+trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
   @InternalApi
   private[payment] def loadProvider(
     clientId: String
@@ -164,9 +164,8 @@ trait SoftPaymentAccountTypeKey extends CommandTypeKey[AccountCommand] {
     SoftPaymentAccountBehavior.TypeKey
 }
 
-object SoftPaymentAccountDao
-    extends SoftPaymentAccountDao
-    with AccountHandler
-    with SoftPaymentAccountTypeKey {
+trait SoftPaymentAccountHandler extends AccountHandler with SoftPaymentAccountTypeKey
+
+object SoftPaymentAccountDao extends SoftPaymentAccountDao {
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 }

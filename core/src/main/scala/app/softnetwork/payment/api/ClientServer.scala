@@ -1,24 +1,22 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.handlers.{PaymentHandler, SoftPaymentAccountDao}
+import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-trait ClientServer extends ClientServiceApi with PaymentHandler {
+trait ClientServer extends ClientServiceApi with SoftPaymentAccountDao {
 
   implicit def system: ActorSystem[_]
 
   implicit lazy val ec: ExecutionContextExecutor = system.executionContext
 
-  def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
-
   override def generateClientTokens(
     in: GenerateClientTokensRequest
   ): Future[ClientTokensResponse] = {
     import in._
-    softPaymentAccountDao.generateClientToken(clientId, clientSecret, scope) map {
+    generateClientToken(clientId, clientSecret, scope) map {
       case Some(tokens) =>
         import tokens._
         ClientTokensResponse.defaultInstance.withTokens(
@@ -36,7 +34,7 @@ trait ClientServer extends ClientServiceApi with PaymentHandler {
 
   override def refreshClientTokens(in: RefreshClientTokensRequest): Future[ClientTokensResponse] = {
     import in._
-    softPaymentAccountDao.refreshClientToken(refreshToken) map {
+    refreshClientToken(refreshToken) map {
       case Some(tokens) =>
         import tokens._
         ClientTokensResponse.defaultInstance.withTokens(

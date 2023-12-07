@@ -1,7 +1,6 @@
 package app.softnetwork.payment.handlers
 
 import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
-import app.softnetwork.account.handlers.AccountHandler
 import app.softnetwork.account.message.AccountCommand
 import app.softnetwork.payment.persistence.typed.MockSoftPaymentAccountBehavior
 import app.softnetwork.persistence.typed.CommandTypeKey
@@ -14,8 +13,12 @@ trait MockSoftPaymentAccountTypeKey extends CommandTypeKey[AccountCommand] {
     MockSoftPaymentAccountBehavior.TypeKey
 }
 
-trait MockSoftPaymentAccountHandler extends AccountHandler with MockSoftPaymentAccountTypeKey
+trait MockSoftPaymentAccountHandler
+    extends SoftPaymentAccountHandler
+    with MockSoftPaymentAccountTypeKey
 
-object MockSoftPaymentAccountDao extends SoftPaymentAccountDao with MockSoftPaymentAccountHandler {
+trait MockSoftPaymentAccountDao extends SoftPaymentAccountDao with MockSoftPaymentAccountTypeKey
+
+object MockSoftPaymentAccountDao extends MockSoftPaymentAccountDao {
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 }
