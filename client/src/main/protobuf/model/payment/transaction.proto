@@ -84,6 +84,7 @@ message Transaction {
     optional string returnUrl = 30;
     optional string payPalBuyerAccountEmail = 31;
     optional string idempotencyKey = 32;
+    optional string clientId = 33;
 }
 
 message BrowserInfo {

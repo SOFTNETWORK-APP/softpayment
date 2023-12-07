@@ -421,9 +421,11 @@ trait PaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
-            val clientId = paymentAccount.clientId.orElse(
-              internalClientId
-            )
+            val clientId = paymentAccount.clientId
+              .orElse(cmd.clientId)
+              .orElse(
+                internalClientId
+              )
             val paymentProvider = loadPaymentProvider(clientId)
             import paymentProvider._
             paymentAccount.transactions.find(_.id == cardPreAuthorizedTransactionId) match {
@@ -432,7 +434,9 @@ trait PaymentBehavior
                   cancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId)
                 val updatedPaymentAccount = paymentAccount.withTransactions(
                   paymentAccount.transactions.filterNot(_.id == cardPreAuthorizedTransactionId) :+
-                  preAuthorizationTransaction.withPreAuthorizationCanceled(preAuthorizationCanceled)
+                  preAuthorizationTransaction
+                    .withPreAuthorizationCanceled(preAuthorizationCanceled)
+                    .copy(clientId = clientId)
                 )
                 val lastUpdated = now()
                 Effect
@@ -819,9 +823,11 @@ trait PaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
-            val clientId = paymentAccount.clientId.orElse(
-              internalClientId
-            )
+            val clientId = paymentAccount.clientId
+              .orElse(cmd.clientId)
+              .orElse(
+                internalClientId
+              )
             val paymentProvider = loadPaymentProvider(clientId)
             import paymentProvider._
             (paymentAccount.transactions.find(_.id == payInTransactionId) match {
@@ -856,7 +862,7 @@ trait PaymentBehavior
                       val updatedPaymentAccount = paymentAccount
                         .withTransactions(
                           paymentAccount.transactions.filterNot(_.id == transaction.id)
-                          :+ transaction
+                          :+ transaction.copy(clientId = clientId)
                         )
                         .withLastUpdated(lastUpdated)
                       val upsertedEvent =
@@ -971,9 +977,11 @@ trait PaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
-            val clientId = paymentAccount.clientId.orElse(
-              internalClientId
-            )
+            val clientId = paymentAccount.clientId
+              .orElse(cmd.clientId)
+              .orElse(
+                internalClientId
+              )
             val paymentProvider = loadPaymentProvider(clientId)
             import paymentProvider._
             paymentAccount.userId match {
@@ -1002,7 +1010,7 @@ trait PaymentBehavior
                             val updatedPaymentAccount = paymentAccount
                               .withTransactions(
                                 paymentAccount.transactions.filterNot(_.id == transaction.id)
-                                :+ transaction
+                                :+ transaction.copy(clientId = clientId)
                               )
                               .withLastUpdated(lastUpdated)
                             if (transaction.status.isTransactionFailedForTechnicalReason) {
@@ -1173,9 +1181,11 @@ trait PaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) => // debited account
-            val clientId = paymentAccount.clientId.orElse(
-              internalClientId
-            )
+            val clientId = paymentAccount.clientId
+              .orElse(cmd.clientId)
+              .orElse(
+                internalClientId
+              )
             val paymentProvider = loadPaymentProvider(clientId)
             import paymentProvider._
             var maybeCreditedPaymentAccount: Option[PaymentAccount] = None
@@ -1225,7 +1235,7 @@ trait PaymentBehavior
                 val updatedPaymentAccount = paymentAccount
                   .withTransactions(
                     paymentAccount.transactions.filterNot(_.id == transaction.id)
-                    :+ transaction
+                    :+ transaction.copy(clientId = clientId)
                   )
                   .withLastUpdated(lastUpdated)
                 if (
@@ -1470,9 +1480,11 @@ trait PaymentBehavior
                     paymentAccount.bankAccount.flatMap(_.mandateId) match {
                       case Some(mandateId) =>
                         if (paymentAccount.mandateActivated) {
-                          val clientId = paymentAccount.clientId.orElse(
-                            internalClientId
-                          )
+                          val clientId = paymentAccount.clientId
+                            .orElse(cmd.clientId)
+                            .orElse(
+                              internalClientId
+                            )
                           val paymentProvider = loadPaymentProvider(clientId)
                           import paymentProvider._
                           directDebit(
@@ -1495,7 +1507,7 @@ trait PaymentBehavior
                               val updatedPaymentAccount = paymentAccount
                                 .withTransactions(
                                   paymentAccount.transactions.filterNot(_.id == transaction.id)
-                                  :+ transaction
+                                  :+ transaction.copy(clientId = clientId)
                                 )
                                 .withLastUpdated(lastUpdated)
                               if (
@@ -1565,9 +1577,11 @@ trait PaymentBehavior
               case Some(transaction) =>
                 paymentAccount.walletId match {
                   case Some(creditedWalletId) =>
-                    val clientId = paymentAccount.clientId.orElse(
-                      internalClientId
-                    )
+                    val clientId = paymentAccount.clientId
+                      .orElse(cmd.clientId)
+                      .orElse(
+                        internalClientId
+                      )
                     val paymentProvider = loadPaymentProvider(clientId)
                     import paymentProvider._
                     val transactionDate: LocalDate = Date.from(transaction.createdDate)
@@ -1586,7 +1600,7 @@ trait PaymentBehavior
                         val updatedPaymentAccount = paymentAccount
                           .withTransactions(
                             paymentAccount.transactions.filterNot(_.id == t.id)
-                            :+ updatedTransaction
+                            :+ updatedTransaction.copy(clientId = clientId)
                           )
                           .withLastUpdated(lastUpdated)
                         if (t.status.isTransactionSucceeded || t.status.isTransactionCreated) {
@@ -3751,8 +3765,10 @@ trait PaymentBehavior
                   val updatedTransaction = updatedPaymentAccount.transactions
                     .find(_.id == preAuthorizationId)
                     .map(
-                      _.copy(preAuthorizationValidated =
-                        Some(validatePreAuthorization(transaction.orderUuid, preAuthorizationId))
+                      _.copy(
+                        preAuthorizationValidated =
+                          Some(validatePreAuthorization(transaction.orderUuid, preAuthorizationId)),
+                        clientId = clientId
                       )
                     )
                   updatedPaymentAccount.withTransactions(
@@ -3832,6 +3848,7 @@ trait PaymentBehavior
         .withTransactions(
           paymentAccount.transactions
             .filterNot(_.id == transaction.id) :+ transaction
+            .copy(clientId = paymentAccount.clientId)
         )
         .withLastUpdated(lastUpdated)
     transaction.status match {

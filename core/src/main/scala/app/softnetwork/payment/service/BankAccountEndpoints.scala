@@ -26,8 +26,8 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         statusCode(StatusCode.Ok)
           .and(jsonBody[BankAccountCreatedOrUpdated].description("Bank account created or updated"))
       )
-      .serverLogic {
-        case (client, session) => { bank =>
+      .serverLogic { case (client, session) =>
+        bank =>
           import bank._
           var externalUuid: String = ""
           val updatedUser: Option[PaymentAccount.User] = {
@@ -78,7 +78,6 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             case r: BankAccountCreatedOrUpdated => Right(r)
             case other                          => Left(error(other))
           }
-        }
       }
       .description("Create or update legal or natural user bank account")
 
