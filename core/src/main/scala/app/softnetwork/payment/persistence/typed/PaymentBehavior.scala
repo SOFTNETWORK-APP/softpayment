@@ -1794,7 +1794,11 @@ trait PaymentBehavior
                             .withDebitedAmount(debitedAmount)
                             .withFeesAmount(feesAmount)
                             .withCurrency(currency)
-                            .withStatementDescriptor(statementDescriptor.getOrElse("")) // TODO
+                            .withStatementDescriptor(
+                              statementDescriptor
+                                .orElse(recurringPayment.statementDescriptor)
+                                .getOrElse("")
+                            ) // TODO
                         ) match {
                           case Some(transaction) =>
                             handleRecurringPayment(

@@ -86,14 +86,23 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
       case AccountMessages.RegisterProvider(provider) =>
         state match {
           case Some(account) =>
-            if (account.clients.exists(_.provider.providerId == provider.providerId)) {
+            if (
+              account.clients.exists(cl =>
+                cl.provider.providerId == provider.providerId &&
+                  cl.provider.providerApiKey == provider.providerApiKey
+              )
+            ) {
               Effect.none.thenRun { _ =>
                 AccountMessages.ProviderAlreadyRegistered ~> replyTo
               }
             } else {
               PaymentProviders.paymentProvider(provider).client match {
                 case Some(client) =>
-                  val updatedClient = client.withClientApiKey(client.generateApiKey())
+                  val updatedClient =
+                    account.clients
+                      .find(_.provider.providerId == provider.providerId)
+                      .map(_.withProvider(provider))
+                      .getOrElse(client.withClientApiKey(client.generateApiKey()))
                   accountKeyDao.addAccountKey(updatedClient.clientId, entityId)
                   Effect
                     .persist(
