@@ -2,7 +2,6 @@ package app.softnetwork.payment.handlers
 
 import akka.actor.typed.ActorSystem
 import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
-import app.softnetwork.account.config.AccountSettings
 import app.softnetwork.account.handlers.{AccountDao, AccountHandler}
 import app.softnetwork.account.message.{
   AccessTokenGenerated,
@@ -62,12 +61,14 @@ trait SoftPaymentAccountDao extends AccountDao { _: AccountHandler =>
     implicit val ec: ExecutionContext = system.executionContext
     ??(clientId, AccountMessages.GenerateClientToken(clientId, clientSecret, scope)) map {
       case result: AccessTokenGenerated =>
+        import result._
         Some(
           Tokens(
-            result.accessToken.token,
-            result.accessToken.tokenType.toLowerCase(),
-            AccountSettings.OAuthSettings.accessToken.expirationTime * 60,
-            result.accessToken.refreshToken
+            accessToken.token,
+            accessToken.tokenType.toLowerCase(),
+            accessToken.expiresIn,
+            accessToken.refreshToken,
+            accessToken.refreshExpiresIn
           )
         )
       case _ => None
@@ -80,12 +81,14 @@ trait SoftPaymentAccountDao extends AccountDao { _: AccountHandler =>
     implicit val ec: ExecutionContext = system.executionContext
     ??(refreshToken, AccountMessages.RefreshClientToken(refreshToken)) map {
       case result: AccessTokenRefreshed =>
+        import result._
         Some(
           Tokens(
-            result.accessToken.token,
-            result.accessToken.tokenType.toLowerCase(),
-            AccountSettings.OAuthSettings.accessToken.expirationTime * 60,
-            result.accessToken.refreshToken
+            accessToken.token,
+            accessToken.tokenType.toLowerCase(),
+            accessToken.expiresIn,
+            accessToken.refreshToken,
+            accessToken.refreshExpiresIn
           )
         )
       case _ => None

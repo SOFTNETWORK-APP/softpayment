@@ -231,7 +231,9 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
         state match {
           case Some(account) if account.status.isActive =>
             account.clients.find(
-              _.accessToken.map(_.refreshToken).getOrElse("") == sha256(refreshToken)
+              _.accessToken.exists(at =>
+                at.refreshToken == sha256(refreshToken) && !at.refreshExpired
+              )
             ) match {
               case Some(client) =>
                 val previousToken = client.getAccessToken
@@ -257,7 +259,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
                     )
                   )
                   .thenRun { _ =>
-                    AccessTokenGenerated(accessToken) ~> replyTo
+                    AccessTokenRefreshed(accessToken) ~> replyTo
                   }
 
               case _ =>
@@ -313,12 +315,21 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
       case AccountMessages.RegisterProviderAccount(provider) =>
         state match {
           case Some(account) =>
+            val updatedClient = account.clients.find(_.clientId == provider.clientId) match {
+              case Some(client) =>
+                client.withClientApiKey(provider.client.getClientApiKey)
+              case _ =>
+                provider.client
+            }
             accountKeyDao.addAccountKey(provider.clientId, entityId)
             Effect
               .persist(
-                SoftPaymentAccountProviderRegisteredEvent(
-                  provider.client,
-                  Instant.now()
+                List(
+                  AccountActivatedEvent(entityId, Some(Instant.now())),
+                  SoftPaymentAccountProviderRegisteredEvent(
+                    updatedClient,
+                    Instant.now()
+                  )
                 )
               )
               .thenRun(state =>

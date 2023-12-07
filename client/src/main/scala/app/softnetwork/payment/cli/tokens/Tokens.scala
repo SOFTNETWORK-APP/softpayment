@@ -4,6 +4,7 @@ import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.api.Client
 import app.softnetwork.payment.cli.Command
 import com.typesafe.scalalogging.StrictLogging
+import org.json4s.Formats
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -13,13 +14,15 @@ object Tokens extends Command[TokensConfig] with StrictLogging {
   )(implicit system: ActorSystem[_]): Future[String] = {
     implicit val ec: ExecutionContext = system.executionContext
     val client = Client(system)
+    implicit val formats: Formats = org.json4s.DefaultFormats
     config.refreshToken match {
       case Some(refreshToken) =>
         client.refreshClientTokens(refreshToken) map {
           case Some(tokens) =>
+            val json = org.json4s.jackson.Serialization.writePretty(tokens)
             s"""
                  |Tokens refreshed successfully!
-                 |${tokens.toString}
+                 |$json
                  |""".stripMargin
           case _ =>
             s"""
@@ -29,7 +32,11 @@ object Tokens extends Command[TokensConfig] with StrictLogging {
       case None =>
         client.generateClientTokens() map {
           case Some(tokens) =>
-            s"Tokens generated successfully! ${tokens.toString}"
+            val json = org.json4s.jackson.Serialization.writePretty(tokens)
+            s"""
+               |Tokens generated successfully!
+               |$json
+               |""".stripMargin
           case _ =>
             "Tokens generation failed!"
         }

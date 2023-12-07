@@ -20,7 +20,7 @@ message Tokens {
     string token_type = 2;
     int64 expires_in = 3;
     string refresh_token = 4;
-    //    google.protobuf.StringValue scope = 5;
+    google.protobuf.Int64Value refresh_token_expires_in = 5;
 }
 
 message ClientTokensResponse {

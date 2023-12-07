@@ -26,7 +26,8 @@ trait ClientServer extends ClientServiceApi with PaymentHandler {
             access_token,
             token_type,
             expires_in,
-            refresh_token
+            refresh_token,
+            refresh_token_expires_in.map(_.toLong)
           )
         )
       case _ => ClientTokensResponse.defaultInstance.withError("unknown")
@@ -43,7 +44,8 @@ trait ClientServer extends ClientServiceApi with PaymentHandler {
             access_token,
             token_type,
             expires_in,
-            refresh_token
+            refresh_token,
+            refresh_token_expires_in.map(_.toLong)
           )
         )
       case _ => ClientTokensResponse.defaultInstance.withError("unknown")
