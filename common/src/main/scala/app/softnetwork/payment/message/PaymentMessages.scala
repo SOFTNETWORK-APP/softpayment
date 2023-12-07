@@ -146,10 +146,13 @@ object PaymentMessages {
     *   - order unique id
     * @param cardPreAuthorizedTransactionId
     *   - card pre authorized transaction id
+    * @param clientId
+    *   - optional client id
     */
   case class CancelPreAuthorization(
     orderUuid: String,
-    cardPreAuthorizedTransactionId: String
+    cardPreAuthorizedTransactionId: String,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     lazy val key: String = cardPreAuthorizedTransactionId
   }
@@ -176,11 +179,14 @@ object PaymentMessages {
     * @param debitedAmount
     *   - amount to be debited from the account that made the pre-authorization (if not specified it
     *     will be the amount specified during the pre-authorization)
+    * @param clientId
+    *   - optional client id
     */
   case class PayInWithCardPreAuthorized(
     preAuthorizationId: String,
     creditedAccount: String,
-    debitedAmount: Option[Int]
+    debitedAmount: Option[Int],
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     lazy val key: String = preAuthorizationId
   }
@@ -281,6 +287,8 @@ object PaymentMessages {
     *   - currency
     * @param externalReference
     *   - optional external reference
+    * @param clientId
+    *   - optional client id
     */
   case class PayOut(
     orderUuid: String,
@@ -288,7 +296,8 @@ object PaymentMessages {
     creditedAmount: Int,
     feesAmount: Int = 0,
     currency: String = "EUR",
-    externalReference: Option[String] = None
+    externalReference: Option[String] = None,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
@@ -305,6 +314,8 @@ object PaymentMessages {
     *   - reason message
     * @param initializedByClient
     *   - whether the refund is initialized by the client or not
+    * @param clientId
+    *   - optional client id
     */
   case class Refund(
     orderUuid: String,
@@ -312,7 +323,8 @@ object PaymentMessages {
     refundAmount: Int,
     currency: String = "EUR",
     reasonMessage: String,
-    initializedByClient: Boolean
+    initializedByClient: Boolean,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     lazy val key: String = payInTransactionId
   }
@@ -333,6 +345,8 @@ object PaymentMessages {
     *   - whether an immediate pay out is required or not
     * @param externalReference
     *   - optional external reference
+    * @param clientId
+    *   - optional client id
     */
   case class Transfer(
     orderUuid: Option[String] = None,
@@ -342,7 +356,8 @@ object PaymentMessages {
     feesAmount: Int = 0,
     currency: String = "EUR",
     payOutRequired: Boolean = true,
-    externalReference: Option[String] = None
+    externalReference: Option[String] = None,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = debitedAccount
   }
@@ -359,6 +374,8 @@ object PaymentMessages {
     *   - statement descriptor
     * @param externalReference
     *   - optional external reference
+    * @param clientId
+    *   - optional client id
     */
   case class DirectDebit(
     creditedAccount: String,
@@ -366,16 +383,21 @@ object PaymentMessages {
     feesAmount: Int = 0,
     currency: String = "EUR",
     statementDescriptor: String,
-    externalReference: Option[String] = None
+    externalReference: Option[String] = None,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
   /** @param directDebitTransactionId
     *   - direct debit transaction id
+    * @param clientId
+    *   - optional client id
     */
-  case class LoadDirectDebitTransaction(directDebitTransactionId: String)
-      extends PaymentCommandWithKey {
+  case class LoadDirectDebitTransaction(
+    directDebitTransactionId: String,
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey {
     val key: String = directDebitTransactionId
   }
 
@@ -401,6 +423,12 @@ object PaymentMessages {
     *   - next debited amount
     * @param nextFeesAmount
     *   - next fees amount
+    * @param statementDescriptor
+    *   - statement descriptor
+    * @param externalReference
+    *   - optional external reference
+    * @param clientId
+    *   - optional client id
     */
   case class RegisterRecurringPayment(
     debitedAccount: String,
@@ -413,7 +441,10 @@ object PaymentMessages {
     frequency: Option[RecurringPayment.RecurringPaymentFrequency] = None,
     fixedNextAmount: Option[Boolean] = None,
     nextDebitedAmount: Option[Int] = None,
-    nextFeesAmount: Option[Int] = None
+    nextFeesAmount: Option[Int] = None,
+    statementDescriptor: Option[String] = None,
+    externalReference: Option[String] = None,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = debitedAccount
   }
@@ -507,9 +538,12 @@ object PaymentMessages {
     *
     * @param account
     *   - payment account reference
+    * @param clientId
+    *   - optional client id
     */
   @InternalApi
-  private[payment] case class LoadPaymentAccount(account: String) extends PaymentCommandWithKey {
+  private[payment] case class LoadPaymentAccount(account: String, clientId: Option[String] = None)
+      extends PaymentCommandWithKey {
     lazy val key: String = account
   }
 
@@ -566,8 +600,11 @@ object PaymentMessages {
 
   /** @param creditedAccount
     *   - account to load
+    * @param clientId
+    *   - optional client id
     */
-  case class LoadBankAccount(creditedAccount: String) extends PaymentCommandWithKey {
+  case class LoadBankAccount(creditedAccount: String, clientId: Option[String] = None)
+      extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
@@ -696,8 +733,11 @@ object PaymentMessages {
 
   /** @param creditedAccount
     *   - account which owns the mandate that would be canceled
+    * @param clientId
+    *   - optional client id
     */
-  case class CancelMandate(creditedAccount: String) extends PaymentCommandWithKey {
+  case class CancelMandate(creditedAccount: String, clientId: Option[String] = None)
+      extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 

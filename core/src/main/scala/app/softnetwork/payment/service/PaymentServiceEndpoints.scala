@@ -35,14 +35,19 @@ trait PaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
   val loadPaymentAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
       .out(jsonBody[PaymentAccountView].description("Authenticated user payment account"))
-      .serverLogic(principal =>
+      .serverLogic { case (client, session) =>
         _ => {
-          run(LoadPaymentAccount(externalUuidWithProfile(principal._2))).map {
+          run(
+            LoadPaymentAccount(
+              externalUuidWithProfile(session),
+              clientId = client.map(_.clientId).orElse(session.clientId)
+            )
+          ).map {
             case r: PaymentAccountLoaded => Right(r.paymentAccount.view)
             case other                   => Left(error(other))
           }
         }
-      )
+      }
       .description("Load authenticated user payment account")
 
   override val endpoints: List[ServerEndpoint[AkkaStreams with capabilities.WebSockets, Future]] =

@@ -132,10 +132,15 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      requiredClientSession { (_, session) =>
+      requiredClientSession { (client, session) =>
         get {
           pathEnd {
-            run(LoadPaymentAccount(externalUuidWithProfile(session))) completeWith {
+            run(
+              LoadPaymentAccount(
+                externalUuidWithProfile(session),
+                clientId = client.map(_.clientId).orElse(session.clientId)
+              )
+            ) completeWith {
               case r: PaymentAccountLoaded =>
                 complete(HttpResponse(StatusCodes.OK, entity = r.paymentAccount.view))
               case other => error(other)
@@ -374,7 +379,12 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
       requiredClientSession { (client, session) =>
         pathEnd {
           get {
-            run(LoadBankAccount(externalUuidWithProfile(session))) completeWith {
+            run(
+              LoadBankAccount(
+                externalUuidWithProfile(session),
+                clientId = client.map(_.clientId).orElse(session.clientId)
+              )
+            ) completeWith {
               case r: BankAccountLoaded =>
                 complete(
                   HttpResponse(
@@ -552,7 +562,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
       // check anti CSRF token
       hmacTokenCsrfProtection(checkHeader) {
         // check if a session exists
-        requiredClientSession { (_, session) =>
+        requiredClientSession { (client, session) =>
           post {
             run(CreateMandate(externalUuidWithProfile(session))) completeWith {
               case r: MandateConfirmationRequired =>
@@ -562,7 +572,12 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
             }
           } ~
           delete {
-            run(CancelMandate(externalUuidWithProfile(session))) completeWith {
+            run(
+              CancelMandate(
+                externalUuidWithProfile(session),
+                clientId = client.map(_.clientId).orElse(session.clientId)
+              )
+            ) completeWith {
               case MandateCanceled => complete(HttpResponse(StatusCodes.OK))
               case other           => error(other)
             }
@@ -575,7 +590,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      requiredClientSession { (_, session) =>
+      requiredClientSession { (client, session) =>
         get {
           pathPrefix(Segment) { recurringPaymentRegistrationId =>
             run(
@@ -588,7 +603,12 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
           }
         } ~ post {
           entity(as[RegisterRecurringPayment]) { cmd =>
-            run(cmd.copy(debitedAccount = externalUuidWithProfile(session))) completeWith {
+            run(
+              cmd.copy(
+                debitedAccount = externalUuidWithProfile(session),
+                clientId = client.map(_.clientId).orElse(session.clientId)
+              )
+            ) completeWith {
               case r: RecurringPaymentRegistered =>
                 complete(HttpResponse(StatusCodes.OK, entity = r))
               case r: MandateConfirmationRequired =>

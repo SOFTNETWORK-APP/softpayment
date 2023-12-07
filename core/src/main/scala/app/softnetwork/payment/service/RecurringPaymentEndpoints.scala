@@ -40,14 +40,19 @@ trait RecurringPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
           )
         )
       )
-      .serverLogic(principal =>
+      .serverLogic { case (client, session) =>
         cmd =>
-          run(cmd.copy(debitedAccount = externalUuidWithProfile(principal._2))).map {
+          run(
+            cmd.copy(
+              debitedAccount = externalUuidWithProfile(session),
+              clientId = client.map(_.clientId).orElse(session.clientId)
+            )
+          ).map {
             case r: RecurringPaymentRegistered  => Right(r)
             case r: MandateConfirmationRequired => Right(r)
             case other                          => Left(error(other))
           }
-      )
+      }
       .description("Register a recurring payment for the authenticated payment account")
 
   val loadRecurringPayment: ServerEndpoint[Any with AkkaStreams, Future] =

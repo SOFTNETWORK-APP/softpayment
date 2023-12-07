@@ -65,7 +65,9 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: PayInWithCardPreAuthorizedRequest
   ): Future[TransactionResponse] = {
     import in._
-    !?(PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount)) map {
+    !?(
+      PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount, Some(clientId))
+    ) map {
       case r: PaidIn =>
         TransactionResponse(
           transactionId = Some(r.transactionId),
@@ -94,7 +96,7 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: CancelPreAuthorizationRequest
   ): Future[CancelPreAuthorizationResponse] = {
     import in._
-    !?(CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId)) map {
+    !?(CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId, Some(clientId))) map {
       case r: PreAuthorizationCanceled =>
         CancelPreAuthorizationResponse(Some(r.preAuthorizationCanceled))
       case _ => CancelPreAuthorizationResponse()
@@ -110,7 +112,8 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
         refundAmount,
         currency,
         reasonMessage,
-        initializedByClient
+        initializedByClient,
+        Some(clientId)
       )
     ) map {
       case r: Refunded =>
@@ -140,7 +143,15 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
   override def payOut(in: PayOutRequest): Future[TransactionResponse] = {
     import in._
     !?(
-      PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency, externalReference)
+      PayOut(
+        orderUuid,
+        creditedAccount,
+        creditedAmount,
+        feesAmount,
+        currency,
+        externalReference,
+        Some(clientId)
+      )
     ) map {
       case r: PaidOut =>
         TransactionResponse(
@@ -177,7 +188,8 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
         feesAmount,
         currency,
         payOutRequired,
-        externalReference
+        externalReference,
+        Some(clientId)
       )
     ) map {
       case r: Transferred =>
@@ -214,7 +226,8 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
         feesAmount,
         currency,
         statementDescriptor,
-        externalReference
+        externalReference,
+        Some(clientId)
       )
     ) map {
       case r: DirectDebited =>
@@ -245,7 +258,7 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: LoadDirectDebitTransactionRequest
   ): Future[TransactionResponse] = {
     import in._
-    !?(LoadDirectDebitTransaction(directDebitTransactionId)) map {
+    !?(LoadDirectDebitTransaction(directDebitTransactionId, Some(clientId))) map {
       case r: DirectDebited =>
         TransactionResponse(
           transactionId = Some(r.transactionId),
@@ -289,7 +302,10 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
             frequency,
             fixedNextAmount,
             nextDebitedAmount,
-            nextFeesAmount
+            nextFeesAmount,
+            statementDescriptor,
+            externalReference,
+            Some(clientId)
           )
         ) map {
           case r: RecurringPaymentRegistered =>
@@ -312,7 +328,7 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: LoadBankAccountOwnerRequest
   ): Future[LoadBankAccountOwnerResponse] = {
     import in._
-    !?(LoadBankAccount(externalUuid)) map {
+    !?(LoadBankAccount(externalUuid, Some(clientId))) map {
       case r: BankAccountLoaded =>
         LoadBankAccountOwnerResponse(r.bankAccount.ownerName, Some(r.bankAccount.ownerAddress))
       case _ => LoadBankAccountOwnerResponse()
@@ -323,7 +339,7 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: LoadLegalUserRequest
   ): Future[LoadLegalUserResponse] = {
     import in._
-    !?(LoadPaymentAccount(externalUuid)) map {
+    !?(LoadPaymentAccount(externalUuid, Some(clientId))) map {
       case r: PaymentAccountLoaded if r.paymentAccount.user.isLegalUser =>
         val legalUser = r.paymentAccount.getLegalUser
         LoadLegalUserResponse(

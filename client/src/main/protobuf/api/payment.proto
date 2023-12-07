@@ -40,6 +40,7 @@ message PayInWithCardPreAuthorizedRequest {
     string preAuthorizationId = 1;
     string creditedAccount = 2;
     google.protobuf.Int32Value debitedAmount = 3;
+    string clientId = 4;
 }
 
 enum TransactionStatus{
@@ -59,6 +60,7 @@ message TransactionResponse {
 message CancelPreAuthorizationRequest {
     string orderUuid = 1;
     string cardPreAuthorizedTransactionId = 2;
+    string clientId = 3;
 }
 
 message CancelPreAuthorizationResponse {
@@ -72,6 +74,7 @@ message RefundRequest {
     string currency = 4;
     string reasonMessage = 5;
     bool initializedByClient = 6;
+    string clientId = 7;
 }
 
 message PayOutRequest {
@@ -81,6 +84,7 @@ message PayOutRequest {
     int32 feesAmount = 4;
     string currency = 5;
     google.protobuf.StringValue externalReference = 6;
+    string clientId = 7;
 }
 
 message TransferRequest {
@@ -92,6 +96,7 @@ message TransferRequest {
     string currency = 6;
     bool payOutRequired = 7;
     google.protobuf.StringValue externalReference = 8;
+    string clientId = 9;
 }
 
 message TransferResponse {
@@ -108,10 +113,12 @@ message DirectDebitRequest {
     string currency = 4;
     string statementDescriptor = 5;
     google.protobuf.StringValue externalReference = 6;
+    string clientId = 7;
 }
 
 message LoadDirectDebitTransactionRequest {
     string directDebitTransactionId = 1;
+    string clientId = 2;
 }
 
 message RegisterRecurringPaymentRequest {
@@ -142,6 +149,9 @@ message RegisterRecurringPaymentRequest {
     google.protobuf.BoolValue fixedNextAmount = 9;
     google.protobuf.Int32Value nextDebitedAmount = 10;
     google.protobuf.Int32Value nextFeesAmount = 11;
+    google.protobuf.StringValue statementDescriptor = 12;
+    google.protobuf.StringValue externalReference = 13;
+    string clientId = 14;
 }
 
 message RegisterRecurringPaymentResponse {
@@ -150,6 +160,7 @@ message RegisterRecurringPaymentResponse {
 
 message CancelMandateRequest {
     string externalUuid = 1;
+    string clientId = 2;
 }
 
 message CancelMandateResponse {
@@ -158,6 +169,7 @@ message CancelMandateResponse {
 
 message LoadBankAccountOwnerRequest {
     string externalUuid = 1;
+    string clientId = 2;
 }
 
 message LoadBankAccountOwnerResponse {
@@ -173,6 +185,7 @@ enum LegalUserType {
 
 message LoadLegalUserRequest {
     string externalUuid = 1;
+    string clientId = 2;
 }
 
 message LoadLegalUserResponse {

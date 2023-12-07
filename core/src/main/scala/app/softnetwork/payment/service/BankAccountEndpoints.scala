@@ -26,58 +26,60 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         statusCode(StatusCode.Ok)
           .and(jsonBody[BankAccountCreatedOrUpdated].description("Bank account created or updated"))
       )
-      .serverLogic(principal => { bank =>
-        import bank._
-        var externalUuid: String = ""
-        val updatedUser: Option[PaymentAccount.User] = {
-          user match {
-            case Left(naturalUser) =>
-              var updatedNaturalUser = {
-                if (naturalUser.externalUuid.trim.isEmpty) {
-                  naturalUser.withExternalUuid(principal._2.id)
-                } else {
-                  naturalUser
+      .serverLogic {
+        case (client, session) => { bank =>
+          import bank._
+          var externalUuid: String = ""
+          val updatedUser: Option[PaymentAccount.User] = {
+            user match {
+              case Left(naturalUser) =>
+                var updatedNaturalUser = {
+                  if (naturalUser.externalUuid.trim.isEmpty) {
+                    naturalUser.withExternalUuid(session.id)
+                  } else {
+                    naturalUser
+                  }
                 }
-              }
-              principal._2.profile match {
-                case Some(profile) if updatedNaturalUser.profile.isEmpty =>
-                  updatedNaturalUser = updatedNaturalUser.withProfile(profile)
-                case _ =>
-              }
-              externalUuid = updatedNaturalUser.externalUuid
-              Some(PaymentAccount.User.NaturalUser(updatedNaturalUser))
-            case Right(legalUser) =>
-              var updatedLegalRepresentative = legalUser.legalRepresentative
-              if (updatedLegalRepresentative.externalUuid.trim.isEmpty) {
-                updatedLegalRepresentative =
-                  updatedLegalRepresentative.withExternalUuid(principal._2.id)
-              }
-              principal._2.profile match {
-                case Some(profile) if updatedLegalRepresentative.profile.isEmpty =>
-                  updatedLegalRepresentative = updatedLegalRepresentative.withProfile(profile)
-                case _ =>
-              }
-              externalUuid = updatedLegalRepresentative.externalUuid
-              Some(
-                PaymentAccount.User.LegalUser(
-                  legalUser.withLegalRepresentative(updatedLegalRepresentative)
+                session.profile match {
+                  case Some(profile) if updatedNaturalUser.profile.isEmpty =>
+                    updatedNaturalUser = updatedNaturalUser.withProfile(profile)
+                  case _ =>
+                }
+                externalUuid = updatedNaturalUser.externalUuid
+                Some(PaymentAccount.User.NaturalUser(updatedNaturalUser))
+              case Right(legalUser) =>
+                var updatedLegalRepresentative = legalUser.legalRepresentative
+                if (updatedLegalRepresentative.externalUuid.trim.isEmpty) {
+                  updatedLegalRepresentative =
+                    updatedLegalRepresentative.withExternalUuid(session.id)
+                }
+                session.profile match {
+                  case Some(profile) if updatedLegalRepresentative.profile.isEmpty =>
+                    updatedLegalRepresentative = updatedLegalRepresentative.withProfile(profile)
+                  case _ =>
+                }
+                externalUuid = updatedLegalRepresentative.externalUuid
+                Some(
+                  PaymentAccount.User.LegalUser(
+                    legalUser.withLegalRepresentative(updatedLegalRepresentative)
+                  )
                 )
-              )
+            }
+          }
+          run(
+            CreateOrUpdateBankAccount(
+              externalUuidWithProfile(session),
+              bankAccount.withExternalUuid(externalUuid),
+              updatedUser,
+              acceptedTermsOfPSP,
+              clientId = client.map(_.clientId).orElse(session.clientId)
+            )
+          ).map {
+            case r: BankAccountCreatedOrUpdated => Right(r)
+            case other                          => Left(error(other))
           }
         }
-        run(
-          CreateOrUpdateBankAccount(
-            externalUuidWithProfile(principal._2),
-            bankAccount.withExternalUuid(externalUuid),
-            updatedUser,
-            acceptedTermsOfPSP,
-            clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
-          )
-        ).map {
-          case r: BankAccountCreatedOrUpdated => Right(r)
-          case other                          => Left(error(other))
-        }
-      })
+      }
       .description("Create or update legal or natural user bank account")
 
   val loadBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
@@ -89,16 +91,19 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             .description("Authenticated user bank account")
         )
       )
-      .serverLogic(principal =>
+      .serverLogic { case (client, session) =>
         _ => {
           run(
-            LoadBankAccount(externalUuidWithProfile(principal._2))
+            LoadBankAccount(
+              externalUuidWithProfile(session),
+              clientId = client.map(_.clientId).orElse(session.clientId)
+            )
           ).map {
             case r: BankAccountLoaded => Right(r.bankAccount.view)
             case other                => Left(error(other))
           }
         }
-      )
+      }
       .description("Load authenticated user bank account")
 
   val deleteBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =

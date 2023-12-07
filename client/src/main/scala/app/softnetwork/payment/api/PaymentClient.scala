@@ -59,7 +59,12 @@ trait PaymentClient extends GrpcClient {
       token
     )
       .invoke(
-        PayInWithCardPreAuthorizedRequest(preAuthorizationId, creditedAccount, debitedAmount)
+        PayInWithCardPreAuthorizedRequest(
+          preAuthorizationId,
+          creditedAccount,
+          debitedAmount,
+          settings.clientId
+        )
       )
   }
 
@@ -73,7 +78,7 @@ trait PaymentClient extends GrpcClient {
       token
     )
       .invoke(
-        CancelPreAuthorizationRequest(orderUuid, cardPreAuthorizedTransactionId)
+        CancelPreAuthorizationRequest(orderUuid, cardPreAuthorizedTransactionId, settings.clientId)
       ) map (_.preAuthorizationCanceled)
   }
 
@@ -97,7 +102,8 @@ trait PaymentClient extends GrpcClient {
           refundAmount,
           currency,
           reasonMessage,
-          initializedByClient
+          initializedByClient,
+          settings.clientId
         )
       )
   }
@@ -122,7 +128,8 @@ trait PaymentClient extends GrpcClient {
           creditedAmount,
           feesAmount,
           currency,
-          externalReference
+          externalReference,
+          settings.clientId
         )
       )
   }
@@ -151,7 +158,8 @@ trait PaymentClient extends GrpcClient {
           feesAmount,
           currency,
           payOutRequired,
-          externalReference
+          externalReference,
+          settings.clientId
         )
       )
   }
@@ -176,7 +184,8 @@ trait PaymentClient extends GrpcClient {
           feesAmount,
           currency,
           statementDescriptor,
-          externalReference
+          externalReference,
+          settings.clientId
         )
       )
   }
@@ -190,7 +199,7 @@ trait PaymentClient extends GrpcClient {
       token
     )
       .invoke(
-        LoadDirectDebitTransactionRequest(directDebitTransactionId)
+        LoadDirectDebitTransactionRequest(directDebitTransactionId, settings.clientId)
       )
   }
 
@@ -206,6 +215,8 @@ trait PaymentClient extends GrpcClient {
     fixedNextAmount: Option[Boolean],
     nextDebitedAmount: Option[Int],
     nextFeesAmount: Option[Int],
+    statementDescriptor: Option[String],
+    externalReference: Option[String],
     token: Option[String] = None
   ): Future[Option[String]] = {
     withAuthorization(
@@ -228,7 +239,10 @@ trait PaymentClient extends GrpcClient {
           },
           fixedNextAmount,
           nextDebitedAmount,
-          nextFeesAmount
+          nextFeesAmount,
+          statementDescriptor,
+          externalReference,
+          settings.clientId
         )
       ) map (_.recurringPaymentRegistrationId)
   }
@@ -249,7 +263,7 @@ trait PaymentClient extends GrpcClient {
       grpcClient.loadBankAccountOwner(),
       token
     )
-      .invoke(LoadBankAccountOwnerRequest(externalUuid)) map (response =>
+      .invoke(LoadBankAccountOwnerRequest(externalUuid, settings.clientId)) map (response =>
       BankAccountOwner(response.ownerName, response.ownerAddress)
     )
   }
@@ -262,7 +276,7 @@ trait PaymentClient extends GrpcClient {
       grpcClient.loadLegalUser(),
       token
     )
-      .invoke(LoadLegalUserRequest(externalUuid)) map (response =>
+      .invoke(LoadLegalUserRequest(externalUuid, settings.clientId)) map (response =>
       LegalUserDetails(
         response.legalUserType,
         response.legalName,

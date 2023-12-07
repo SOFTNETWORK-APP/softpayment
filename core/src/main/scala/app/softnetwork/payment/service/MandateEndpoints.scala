@@ -51,13 +51,18 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         statusCode(StatusCode.Ok)
           .and(jsonBody[MandateCanceled.type].description("Mandate canceled"))
       )
-      .serverLogic(principal =>
+      .serverLogic { case (client, session) =>
         _ =>
-          run(CancelMandate(externalUuidWithProfile(principal._2))).map {
+          run(
+            CancelMandate(
+              externalUuidWithProfile(session),
+              clientId = client.map(_.clientId).orElse(session.clientId)
+            )
+          ).map {
             case MandateCanceled => Right(MandateCanceled)
             case other           => Left(error(other))
           }
-      )
+      }
       .description("Create Mandate for the authenticated payment account")
 
   val updateMandateStatus: ServerEndpoint[Any with AkkaStreams, Future] =
