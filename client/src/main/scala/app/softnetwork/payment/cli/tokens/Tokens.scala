@@ -18,27 +18,31 @@ object Tokens extends Command[TokensConfig] with StrictLogging {
     config.refreshToken match {
       case Some(refreshToken) =>
         client.refreshClientTokens(refreshToken) map {
-          case Some(tokens) =>
+          case Right(tokens) =>
             val json = org.json4s.jackson.Serialization.writePretty(tokens)
             s"""
                  |Tokens refreshed successfully!
                  |$json
                  |""".stripMargin
-          case _ =>
+          case Left(error) =>
             s"""
                  |Tokens refresh failed!
+                 |$error
                  |""".stripMargin
         }
       case None =>
         client.generateClientTokens() map {
-          case Some(tokens) =>
+          case Right(tokens) =>
             val json = org.json4s.jackson.Serialization.writePretty(tokens)
             s"""
                |Tokens generated successfully!
                |$json
                |""".stripMargin
-          case _ =>
-            "Tokens generation failed!"
+          case Left(error) =>
+            s"""
+               |Tokens generation failed!
+               |$error
+               |""".stripMargin
         }
     }
   }

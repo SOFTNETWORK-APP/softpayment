@@ -8,7 +8,7 @@ import app.softnetwork.account.message._
 import app.softnetwork.account.model.{BasicAccount, BasicAccountProfile, Principal, PrincipalType}
 import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.payment.message.AccountMessages
-import app.softnetwork.payment.message.AccountMessages.SoftPaymentSignup
+import app.softnetwork.payment.message.AccountMessages.SoftPaymentSignUp
 import app.softnetwork.payment.message.SoftPaymentAccountEvents.{
   SoftPaymentAccountCreatedEvent,
   SoftPaymentAccountProviderRegisteredEvent,
@@ -30,7 +30,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
     cmd: SignUp
   )(implicit context: ActorContext[AccountCommand]): Option[SoftPaymentAccount] = {
     cmd match {
-      case SoftPaymentSignup(_, _, provider, _, _) =>
+      case SoftPaymentSignUp(_, _, provider, _, _) =>
         PaymentProviders.paymentProvider(provider).client match {
           case Some(client) =>
             SoftPaymentAccount(BasicAccount(cmd, Some(entityId)))
@@ -89,8 +89,14 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
             if (
               account.clients.exists(cl =>
                 cl.provider.providerId == provider.providerId &&
-                  cl.provider.providerApiKey == provider.providerApiKey
+                cl.provider.providerApiKey == provider.providerApiKey
               )
+            ) {
+              Effect.none.thenRun { _ =>
+                AccountMessages.ProviderAlreadyRegistered ~> replyTo
+              }
+            } else if (
+              (accountKeyDao.lookupAccount(provider.clientId) complete ()).exists(_ != entityId)
             ) {
               Effect.none.thenRun { _ =>
                 AccountMessages.ProviderAlreadyRegistered ~> replyTo

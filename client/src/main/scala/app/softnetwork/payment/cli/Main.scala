@@ -4,6 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.PaymentClientBuildInfo
+import app.softnetwork.payment.cli.signup.{SignUpClient, SignUpClientConfig}
 import app.softnetwork.payment.cli.tokens.{Tokens, TokensConfig}
 import com.typesafe.scalalogging.StrictLogging
 
@@ -19,6 +20,7 @@ object Main extends StrictLogging {
 
 class Main extends Completion with StrictLogging {
   val configs: List[CliConfig[_]] = List(
+    SignUpClientConfig,
     TokensConfig
   )
 
@@ -65,13 +67,29 @@ class Main extends Completion with StrictLogging {
             println(s"ERROR: Unknown command --> $command")
             printUsage()
             System.exit(1)
-          case Some(_) =>
+          case Some(config) =>
             command match {
-              case "tokens" =>
+              case SignUpClientConfig.command =>
+                SignUpClientConfig.parse(list) match {
+                  case None =>
+                    println(s"ERROR: Invalid arguments for command --> $command")
+                    printUsage(config.usage())
+                    System.exit(1)
+                  case Some(conf) =>
+                    SignUpClient.run(conf) complete () match {
+                      case Success(result) =>
+                        println(result)
+                        System.exit(0)
+                      case Failure(f) =>
+                        logger.error(s"Failed to run command $command", f)
+                        System.exit(1)
+                    }
+                }
+              case TokensConfig.command =>
                 TokensConfig.parse(list) match {
                   case None =>
                     println(s"ERROR: Invalid arguments for command --> $command")
-                    printUsage(command)
+                    printUsage(config.usage())
                     System.exit(1)
                   case Some(conf) =>
                     Tokens.run(conf) complete () match {

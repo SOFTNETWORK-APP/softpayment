@@ -7,12 +7,15 @@ import app.softnetwork.account.message.{
   AccessTokenGenerated,
   AccessTokenRefreshed,
   AccountCommand,
+  AccountCreated,
+  AccountErrorMessage,
   Tokens
 }
 import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.message.AccountMessages
 import app.softnetwork.payment.model.SoftPaymentAccount
 import app.softnetwork.payment.persistence.typed.SoftPaymentAccountBehavior
+import app.softnetwork.persistence.generateUUID
 import app.softnetwork.persistence.typed.CommandTypeKey
 import app.softnetwork.session.model.JwtClaimsEncoder
 import com.softwaremill.session.SessionConfig
@@ -53,16 +56,16 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
     }
   }
 
-  def generateClientToken(
+  def generateClientTokens(
     clientId: String,
     clientSecret: String,
     scope: Option[String] = None
-  )(implicit system: ActorSystem[_]): Future[Option[Tokens]] = {
+  )(implicit system: ActorSystem[_]): Future[Either[String, Tokens]] = {
     implicit val ec: ExecutionContext = system.executionContext
     ??(clientId, AccountMessages.GenerateClientToken(clientId, clientSecret, scope)) map {
       case result: AccessTokenGenerated =>
         import result._
-        Some(
+        Right(
           Tokens(
             accessToken.token,
             accessToken.tokenType.toLowerCase(),
@@ -71,18 +74,19 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
             accessToken.refreshExpiresIn
           )
         )
-      case _ => None
+      case error: AccountErrorMessage => Left(error.message)
+      case _                          => Left("unknown")
     }
   }
 
-  def refreshClientToken(
+  def refreshClientTokens(
     refreshToken: String
-  )(implicit system: ActorSystem[_]): Future[Option[Tokens]] = {
+  )(implicit system: ActorSystem[_]): Future[Either[String, Tokens]] = {
     implicit val ec: ExecutionContext = system.executionContext
     ??(refreshToken, AccountMessages.RefreshClientToken(refreshToken)) map {
       case result: AccessTokenRefreshed =>
         import result._
-        Some(
+        Right(
           Tokens(
             accessToken.token,
             accessToken.tokenType.toLowerCase(),
@@ -91,7 +95,29 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
             accessToken.refreshExpiresIn
           )
         )
-      case _ => None
+      case error: AccountErrorMessage => Left(error.message)
+      case _                          => Left("unknown")
+    }
+  }
+
+  def signUpClient(
+    signUp: AccountMessages.SoftPaymentSignUp
+  )(implicit system: ActorSystem[_]): Future[Either[String, SoftPaymentAccount.Client]] = {
+    implicit val ec: ExecutionContext = system.executionContext
+    ??(
+      generateUUID(Some(signUp.login)),
+      signUp
+    ) map {
+      case result: AccountCreated =>
+        Right(
+          result.account
+            .asInstanceOf[SoftPaymentAccount]
+            .clients
+            .find(_.provider.providerId == signUp.provider.providerId)
+            .get
+        )
+      case error: AccountErrorMessage => Left(error.message)
+      case _                          => Left("unknown")
     }
   }
 

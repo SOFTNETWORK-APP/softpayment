@@ -18,7 +18,7 @@ trait Client extends GrpcClient {
 
   def generateClientTokens(
     scope: Option[String] = None
-  ): Future[Option[Tokens]] = {
+  ): Future[Either[String, Option[Tokens]]] = {
     import settings._
     grpcClient
       .generateClientTokens()
@@ -27,13 +27,13 @@ trait Client extends GrpcClient {
       ) map (response =>
       response.clientTokens match {
         case r: ClientTokensResponse.ClientTokens.Tokens =>
-          r.tokens
-        case _ => None
+          Right(r.tokens)
+        case error: ClientTokensResponse.ClientTokens.Error => Left(error.value)
       }
     )
   }
 
-  def refreshClientTokens(refreshToken: String): Future[Option[Tokens]] = {
+  def refreshClientTokens(refreshToken: String): Future[Either[String, Option[Tokens]]] = {
     grpcClient
       .refreshClientTokens()
       .invoke(
@@ -41,8 +41,34 @@ trait Client extends GrpcClient {
       ) map (response =>
       response.clientTokens match {
         case r: ClientTokensResponse.ClientTokens.Tokens =>
-          r.tokens
-        case _ => None
+          Right(r.tokens)
+        case error: ClientTokensResponse.ClientTokens.Error => Left(error.value)
+      }
+    )
+  }
+
+  def signUpClient(
+    principal: String,
+    credentials: Array[Char],
+    providerId: String,
+    providerApiKey: Array[Char],
+    providerType: Option[ProviderType]
+  ): Future[Either[String, Option[ClientCreated]]] = {
+    grpcClient
+      .signUpClient()
+      .invoke(
+        SignUpClientRequest(
+          principal,
+          credentials.mkString,
+          providerId,
+          providerApiKey.mkString,
+          providerType.getOrElse(ProviderType.MANGOPAY)
+        )
+      ) map (response =>
+      response.signup match {
+        case r: SignUpClientResponse.Signup.Client =>
+          Right(r.client)
+        case error: SignUpClientResponse.Signup.Error => Left(error.value)
       }
     )
   }

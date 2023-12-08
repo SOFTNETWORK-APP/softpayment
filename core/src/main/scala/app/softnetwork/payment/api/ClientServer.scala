@@ -2,6 +2,8 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
+import app.softnetwork.payment.message.AccountMessages
+import app.softnetwork.payment.model.SoftPaymentAccount
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -16,8 +18,8 @@ trait ClientServer extends ClientServiceApi with SoftPaymentAccountDao {
     in: GenerateClientTokensRequest
   ): Future[ClientTokensResponse] = {
     import in._
-    generateClientToken(clientId, clientSecret, scope) map {
-      case Some(tokens) =>
+    generateClientTokens(clientId, clientSecret, scope) map {
+      case Right(tokens) =>
         import tokens._
         ClientTokensResponse.defaultInstance.withTokens(
           Tokens(
@@ -28,14 +30,14 @@ trait ClientServer extends ClientServiceApi with SoftPaymentAccountDao {
             refresh_token_expires_in.map(_.toLong)
           )
         )
-      case _ => ClientTokensResponse.defaultInstance.withError("unknown")
+      case Left(error) => ClientTokensResponse.defaultInstance.withError(error)
     }
   }
 
   override def refreshClientTokens(in: RefreshClientTokensRequest): Future[ClientTokensResponse] = {
     import in._
-    refreshClientToken(refreshToken) map {
-      case Some(tokens) =>
+    refreshClientTokens(refreshToken) map {
+      case Right(tokens) =>
         import tokens._
         ClientTokensResponse.defaultInstance.withTokens(
           Tokens(
@@ -46,7 +48,34 @@ trait ClientServer extends ClientServiceApi with SoftPaymentAccountDao {
             refresh_token_expires_in.map(_.toLong)
           )
         )
-      case _ => ClientTokensResponse.defaultInstance.withError("unknown")
+      case Left(error) => ClientTokensResponse.defaultInstance.withError(error)
+    }
+  }
+
+  override def signUpClient(in: SignUpClientRequest): Future[SignUpClientResponse] = {
+    import in._
+    signUpClient(
+      AccountMessages.SoftPaymentSignUp(
+        principal,
+        credentials,
+        SoftPaymentAccount.Client.Provider(
+          providerId,
+          providerApiKey,
+          SoftPaymentAccount.Client.Provider.ProviderType
+            .fromName(providerType.name)
+            .getOrElse(SoftPaymentAccount.Client.Provider.ProviderType.MANGOPAY)
+        )
+      )
+    ) map {
+      case Right(client) =>
+        import client._
+        SignUpClientResponse.defaultInstance.withClient(
+          ClientCreated(
+            clientId,
+            clientApiKey.getOrElse("")
+          )
+        )
+      case Left(error) => SignUpClientResponse.defaultInstance.withError(error)
     }
   }
 }

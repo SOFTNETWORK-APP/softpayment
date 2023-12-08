@@ -14,7 +14,7 @@ import app.softnetwork.persistence.message.EntityCommand
 import org.softnetwork.session.model.ApiKey
 
 object AccountMessages {
-  case class SoftPaymentSignup(
+  case class SoftPaymentSignUp(
     login: String,
     password: String,
     provider: SoftPaymentAccount.Client.Provider,

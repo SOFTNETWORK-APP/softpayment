@@ -1,9 +1,8 @@
 package app.softnetwork.payment.cli
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.api.PaymentClient
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 trait Command[T] {
 
