@@ -70,4 +70,6 @@ object AccountMessages {
   case object ClientNotFound extends AccountErrorMessage("client.not.found")
 
   case object ApiKeyNotFound extends AccountErrorMessage("api.key.not.found")
+
+  case class InactiveAccount(help: String) extends AccountErrorMessage(s"InactiveAccount\n$help")
 }

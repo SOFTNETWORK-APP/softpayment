@@ -30,7 +30,7 @@ object SignUpClientConfig extends CliConfig[SignUpClientConfig] {
         .action((x, c) => c.copy(credentials = x.toCharArray))
         .text("credentials")
         .required()
-        /*.validate(x =>
+      /*.validate(x =>
           import app.softnetwork.account.config.AccountSettings.passwordRules
           passwordRules().validate(x) match {
             case Right(_)    => success

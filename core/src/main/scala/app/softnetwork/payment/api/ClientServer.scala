@@ -1,6 +1,7 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.account.message.Activate
 import app.softnetwork.payment.handlers.SoftPaymentAccountDao
 import app.softnetwork.payment.message.AccountMessages
 import app.softnetwork.payment.model.SoftPaymentAccount
@@ -76,6 +77,15 @@ trait ClientServer extends ClientServiceApi with SoftPaymentAccountDao {
           )
         )
       case Left(error) => SignUpClientResponse.defaultInstance.withError(error)
+    }
+  }
+
+  override def activateClient(in: ActivateClientRequest): Future[ActivateClientResponse] = {
+    import in._
+    activateClient(Activate(token)) map {
+      case Right(activated) => ActivateClientResponse.defaultInstance.withActivated(activated)
+      case Left(error) =>
+        ActivateClientResponse.defaultInstance.withError(error)
     }
   }
 }

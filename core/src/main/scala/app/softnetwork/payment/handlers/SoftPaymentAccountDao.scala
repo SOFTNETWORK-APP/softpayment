@@ -6,9 +6,11 @@ import app.softnetwork.account.handlers.{AccountDao, AccountHandler}
 import app.softnetwork.account.message.{
   AccessTokenGenerated,
   AccessTokenRefreshed,
+  AccountActivated,
   AccountCommand,
   AccountCreated,
   AccountErrorMessage,
+  Activate,
   Tokens
 }
 import app.softnetwork.payment.annotation.InternalApi
@@ -116,6 +118,17 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
             .find(_.provider.providerId == signUp.provider.providerId)
             .get
         )
+      case error: AccountErrorMessage => Left(error.message)
+      case _                          => Left("unknown")
+    }
+  }
+
+  def activateClient(
+    activation: Activate
+  )(implicit system: ActorSystem[_]): Future[Either[String, Boolean]] = {
+    implicit val ec: ExecutionContext = system.executionContext
+    ??(activation.token, activation) map {
+      case result: AccountActivated   => Right(result.account.status.isActive)
       case error: AccountErrorMessage => Left(error.message)
       case _                          => Left("unknown")
     }

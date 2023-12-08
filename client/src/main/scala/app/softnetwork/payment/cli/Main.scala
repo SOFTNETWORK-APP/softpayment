@@ -4,6 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.PaymentClientBuildInfo
+import app.softnetwork.payment.cli.activate.{ActivateClient, ActivateClientConfig}
 import app.softnetwork.payment.cli.signup.{SignUpClient, SignUpClientConfig}
 import app.softnetwork.payment.cli.tokens.{Tokens, TokensConfig}
 import com.typesafe.scalalogging.StrictLogging
@@ -21,6 +22,7 @@ object Main extends StrictLogging {
 class Main extends Completion with StrictLogging {
   val configs: List[CliConfig[_]] = List(
     SignUpClientConfig,
+    ActivateClientConfig,
     TokensConfig
   )
 
@@ -93,6 +95,22 @@ class Main extends Completion with StrictLogging {
                     System.exit(1)
                   case Some(conf) =>
                     Tokens.run(conf) complete () match {
+                      case Success(result) =>
+                        println(result)
+                        System.exit(0)
+                      case Failure(f) =>
+                        logger.error(s"Failed to run command $command", f)
+                        System.exit(1)
+                    }
+                }
+              case ActivateClientConfig.command =>
+                ActivateClientConfig.parse(list) match {
+                  case None =>
+                    println(s"ERROR: Invalid arguments for command --> $command")
+                    printUsage(config.usage())
+                    System.exit(1)
+                  case Some(conf) =>
+                    ActivateClient.run(conf) complete () match {
                       case Success(result) =>
                         println(result)
                         System.exit(0)

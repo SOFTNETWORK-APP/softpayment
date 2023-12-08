@@ -3,10 +3,12 @@ package app.softnetwork.payment.persistence.typed
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
 import akka.persistence.typed.scaladsl.Effect
+import app.softnetwork.account.config.AccountSettings.{ActivationTokenExpirationTime, BaseUrl, Path}
 import app.softnetwork.account.handlers.{DefaultGenerator, Generator}
 import app.softnetwork.account.message._
 import app.softnetwork.account.model.{BasicAccount, BasicAccountProfile, Principal, PrincipalType}
 import app.softnetwork.account.persistence.typed.AccountBehavior
+import app.softnetwork.notification.message.ExternalEntityToNotificationEvent
 import app.softnetwork.payment.message.AccountMessages
 import app.softnetwork.payment.message.AccountMessages.SoftPaymentSignUp
 import app.softnetwork.payment.message.SoftPaymentAccountEvents.{
@@ -20,6 +22,8 @@ import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.persistence.typed._
 import app.softnetwork.scheduler.message.SchedulerEvents.ExternalSchedulerEvent
 import app.softnetwork.security.sha256
+import mustache.Mustache
+import org.slf4j.Logger
 
 import java.time.Instant
 
@@ -230,6 +234,9 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
                 }
             }
 
+          case Some(account) if !account.status.isActive =>
+            inactiveAccount(entityId, account, replyTo)
+
           case Some(account) if account.status.isDisabled =>
             Effect.none.thenRun(_ => AccountDisabled ~> replyTo)
 
@@ -282,6 +289,9 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
                   AccountMessages.ClientNotFound ~> replyTo
                 }
             }
+
+          case Some(account) if !account.status.isActive =>
+            inactiveAccount(entityId, account, replyTo)
 
           case Some(account) if account.status.isDisabled =>
             Effect.none.thenRun(_ => AccountDisabled ~> replyTo)
@@ -399,6 +409,51 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
     }
   }
 
+  private def inactiveAccount(
+    entityId: String,
+    account: SoftPaymentAccount,
+    replyTo: Option[ActorRef[AccountCommandResult]]
+  )(implicit
+    context: ActorContext[_]
+  ): Effect[ExternalEntityToNotificationEvent, Option[SoftPaymentAccount]] = {
+    implicit val log: Logger = context.log
+    implicit val system: ActorSystem[Nothing] = context.system
+    def help(token: String): String = {
+      Mustache("snippets/account/inactive.mustache").render(
+        Map(
+          "command"       -> s"payment activate -t $token",
+          "activationUrl" -> s"$BaseUrl/$Path/activate?token=$token"
+        )
+      )
+    }
+    account.verificationToken match {
+      case Some(v) =>
+        if (v.expired) {
+          accountKeyDao.removeAccountKey(v.token)
+          val activationToken = generator.generateToken(
+            account.primaryPrincipal.value,
+            ActivationTokenExpirationTime
+          )
+          accountKeyDao.addAccountKey(activationToken.token, entityId)
+          val notifications = sendActivation(entityId, account, activationToken)
+          Effect
+            .persist(notifications.toList)
+            .thenRun(_ => AccountMessages.InactiveAccount(help(activationToken.token)) ~> replyTo)
+        } else {
+          Effect.none.thenRun(_ => AccountMessages.InactiveAccount(help(v.token)) ~> replyTo)
+        }
+      case _ =>
+        val activationToken = generator.generateToken(
+          account.primaryPrincipal.value,
+          ActivationTokenExpirationTime
+        )
+        accountKeyDao.addAccountKey(activationToken.token, entityId)
+        val notifications = sendActivation(entityId, account, activationToken)
+        Effect
+          .persist(notifications.toList)
+          .thenRun(_ => AccountMessages.InactiveAccount(help(activationToken.token)) ~> replyTo)
+    }
+  }
 }
 
 case object SoftPaymentAccountBehavior extends SoftPaymentAccountBehavior with DefaultGenerator {

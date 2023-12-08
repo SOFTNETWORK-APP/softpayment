@@ -1,7 +1,10 @@
 package app.softnetwork.payment.api.config
 
 import akka.actor.typed.ActorSystem
+import com.typesafe.config.{Config, ConfigFactory}
 import org.softnetwork.session.model.JwtClaims
+
+import java.nio.file.{Path, Paths}
 
 case class PaymentClientSettings(clientId: String, apiKey: String) {
   def generateToken(): String =
@@ -13,7 +16,18 @@ case class PaymentClientSettings(clientId: String, apiKey: String) {
 
 object PaymentClientSettings {
   def apply(system: ActorSystem[_]): PaymentClientSettings = {
-    val clientConfig = system.settings.config.getConfig("payment")
+    val softPaymentHome =
+      sys.env.getOrElse("SOFT_PAYMENT_HOME", System.getProperty("user.home") + "/soft-payment")
+    val clientConfigFile: Path = Paths.get(s"$softPaymentHome/config/application.conf")
+    val clientConfig: Config = {
+      if (clientConfigFile.toFile.exists()) {
+        ConfigFactory
+          .parseFile(clientConfigFile.toFile)
+          .withFallback(system.settings.config.getConfig("payment"))
+      } else {
+        system.settings.config.getConfig("payment")
+      }
+    }
     PaymentClientSettings(
       clientId = clientConfig.getString("client-id"),
       apiKey = clientConfig.getString("api-key")

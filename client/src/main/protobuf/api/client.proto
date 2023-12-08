@@ -12,6 +12,7 @@ option (scalapb.options) = {
 
 service ClientServiceApi {
     rpc SignUpClient (SignUpClientRequest) returns (SignUpClientResponse) {}
+    rpc ActivateClient (ActivateClientRequest) returns (ActivateClientResponse) {}
     rpc GenerateClientTokens (GenerateClientTokensRequest) returns (ClientTokensResponse) {}
     rpc RefreshClientTokens (RefreshClientTokensRequest) returns (ClientTokensResponse) {}
 }
@@ -38,6 +39,17 @@ message ClientCreated {
 message SignUpClientResponse {
     oneof signup {
         ClientCreated client = 1;
+        string error = 2;
+    }
+}
+
+message ActivateClientRequest {
+    string token = 1;
+}
+
+message ActivateClientResponse {
+    oneof activation {
+        bool activated = 1;
         string error = 2;
     }
 }

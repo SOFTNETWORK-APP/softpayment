@@ -72,6 +72,19 @@ trait Client extends GrpcClient {
       }
     )
   }
+
+  def activateClient(token: String): Future[Either[String, Boolean]] = {
+    grpcClient
+      .activateClient()
+      .invoke(
+        ActivateClientRequest(token)
+      ) map (response =>
+      response.activation match {
+        case r: ActivateClientResponse.Activation.Activated => Right(r.value)
+        case error: ActivateClientResponse.Activation.Error => Left(error.value)
+      }
+    )
+  }
 }
 
 object Client extends GrpcClientFactory[Client] {
