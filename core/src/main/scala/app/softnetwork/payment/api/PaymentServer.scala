@@ -2,47 +2,31 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.api.serialization._
-import app.softnetwork.payment.handlers.PaymentHandler
+import app.softnetwork.payment.handlers.PaymentDao
 import app.softnetwork.payment.message.PaymentMessages.{
-  BankAccountLoaded,
-  CancelMandate,
-  CancelPreAuthorization,
   CreateOrUpdatePaymentAccount,
-  DirectDebit,
   DirectDebitFailed,
   DirectDebited,
-  LoadBankAccount,
-  LoadDirectDebitTransaction,
-  LoadPaymentAccount,
-  MandateCanceled,
   PaidIn,
   PaidOut,
-  PayInFailed,
-  PayInWithCardPreAuthorized,
-  PayOut,
   PayOutFailed,
   PaymentAccountCreated,
-  PaymentAccountLoaded,
   PaymentAccountUpdated,
-  PaymentError,
   PreAuthorizationCanceled,
   RecurringPaymentRegistered,
-  Refund,
   RefundFailed,
   Refunded,
-  RegisterRecurringPayment,
-  Transfer,
   TransferFailed,
   Transferred
 }
-import app.softnetwork.payment.model.RecurringPayment
+import app.softnetwork.payment.model.{BankAccount, PaymentAccount, RecurringPayment}
 import app.softnetwork.payment.serialization._
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.implicitConversions
 
-trait PaymentServer extends PaymentServiceApi with PaymentHandler {
+trait PaymentServer extends PaymentServiceApi with PaymentDao {
   implicit def system: ActorSystem[_]
 
   implicit lazy val ec: ExecutionContextExecutor = system.executionContext
@@ -65,29 +49,22 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: PayInWithCardPreAuthorizedRequest
   ): Future[TransactionResponse] = {
     import in._
-    !?(
-      PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount, Some(clientId))
+    payInWithCardPreAuthorized(
+      preAuthorizationId,
+      creditedAccount,
+      debitedAmount,
+      Some(clientId)
     ) map {
-      case r: PaidIn =>
+      case Right(r: PaidIn) =>
         TransactionResponse(
           transactionId = Some(r.transactionId),
           transactionStatus = r.transactionStatus
         )
-      case f: PayInFailed =>
+      case Left(f) =>
         TransactionResponse(
-          transactionId = Some(f.transactionId),
+          transactionId = if (f.transactionId.isEmpty) None else Some(f.transactionId),
           transactionStatus = f.transactionStatus,
           error = Some(f.message)
-        )
-      case e: PaymentError =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some(e.message)
-        )
-      case _ =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some("unknown")
         )
     }
   }
@@ -96,8 +73,8 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: CancelPreAuthorizationRequest
   ): Future[CancelPreAuthorizationResponse] = {
     import in._
-    !?(CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId, Some(clientId))) map {
-      case r: PreAuthorizationCanceled =>
+    cancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId, Some(clientId)) map {
+      case Right(r: PreAuthorizationCanceled) =>
         CancelPreAuthorizationResponse(Some(r.preAuthorizationCanceled))
       case _ => CancelPreAuthorizationResponse()
     }
@@ -105,151 +82,103 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
 
   override def refund(in: RefundRequest): Future[TransactionResponse] = {
     import in._
-    !?(
-      Refund(
-        orderUuid,
-        payInTransactionId,
-        refundAmount,
-        currency,
-        reasonMessage,
-        initializedByClient,
-        Some(clientId)
-      )
+    refund(
+      orderUuid,
+      payInTransactionId,
+      refundAmount,
+      currency,
+      reasonMessage,
+      initializedByClient,
+      Some(clientId)
     ) map {
-      case r: Refunded =>
+      case Right(r: Refunded) =>
         TransactionResponse(
           transactionId = Some(r.transactionId),
           transactionStatus = r.transactionStatus
         )
-      case f: RefundFailed =>
+      case Left(f: RefundFailed) =>
         TransactionResponse(
-          transactionId = Some(f.transactionId),
+          transactionId = if (f.transactionId.isEmpty) None else Some(f.transactionId),
           transactionStatus = f.transactionStatus,
           error = Some(f.message)
-        )
-      case e: PaymentError =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some(e.message)
-        )
-      case _ =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some("unknown")
         )
     }
   }
 
   override def payOut(in: PayOutRequest): Future[TransactionResponse] = {
     import in._
-    !?(
-      PayOut(
-        orderUuid,
-        creditedAccount,
-        creditedAmount,
-        feesAmount,
-        currency,
-        externalReference,
-        Some(clientId)
-      )
+    payOut(
+      orderUuid,
+      creditedAccount,
+      creditedAmount,
+      feesAmount,
+      currency,
+      externalReference,
+      Some(clientId)
     ) map {
-      case r: PaidOut =>
+      case Right(r: PaidOut) =>
         TransactionResponse(
           transactionId = Some(r.transactionId),
           transactionStatus = r.transactionStatus
         )
-      case f: PayOutFailed =>
+      case Left(f: PayOutFailed) =>
         TransactionResponse(
-          transactionId = Some(f.transactionId),
+          transactionId = if (f.transactionId.isEmpty) None else Some(f.transactionId),
           transactionStatus = f.transactionStatus,
           error = Some(f.message)
-        )
-      case e: PaymentError =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some(e.message)
-        )
-      case _ =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some("unknown")
         )
     }
   }
 
   override def transfer(in: TransferRequest): Future[TransferResponse] = {
     import in._
-    !?(
-      Transfer(
-        orderUuid,
-        debitedAccount,
-        creditedAccount,
-        debitedAmount,
-        feesAmount,
-        currency,
-        payOutRequired,
-        externalReference,
-        Some(clientId)
-      )
+    transfer(
+      orderUuid,
+      debitedAccount,
+      creditedAccount,
+      debitedAmount,
+      feesAmount,
+      currency,
+      payOutRequired,
+      externalReference,
+      Some(clientId)
     ) map {
-      case r: Transferred =>
+      case Right(r: Transferred) =>
         TransferResponse(
           Some(r.transferredTransactionId),
           r.transferredTransactionStatus,
           r.paidOutTransactionId
         )
-      case f: TransferFailed =>
+      case Left(f: TransferFailed) =>
         TransferResponse(
-          Some(f.transferredTransactionId),
+          if (f.transferredTransactionId.isEmpty) None else Some(f.transferredTransactionId),
           f.transferredTransactionStatus,
           error = Some(f.message)
-        )
-      case e: PaymentError =>
-        TransferResponse(
-          transferredTransactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some(e.message)
-        )
-      case _ =>
-        TransferResponse(
-          transferredTransactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some("unknown")
         )
     }
   }
 
   override def directDebit(in: DirectDebitRequest): Future[TransactionResponse] = {
     import in._
-    !?(
-      DirectDebit(
-        creditedAccount,
-        debitedAmount,
-        feesAmount,
-        currency,
-        statementDescriptor,
-        externalReference,
-        Some(clientId)
-      )
+    directDebit(
+      creditedAccount,
+      debitedAmount,
+      feesAmount,
+      currency,
+      statementDescriptor,
+      externalReference,
+      Some(clientId)
     ) map {
-      case r: DirectDebited =>
+      case Right(r: DirectDebited) =>
         TransactionResponse(
           transactionId = Some(r.transactionId),
           transactionStatus = r.transactionStatus
         )
-      case f: DirectDebitFailed =>
+      case Left(f: DirectDebitFailed) =>
         TransactionResponse(
-          transactionId = Some(f.transactionId),
+          transactionId = if (f.transactionId.isEmpty) None else Some(f.transactionId),
           transactionStatus = f.transactionStatus,
           error = Some(f.message)
-        )
-      case e: PaymentError =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some(e.message)
-        )
-      case _ =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some("unknown")
         )
     }
   }
@@ -258,27 +187,17 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: LoadDirectDebitTransactionRequest
   ): Future[TransactionResponse] = {
     import in._
-    !?(LoadDirectDebitTransaction(directDebitTransactionId, Some(clientId))) map {
-      case r: DirectDebited =>
+    loadDirectDebitTransaction(directDebitTransactionId, Some(clientId)) map {
+      case Right(r: DirectDebited) =>
         TransactionResponse(
           transactionId = Some(r.transactionId),
           transactionStatus = r.transactionStatus
         )
-      case f: DirectDebitFailed =>
+      case Left(f: DirectDebitFailed) =>
         TransactionResponse(
-          transactionId = Some(f.transactionId),
+          transactionId = if (f.transactionId.isEmpty) None else Some(f.transactionId),
           transactionStatus = f.transactionStatus,
           error = Some(f.message)
-        )
-      case e: PaymentError =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some(e.message)
-        )
-      case _ =>
-        TransactionResponse(
-          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
-          error = Some("unknown")
         )
     }
   }
@@ -289,26 +208,24 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     import in._
     val maybeType: Option[RecurringPayment.RecurringPaymentType] = `type`
     maybeType match {
-      case Some(atype) =>
-        !?(
-          RegisterRecurringPayment(
-            debitedAccount,
-            firstDebitedAmount,
-            firstFeesAmount,
-            currency,
-            atype,
-            startDate,
-            endDate,
-            frequency,
-            fixedNextAmount,
-            nextDebitedAmount,
-            nextFeesAmount,
-            statementDescriptor,
-            externalReference,
-            Some(clientId)
-          )
+      case Some(recurringPaymentType) =>
+        registerRecurringPayment(
+          debitedAccount,
+          firstDebitedAmount,
+          firstFeesAmount,
+          currency,
+          recurringPaymentType,
+          startDate,
+          endDate,
+          frequency,
+          fixedNextAmount,
+          nextDebitedAmount,
+          nextFeesAmount,
+          statementDescriptor,
+          externalReference,
+          Some(clientId)
         ) map {
-          case r: RecurringPaymentRegistered =>
+          case Right(r: RecurringPaymentRegistered) =>
             RegisterRecurringPaymentResponse(Some(r.recurringPaymentRegistrationId))
           case _ => RegisterRecurringPaymentResponse()
         }
@@ -318,9 +235,9 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
 
   override def cancelMandate(in: CancelMandateRequest): Future[CancelMandateResponse] = {
     import in._
-    !?(CancelMandate(externalUuid)) map {
-      case MandateCanceled => CancelMandateResponse(true)
-      case _               => CancelMandateResponse()
+    cancelMandate(externalUuid, Some(clientId)) map {
+      case Right(r) => CancelMandateResponse(r)
+      case Left(_)  => CancelMandateResponse()
     }
   }
 
@@ -328,9 +245,9 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: LoadBankAccountOwnerRequest
   ): Future[LoadBankAccountOwnerResponse] = {
     import in._
-    !?(LoadBankAccount(externalUuid, Some(clientId))) map {
-      case r: BankAccountLoaded =>
-        LoadBankAccountOwnerResponse(r.bankAccount.ownerName, Some(r.bankAccount.ownerAddress))
+    loadBankAccount(externalUuid, Some(clientId)) map {
+      case Some(r: BankAccount) =>
+        LoadBankAccountOwnerResponse(r.ownerName, Some(r.ownerAddress))
       case _ => LoadBankAccountOwnerResponse()
     }
   }
@@ -339,9 +256,9 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
     in: LoadLegalUserRequest
   ): Future[LoadLegalUserResponse] = {
     import in._
-    !?(LoadPaymentAccount(externalUuid, Some(clientId))) map {
-      case r: PaymentAccountLoaded if r.paymentAccount.user.isLegalUser =>
-        val legalUser = r.paymentAccount.getLegalUser
+    loadPaymentAccount(externalUuid, Some(clientId)) map {
+      case Some(r: PaymentAccount) if r.user.isLegalUser =>
+        val legalUser = r.getLegalUser
         LoadLegalUserResponse(
           legalUser.legalUserType,
           legalUser.legalName,
@@ -349,8 +266,8 @@ trait PaymentServer extends PaymentServiceApi with PaymentHandler {
           Some(legalUser.legalRepresentativeAddress),
           Some(legalUser.headQuartersAddress)
         )
-      case r: PaymentAccountLoaded if r.paymentAccount.bankAccount.isDefined =>
-        val bankAccount = r.paymentAccount.getBankAccount
+      case Some(r: PaymentAccount) if r.bankAccount.isDefined =>
+        val bankAccount = r.getBankAccount
         LoadLegalUserResponse(
           LegalUserType.SOLETRADER,
           bankAccount.ownerName,

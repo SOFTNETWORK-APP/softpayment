@@ -3,7 +3,8 @@ package app.softnetwork.payment.handlers
 import akka.actor.typed.ActorSystem
 import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
 import app.softnetwork.kv.handlers.GenericKeyValueDao
-import app.softnetwork.payment.message.PaymentMessages._
+import app.softnetwork.payment.annotation.InternalApi
+import app.softnetwork.payment.message.PaymentMessages.{MandateCanceled, _}
 import app.softnetwork.persistence.typed.scaladsl.EntityPattern
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.persistence.typed.PaymentBehavior
@@ -11,6 +12,7 @@ import app.softnetwork.persistence._
 import app.softnetwork.persistence.typed.CommandTypeKey
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.util.Date
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
@@ -53,25 +55,46 @@ trait PaymentHandler extends EntityPattern[PaymentCommand, PaymentResult] with P
   }
 }
 
-trait PaymentDao { _: PaymentHandler =>
+trait PaymentDao extends PaymentHandler {
 
-  protected[payment] def loadPaymentAccount(
-    key: String
+  @InternalApi
+  private[payment] def loadPaymentAccount(
+    key: String,
+    clientId: Option[String]
   )(implicit system: ActorSystem[_]): Future[Option[PaymentAccount]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    !?(LoadPaymentAccount(key)) map {
+    !?(LoadPaymentAccount(key, clientId)) map {
       case result: PaymentAccountLoaded => Some(result.paymentAccount)
       case _                            => None
     }
   }
 
-  def preRegisterCard(orderUuid: String, user: PaymentUser, currency: String = "EUR")(implicit
-    system: ActorSystem[_]
-  ): Future[Option[CardPreRegistration]] = {
+  @InternalApi
+  private[payment] def loadBankAccount(
+    externalUuid: String,
+    clientId: Option[String] = None
+  )(implicit system: ActorSystem[_]): Future[Option[BankAccount]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    !?(PreRegisterCard(orderUuid, user, currency)) map {
-      case result: CardPreRegistered => Some(result.cardPreRegistration)
+    !?(LoadBankAccount(externalUuid, clientId)) map {
+      case result: BankAccountLoaded => Some(result.bankAccount)
       case _                         => None
+    }
+  }
+
+  @InternalApi
+  private[payment] def preRegisterCard(
+    orderUuid: String,
+    user: PaymentUser,
+    currency: String = "EUR",
+    clientId: Option[String] = None
+  )(implicit
+    system: ActorSystem[_]
+  ): Future[Either[String, CardPreRegistration]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(PreRegisterCard(orderUuid, user, currency, clientId)) map {
+      case result: CardPreRegistered => Right(result.cardPreRegistration)
+      case error: PaymentError       => Left(error.message)
+      case _                         => Left("unknown")
     }
   }
 
@@ -154,29 +177,53 @@ trait PaymentDao { _: PaymentHandler =>
     }
   }
 
-  def payInWithCardPreAuthorized(
+  @InternalApi
+  private[payment] def cancelPreAuthorization(
+    orderUuid: String,
+    cardPreAuthorizedTransactionId: String,
+    clientId: Option[String] = None
+  )(implicit system: ActorSystem[_]): Future[Either[String, PreAuthorizationCanceled]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId, clientId)) map {
+      case result: PreAuthorizationCanceled => Right(result)
+      case error: PaymentError              => Left(error.message)
+      case _                                => Left("unknown")
+    }
+  }
+
+  @InternalApi
+  private[payment] def payInWithCardPreAuthorized(
     preAuthorizationId: String,
     creditedAccount: String,
-    debitedAmount: Option[Int]
+    debitedAmount: Option[Int],
+    clientId: Option[String] = None
   )(implicit
     system: ActorSystem[_]
   ): Future[Either[PayInFailed, PaidIn]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    !?(PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount)) map {
+    !?(
+      PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount, clientId)
+    ) map {
       case result: PaidIn     => Right(result)
       case error: PayInFailed => Left(error)
+      case error: PaymentError =>
+        Left(
+          PayInFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, error.message)
+        )
       case _ =>
         Left(PayInFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 
-  def refund(
+  @InternalApi
+  private[payment] def refund(
     orderUuid: String,
     payInTransactionId: String,
     refundAmount: Int,
     currency: String = "EUR",
     reasonMessage: String,
-    initializedByClient: Boolean
+    initializedByClient: Boolean,
+    clientId: Option[String] = None
   )(implicit system: ActorSystem[_]): Future[Either[RefundFailed, Refunded]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
     !?(
@@ -186,44 +233,67 @@ trait PaymentDao { _: PaymentHandler =>
         refundAmount,
         currency,
         reasonMessage,
-        initializedByClient
+        initializedByClient,
+        clientId
       )
     ) map {
       case result: Refunded    => Right(result)
       case error: RefundFailed => Left(error)
+      case error: PaymentError =>
+        Left(
+          RefundFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, error.message)
+        )
       case _ =>
         Left(RefundFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 
-  def payOut(
+  @InternalApi
+  private[payment] def payOut(
     orderUuid: String,
     creditedAccount: String,
     creditedAmount: Int,
     feesAmount: Int,
     currency: String = "EUR",
-    externalReference: Option[String]
+    externalReference: Option[String],
+    clientId: Option[String] = None
   )(implicit
     system: ActorSystem[_]
   ): Future[Either[PayOutFailed, PaidOut]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
     !?(
-      PayOut(orderUuid, creditedAccount, creditedAmount, feesAmount, currency, externalReference)
+      PayOut(
+        orderUuid,
+        creditedAccount,
+        creditedAmount,
+        feesAmount,
+        currency,
+        externalReference,
+        clientId
+      )
     ) map {
       case result: PaidOut     => Right(result)
       case error: PayOutFailed => Left(error)
+      case error: PaymentError =>
+        Left(
+          PayOutFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, error.message)
+        )
       case _ =>
         Left(PayOutFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
 
-  def transfer(
+  @InternalApi
+  private[payment] def transfer(
     orderUuid: Option[String] = None,
     debitedAccount: String,
     creditedAccount: String,
     debitedAmount: Int,
     feesAmount: Int = 0,
-    payOutRequired: Boolean = true
+    currency: String = "EUR",
+    payOutRequired: Boolean = true,
+    externalReference: Option[String] = None,
+    clientId: Option[String] = None
   )(implicit system: ActorSystem[_]): Future[Either[TransferFailed, Transferred]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
     !?(
@@ -233,17 +303,151 @@ trait PaymentDao { _: PaymentHandler =>
         creditedAccount,
         debitedAmount,
         feesAmount,
-        payOutRequired
+        currency,
+        payOutRequired,
+        externalReference,
+        clientId
       )
     ) map {
       case result: Transferred   => Right(result)
       case error: TransferFailed => Left(error)
+      case error: PaymentError =>
+        Left(
+          TransferFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, error.message)
+        )
       case _ =>
         Left(TransferFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
     }
   }
+
+  @InternalApi
+  private[payment] def cancelMandate(
+    creditedAccount: String,
+    clientId: Option[String] = None
+  )(implicit system: ActorSystem[_]): Future[Either[String, Boolean]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(CancelMandate(creditedAccount, clientId)) map {
+      case MandateCanceled     => Right(true)
+      case error: PaymentError => Left(error.message)
+      case _                   => Left("unknown")
+    }
+  }
+
+  @InternalApi
+  private[payment] def directDebit(
+    creditedAccount: String,
+    debitedAmount: Int,
+    feesAmount: Int = 0,
+    currency: String = "EUR",
+    statementDescriptor: String,
+    externalReference: Option[String] = None,
+    clientId: Option[String] = None
+  )(implicit
+    system: ActorSystem[_]
+  ): Future[Either[DirectDebitFailed, DirectDebited]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(
+      DirectDebit(
+        creditedAccount,
+        debitedAmount,
+        feesAmount,
+        currency,
+        statementDescriptor,
+        externalReference,
+        clientId
+      )
+    ) map {
+      case result: DirectDebited    => Right(result)
+      case error: DirectDebitFailed => Left(error)
+      case error: PaymentError =>
+        Left(
+          DirectDebitFailed(
+            "",
+            Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+            error.message
+          )
+        )
+      case _ =>
+        Left(
+          DirectDebitFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown")
+        )
+    }
+  }
+
+  @InternalApi
+  private[payment] def loadDirectDebitTransaction(
+    directDebitTransactionId: String,
+    clientId: Option[String] = None
+  )(implicit
+    system: ActorSystem[_]
+  ): Future[Either[DirectDebitFailed, DirectDebited]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(LoadDirectDebitTransaction(directDebitTransactionId, clientId)) map {
+      case result: DirectDebited    => Right(result)
+      case error: DirectDebitFailed => Left(error)
+      case error: PaymentError =>
+        Left(
+          DirectDebitFailed(
+            "",
+            Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+            error.message
+          )
+        )
+      case _ =>
+        Left(
+          DirectDebitFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown")
+        )
+    }
+  }
+
+  @InternalApi
+  private[payment] def registerRecurringPayment(
+    debitedAccount: String,
+    firstDebitedAmount: Int,
+    firstFeesAmount: Int,
+    currency: String = "EUR",
+    `type`: RecurringPayment.RecurringPaymentType = RecurringPayment.RecurringPaymentType.CARD,
+    startDate: Option[Date] = None,
+    endDate: Option[Date] = None,
+    frequency: Option[RecurringPayment.RecurringPaymentFrequency] = None,
+    fixedNextAmount: Option[Boolean] = None,
+    nextDebitedAmount: Option[Int] = None,
+    nextFeesAmount: Option[Int] = None,
+    statementDescriptor: Option[String] = None,
+    externalReference: Option[String] = None,
+    clientId: Option[String] = None
+  )(implicit
+    system: ActorSystem[_]
+  ): Future[Either[String, RecurringPaymentRegistered]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(
+      RegisterRecurringPayment(
+        debitedAccount,
+        firstDebitedAmount,
+        firstFeesAmount,
+        currency,
+        `type`,
+        startDate,
+        endDate,
+        frequency,
+        fixedNextAmount,
+        nextDebitedAmount,
+        nextFeesAmount,
+        statementDescriptor,
+        externalReference,
+        Some(clientId)
+      )
+    ) map {
+      case result: RecurringPaymentRegistered => Right(result)
+      case error: PaymentError                => Left(error.message)
+      case _ =>
+        Left(
+          "unknown"
+        )
+    }
+  }
 }
 
-object PaymentDao extends PaymentDao with PaymentHandler {
+object PaymentDao extends PaymentDao {
   lazy val log: Logger = LoggerFactory.getLogger(getClass.getName)
 }

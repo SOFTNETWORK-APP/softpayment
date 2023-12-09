@@ -58,7 +58,8 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
     }
   }
 
-  def generateClientTokens(
+  @InternalApi
+  private[payment] def generateClientTokens(
     clientId: String,
     clientSecret: String,
     scope: Option[String] = None
@@ -81,7 +82,8 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
     }
   }
 
-  def refreshClientTokens(
+  @InternalApi
+  private[payment] def refreshClientTokens(
     refreshToken: String
   )(implicit system: ActorSystem[_]): Future[Either[String, Tokens]] = {
     implicit val ec: ExecutionContext = system.executionContext
@@ -102,7 +104,8 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
     }
   }
 
-  def signUpClient(
+  @InternalApi
+  private[payment] def signUpClient(
     signUp: AccountMessages.SoftPaymentSignUp
   )(implicit system: ActorSystem[_]): Future[Either[String, SoftPaymentAccount.Client]] = {
     implicit val ec: ExecutionContext = system.executionContext
@@ -123,7 +126,8 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
     }
   }
 
-  def activateClient(
+  @InternalApi
+  private[payment] def activateClient(
     activation: Activate
   )(implicit system: ActorSystem[_]): Future[Either[String, Boolean]] = {
     implicit val ec: ExecutionContext = system.executionContext
@@ -134,7 +138,8 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
     }
   }
 
-  def loadApiKey(
+  @InternalApi
+  private[payment] def loadApiKey(
     clientId: String
   )(implicit system: ActorSystem[_]): Future[Option[ApiKey]] = {
     implicit val ec: ExecutionContext = system.executionContext
@@ -144,8 +149,9 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
     }
   }
 
-  def registerProviderAccount(provider: SoftPaymentAccount.Client.Provider)(implicit
-    system: ActorSystem[_]
+  @InternalApi
+  private[payment] def registerProviderAccount(provider: SoftPaymentAccount.Client.Provider)(
+    implicit system: ActorSystem[_]
   ): Future[Option[SoftPaymentAccount]] = {
     implicit val ec: ExecutionContext = system.executionContext
     !?(AccountMessages.RegisterProviderAccount(provider)) map {
@@ -154,7 +160,8 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
     }
   }
 
-  def authenticateClient(
+  @InternalApi
+  private[payment] def authenticateClient(
     token: Option[String]
   )(implicit system: ActorSystem[_]): Future[Option[SoftPaymentAccount.Client]] = {
     token match {

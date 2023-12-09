@@ -464,6 +464,11 @@ trait PaymentBehavior
         import cmd._
         state match {
           case Some(paymentAccount) =>
+            val clientId = paymentAccount.clientId
+              .orElse(cmd.clientId)
+              .orElse(
+                internalClientId
+              )
             val maybeTransaction = paymentAccount.transactions.find(_.id == preAuthorizationId)
             maybeTransaction match {
               case None =>
@@ -516,7 +521,7 @@ trait PaymentBehavior
                 )
               case Some(preAuthorizationTransaction) =>
                 // load credited payment account
-                paymentDao.loadPaymentAccount(creditedAccount) complete () match {
+                paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
                   case Success(s) =>
                     s match {
                       case Some(creditedPaymentAccount) =>
@@ -611,7 +616,7 @@ trait PaymentBehavior
                     }) match {
                       case Some(cardId) =>
                         // load credited payment account
-                        paymentDao.loadPaymentAccount(creditedAccount) complete () match {
+                        paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
                           case Success(s) =>
                             s match {
                               case Some(creditedPaymentAccount) =>
@@ -687,7 +692,7 @@ trait PaymentBehavior
                 paymentAccount.userId match {
                   case Some(userId) =>
                     // load credited payment account
-                    paymentDao.loadPaymentAccount(creditedAccount) complete () match {
+                    paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
                       case Success(s) =>
                         s match {
                           case Some(creditedPaymentAccount) =>
@@ -1194,7 +1199,7 @@ trait PaymentBehavior
                 paymentAccount.walletId match {
                   case Some(debitedWalletId) =>
                     // load credited payment account
-                    paymentDao.loadPaymentAccount(creditedAccount) complete () match {
+                    paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
                       case Success(s) =>
                         maybeCreditedPaymentAccount = s
                         maybeCreditedPaymentAccount match {
