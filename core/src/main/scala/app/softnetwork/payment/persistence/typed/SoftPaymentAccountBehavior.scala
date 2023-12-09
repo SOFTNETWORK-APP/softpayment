@@ -9,6 +9,7 @@ import app.softnetwork.account.message._
 import app.softnetwork.account.model.{BasicAccount, BasicAccountProfile, Principal, PrincipalType}
 import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.notification.message.ExternalEntityToNotificationEvent
+import app.softnetwork.payment.cli.Main
 import app.softnetwork.payment.message.AccountMessages
 import app.softnetwork.payment.message.AccountMessages.SoftPaymentSignUp
 import app.softnetwork.payment.message.SoftPaymentAccountEvents.{
@@ -421,7 +422,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
     def help(token: String): String = {
       Mustache("snippets/account/inactive.mustache").render(
         Map(
-          "command"       -> s"payment activate -t $token",
+          "command"       -> s"${Main.shell} activate -t $token",
           "activationUrl" -> s"$BaseUrl/$Path/activate?token=$token"
         )
       )

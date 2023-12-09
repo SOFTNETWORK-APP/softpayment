@@ -32,7 +32,7 @@ Test / parallelExecution := false
 lazy val client = project.in(file("client"))
   .configs(IntegrationTest)
   .settings(Defaults.itSettings, app.softnetwork.Info.infoSettings)
-  .enablePlugins(BuildInfoPlugin, AkkaGrpcPlugin)
+  .enablePlugins(BuildInfoPlugin, AkkaGrpcPlugin, JavaAppPackaging)
 
 lazy val common = project.in(file("common"))
   .configs(IntegrationTest)

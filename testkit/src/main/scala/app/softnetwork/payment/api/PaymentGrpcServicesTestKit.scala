@@ -16,14 +16,21 @@ trait PaymentGrpcServicesTestKit extends SchedulerGrpcServicesTestKit with Payme
   def paymentGrpcConfig: String = schedulerGrpcConfig + s"""
                               |# Important: enable HTTP/2 in ActorSystem's config
                               |akka.http.server.preview.enable-http2 = on
+                              |
+                              |akka.grpc.client."${Client.name}"{
+                              |    host = $interface
+                              |    port = $port
+                              |    use-tls = false
+                              |}
+                              |
                               |akka.grpc.client."${PaymentClient.name}"{
                               |    host = $interface
                               |    port = $port
                               |    use-tls = false
                               |}
                               |
+                              |payment.test = true
                               |payment.client-id = "${settings.clientId}"
-                              |
                               |payment.api-key = "${settings.apiKey}"
                               |
                               |""".stripMargin

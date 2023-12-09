@@ -4,6 +4,8 @@ import scopt.OParser
 
 trait CommandConfig {
   def command: String
+
+  def shell: String = Main.shell
 }
 
 trait CliConfig[T] extends CommandConfig {

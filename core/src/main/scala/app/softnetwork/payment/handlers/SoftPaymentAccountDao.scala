@@ -183,8 +183,8 @@ trait SoftPaymentAccountDao extends AccountDao with SoftPaymentAccountHandler {
                       .toOption match {
                       case Some(result) if result.signatureMatches =>
                         loadClient(clientId) flatMap {
-                          case Some(client) => Future.successful(Some(client))
-                          case _            => Future.successful(None)
+                          case None => Future.successful(None)
+                          case some => Future.successful(some)
                         }
                       case _ => Future.successful(None)
                     }

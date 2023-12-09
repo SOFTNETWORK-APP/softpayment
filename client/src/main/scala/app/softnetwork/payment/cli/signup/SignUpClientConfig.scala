@@ -9,7 +9,7 @@ case class SignUpClientConfig(
   credentials: Array[Char] = Array.emptyCharArray,
   providerId: String = "",
   providerApiKey: Array[Char] = Array.emptyCharArray,
-  providerType: Option[ProviderType] = None
+  providerType: Option[ProviderType] = Some(ProviderType.MANGOPAY)
 )
 
 object SignUpClientConfig extends CliConfig[SignUpClientConfig] {
@@ -20,8 +20,8 @@ object SignUpClientConfig extends CliConfig[SignUpClientConfig] {
     val builder = OParser.builder[SignUpClientConfig]
     import builder._
     OParser.sequence(
-      programName(s"payment $command"),
-      head("payment", command, "[options]"),
+      programName(s"$shell $command"),
+      head(shell, command, "[options]"),
       opt[String]('p', "principal")
         .action((x, c) => c.copy(principal = x))
         .text("principal")
@@ -39,15 +39,15 @@ object SignUpClientConfig extends CliConfig[SignUpClientConfig] {
         )*/,
       opt[String]('i', "providerId")
         .action((x, c) => c.copy(providerId = x))
-        .text("provider Id")
+        .text("payment provider Id")
         .required(),
       opt[String]('k', "providerApiKey")
         .action((x, c) => c.copy(providerApiKey = x.toCharArray))
-        .text("provider Api Key")
+        .text("payment provider Api Key")
         .required(),
       opt[String]('t', "providerType")
-        .action((x, c) => c.copy(providerType = ProviderType.fromName(x)))
-        .text("provider type")
+        .action((x, c) => c.copy(providerType = ProviderType.fromName(x.toUpperCase)))
+        .text("optional payment provider type - default is 'MangoPay'")
         .optional()
     )
   }

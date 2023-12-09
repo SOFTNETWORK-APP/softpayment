@@ -3,7 +3,7 @@ package app.softnetwork.payment.cli
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import app.softnetwork.concurrent.Completion
-import app.softnetwork.payment.PaymentClientBuildInfo
+import app.softnetwork.payment.SoftPaymentBuildInfo
 import app.softnetwork.payment.cli.activate.{ActivateClient, ActivateClientConfig}
 import app.softnetwork.payment.cli.signup.{SignUpClient, SignUpClientConfig}
 import app.softnetwork.payment.cli.tokens.{Tokens, TokensConfig}
@@ -12,6 +12,8 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.util.{Failure, Success}
 
 object Main extends StrictLogging {
+
+  def shell: String = "soft-payment"
 
   def main(args: Array[String]): Unit = {
     implicit def system: ActorSystem[_] = ActorSystem(Behaviors.empty, "PaymentClient")
@@ -28,9 +30,9 @@ class Main extends Completion with StrictLogging {
 
   private def printUsage(): Unit = {
     // scalastyle:off println
-    println(s"Payment Version ${PaymentClientBuildInfo.version}")
+    println(s"SoftPayment Version ${SoftPaymentBuildInfo.version}")
     println("Usage:")
-    println("\tpayment [command]")
+    println(s"\t${Main.shell} [command]")
     println("Available commands =>")
     configs.foreach { config =>
       println(s"\t${config.command}")
@@ -54,6 +56,9 @@ class Main extends Completion with StrictLogging {
         printUsage()
         System.exit(0)
       case "help" :: command :: _ =>
+        printUsage(command)
+        System.exit(0)
+      case command :: "help" :: Nil =>
         printUsage(command)
         System.exit(0)
       case _ =>

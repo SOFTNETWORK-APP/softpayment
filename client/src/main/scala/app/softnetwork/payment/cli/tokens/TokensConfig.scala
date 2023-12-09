@@ -15,11 +15,12 @@ object TokensConfig extends CliConfig[TokensConfig] {
     val builder = OParser.builder[TokensConfig]
     import builder._
     OParser.sequence(
-      programName(s"payment $command"),
-      head("payment", command, "[options]"),
+      programName(s"$shell $command"),
+      head(shell, command, "[options]"),
       opt[String]('r', "refreshToken")
         .action((x, c) => c.copy(refreshToken = Some(x)))
-        .text("refresh token")
+        .text("optional refresh token")
+        .optional()
     )
   }
 

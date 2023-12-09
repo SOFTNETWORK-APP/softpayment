@@ -1,6 +1,6 @@
 organization := "app.softnetwork.payment"
 
-name := "payment-client"
+name := "soft-payment"
 
 akkaGrpcGeneratedSources := Seq(AkkaGrpc.Client)
 
@@ -22,3 +22,5 @@ libraryDependencies ++= Seq(
   "org.scalatra.scalate" %% "scalate-core" % Versions.scalate exclude ("org.scala-lang.modules", "scala-xml_2.12") exclude ("org.scala-lang.modules", "scala-parser-combinators_2.12"),
   "com.hubspot.jinjava" % "jinjava" % Versions.jinja excludeAll (jacksonExclusions *) exclude ("com.google.guava", "guava") exclude ("org.apache.commons", "commons-lang3")
 )
+
+Compile / mainClass := Some("app.softnetwork.payment.cli.Main")

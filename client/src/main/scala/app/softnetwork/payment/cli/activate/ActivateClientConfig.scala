@@ -13,8 +13,8 @@ object ActivateClientConfig extends CliConfig[ActivateClientConfig] {
     val builder = OParser.builder[ActivateClientConfig]
     import builder._
     OParser.sequence(
-      programName(s"payment $command"),
-      head("payment", command, "[options]"),
+      programName(s"$shell $command"),
+      head(shell, command, "[options]"),
       opt[String]('t', "token")
         .action((x, c) => c.copy(token = x))
         .text("token")

@@ -19,13 +19,14 @@ object PaymentClientSettings {
     val softPaymentHome =
       sys.env.getOrElse("SOFT_PAYMENT_HOME", System.getProperty("user.home") + "/soft-payment")
     val clientConfigFile: Path = Paths.get(s"$softPaymentHome/config/application.conf")
+    val systemConfig = system.settings.config.getConfig("payment")
     val clientConfig: Config = {
-      if (clientConfigFile.toFile.exists()) {
+      if (clientConfigFile.toFile.exists() && !systemConfig.hasPath("test")) {
         ConfigFactory
           .parseFile(clientConfigFile.toFile)
-          .withFallback(system.settings.config.getConfig("payment"))
+          .withFallback(systemConfig)
       } else {
-        system.settings.config.getConfig("payment")
+        systemConfig
       }
     }
     PaymentClientSettings(
