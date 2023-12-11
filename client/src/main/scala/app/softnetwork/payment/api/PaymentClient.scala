@@ -4,7 +4,7 @@ import akka.actor.typed.ActorSystem
 import akka.grpc.GrpcClientSettings
 import akka.grpc.scaladsl.SingleResponseRequestBuilder
 import app.softnetwork.api.server.client.{GrpcClient, GrpcClientFactory}
-import app.softnetwork.payment.api.config.PaymentClientSettings
+import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.api.serialization._
 import app.softnetwork.payment.model.{
   BankAccountOwner,
@@ -22,7 +22,7 @@ trait PaymentClient extends GrpcClient {
       GrpcClientSettings.fromConfig(name)
     )
 
-  lazy val settings: PaymentClientSettings = PaymentClientSettings(system)
+  lazy val settings: SoftPayClientSettings = SoftPayClientSettings(system)
 
   private lazy val generatedToken: String = settings.generateToken()
 

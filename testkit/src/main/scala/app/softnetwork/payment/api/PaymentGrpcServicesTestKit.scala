@@ -7,7 +7,7 @@ import app.softnetwork.payment.launch.PaymentGuardian
 import app.softnetwork.scheduler.api.SchedulerGrpcServicesTestKit
 import app.softnetwork.scheduler.launch.SchedulerGuardian
 
-trait PaymentGrpcServicesTestKit extends SchedulerGrpcServicesTestKit with PaymentClientTestKit {
+trait PaymentGrpcServicesTestKit extends SchedulerGrpcServicesTestKit with SoftPayClientTestKit {
   _: PaymentGuardian with SchedulerGuardian with ServerTestKit =>
 
   override def grpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
@@ -28,10 +28,5 @@ trait PaymentGrpcServicesTestKit extends SchedulerGrpcServicesTestKit with Payme
                               |    port = $port
                               |    use-tls = false
                               |}
-                              |
-                              |payment.test = true
-                              |payment.client-id = "${settings.clientId}"
-                              |payment.api-key = "${settings.apiKey}"
-                              |
-                              |""".stripMargin
+                              |""".stripMargin + softPayClientSettings
 }

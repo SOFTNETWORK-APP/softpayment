@@ -3,8 +3,9 @@ package app.softnetwork.payment.cli
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import app.softnetwork.concurrent.Completion
-import app.softnetwork.payment.SoftPaymentBuildInfo
+import app.softnetwork.payment.SoftpayBuildInfo
 import app.softnetwork.payment.cli.activate.{ActivateClient, ActivateClientConfig}
+import app.softnetwork.payment.cli.clients.{Clients, ClientsConfig}
 import app.softnetwork.payment.cli.signup.{SignUpClient, SignUpClientConfig}
 import app.softnetwork.payment.cli.tokens.{Tokens, TokensConfig}
 import com.typesafe.scalalogging.StrictLogging
@@ -13,7 +14,7 @@ import scala.util.{Failure, Success}
 
 object Main extends StrictLogging {
 
-  def shell: String = "soft-payment"
+  def shell: String = "softpay"
 
   def main(args: Array[String]): Unit = {
     implicit def system: ActorSystem[_] = ActorSystem(Behaviors.empty, "PaymentClient")
@@ -25,12 +26,13 @@ class Main extends Completion with StrictLogging {
   val configs: List[CliConfig[_]] = List(
     SignUpClientConfig,
     ActivateClientConfig,
-    TokensConfig
+    TokensConfig,
+    ClientsConfig
   )
 
   private def printUsage(): Unit = {
     // scalastyle:off println
-    println(s"SoftPayment Version ${SoftPaymentBuildInfo.version}")
+    println(s"Softpay Version ${SoftpayBuildInfo.version}")
     println("Usage:")
     println(s"\t${Main.shell} [command]")
     println("Available commands =>")
@@ -116,6 +118,22 @@ class Main extends Completion with StrictLogging {
                     System.exit(1)
                   case Some(conf) =>
                     ActivateClient.run(conf) complete () match {
+                      case Success(result) =>
+                        println(result)
+                        System.exit(0)
+                      case Failure(f) =>
+                        logger.error(s"Failed to run command $command", f)
+                        System.exit(1)
+                    }
+                }
+              case ClientsConfig.command =>
+                ClientsConfig.parse(list) match {
+                  case None =>
+                    println(s"ERROR: Invalid arguments for command --> $command")
+                    printUsage(config.usage())
+                    System.exit(1)
+                  case Some(conf) =>
+                    Clients.run(conf) complete () match {
                       case Success(result) =>
                         println(result)
                         System.exit(0)

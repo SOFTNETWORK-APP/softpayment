@@ -1,6 +1,6 @@
 organization := "app.softnetwork.payment"
 
-name := "soft-payment"
+name := "softpay"
 
 akkaGrpcGeneratedSources := Seq(AkkaGrpc.Client)
 

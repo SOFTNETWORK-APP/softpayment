@@ -2,6 +2,7 @@ package app.softnetwork.payment.cli.signup
 
 import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.api.Client
+import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.cli.Command
 import org.json4s.Formats
 
@@ -20,6 +21,7 @@ object SignUpClient extends Command[SignUpClientConfig] {
       config.providerType
     ) map {
       case Right(client) =>
+        SoftPayClientSettings(client.clientId, client.clientSecret).write()
         val json = org.json4s.jackson.Serialization.writePretty(client)
         s"""
            |Client registered successfully!

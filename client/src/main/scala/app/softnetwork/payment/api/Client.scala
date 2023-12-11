@@ -3,7 +3,7 @@ package app.softnetwork.payment.api
 import akka.actor.typed.ActorSystem
 import akka.grpc.GrpcClientSettings
 import app.softnetwork.api.server.client.{GrpcClient, GrpcClientFactory}
-import app.softnetwork.payment.api.config.PaymentClientSettings
+import app.softnetwork.payment.api.config.SoftPayClientSettings
 
 import scala.concurrent.Future
 
@@ -14,7 +14,7 @@ trait Client extends GrpcClient {
       GrpcClientSettings.fromConfig(name)
     )
 
-  lazy val settings: PaymentClientSettings = PaymentClientSettings(system)
+  lazy val settings: SoftPayClientSettings = SoftPayClientSettings(system)
 
   def generateClientTokens(
     scope: Option[String] = None
@@ -53,7 +53,7 @@ trait Client extends GrpcClient {
     providerId: String,
     providerApiKey: Array[Char],
     providerType: Option[ProviderType]
-  ): Future[Either[String, Option[ClientCreated]]] = {
+  ): Future[Either[String, ClientCreated]] = {
     grpcClient
       .signUpClient()
       .invoke(
@@ -67,7 +67,7 @@ trait Client extends GrpcClient {
       ) map (response =>
       response.signup match {
         case r: SignUpClientResponse.Signup.Client =>
-          Right(r.client)
+          Right(r.value)
         case error: SignUpClientResponse.Signup.Error => Left(error.value)
       }
     )

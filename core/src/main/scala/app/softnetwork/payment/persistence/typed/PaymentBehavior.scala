@@ -6,7 +6,7 @@ import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.kv.handlers.GenericKeyValueDao
 import app.softnetwork.payment.annotation.InternalApi
-import app.softnetwork.payment.api.config.PaymentClientSettings
+import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.config.PaymentSettings.{AkkaNodeRole, PayInStatementDescriptor}
 import app.softnetwork.payment.handlers.{PaymentDao, PaymentKvDao, SoftPaymentAccountDao}
@@ -111,8 +111,8 @@ trait PaymentBehavior
   ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     implicit val system: ActorSystem[_] = context.system
     implicit val log: Logger = context.log
-    implicit val paymentClientSettings: PaymentClientSettings = PaymentClientSettings(system)
-    val internalClientId = Option(paymentClientSettings.clientId)
+    implicit val softPayClientSettings: SoftPayClientSettings = SoftPayClientSettings(system)
+    val internalClientId = Option(softPayClientSettings.clientId)
     command match {
 
       case cmd: CreateOrUpdatePaymentAccount =>
@@ -201,9 +201,11 @@ trait PaymentBehavior
         var registerWallet: Boolean = false
         loadPaymentAccount(entityId, state, PaymentAccount.User.NaturalUser(user), clientId) match {
           case Some(paymentAccount) =>
-            val clientId = paymentAccount.clientId.orElse(
-              internalClientId
-            )
+            val clientId = paymentAccount.clientId
+              .orElse(cmd.clientId)
+              .orElse(
+                internalClientId
+              )
             val paymentProvider = loadPaymentProvider(clientId)
             import paymentProvider._
             val lastUpdated = now()
@@ -228,7 +230,7 @@ trait PaymentBehavior
                 }) match {
                   case Some(walletId) =>
                     keyValueDao.addKeyValue(walletId, entityId)
-                    val createOrUpdatePaymentAccount =
+                    val paymentAccountUpsertedEvent =
                       PaymentAccountUpsertedEvent.defaultInstance
                         .withDocument(
                           paymentAccount
@@ -276,7 +278,7 @@ trait PaymentBehavior
                                     .withLastName(user.lastName)
                                     .withBirthday(user.birthday)
                                 )
-                            ) ++ walletEvents :+ createOrUpdatePaymentAccount
+                            ) ++ walletEvents :+ paymentAccountUpsertedEvent
                           )
                           .thenRun(_ => CardPreRegistered(cardPreRegistration) ~> replyTo)
                       case _ =>
@@ -290,13 +292,13 @@ trait PaymentBehavior
                                   .withUserId(userId)
                                   .withWalletId(walletId)
                                   .withLastUpdated(lastUpdated)
-                              ) :+ createOrUpdatePaymentAccount
+                              ) :+ paymentAccountUpsertedEvent
                             )
                             .thenRun(_ => CardNotPreRegistered ~> replyTo)
                         } else {
                           Effect
                             .persist(
-                              createOrUpdatePaymentAccount
+                              paymentAccountUpsertedEvent
                             )
                             .thenRun(_ => CardNotPreRegistered ~> replyTo)
                         }
@@ -870,7 +872,7 @@ trait PaymentBehavior
                           :+ transaction.copy(clientId = clientId)
                         )
                         .withLastUpdated(lastUpdated)
-                      val upsertedEvent =
+                      val paymentAccountUpsertedEvent =
                         PaymentAccountUpsertedEvent.defaultInstance
                           .withDocument(updatedPaymentAccount)
                           .withLastUpdated(lastUpdated)
@@ -889,7 +891,7 @@ trait PaymentBehavior
                                   .withOrderUuid(orderUuid)
                                   .withResultMessage(transaction.resultMessage)
                                   .withTransaction(transaction)
-                              ) :+ upsertedEvent
+                              ) :+ paymentAccountUpsertedEvent
                             )
                             .thenRun(_ =>
                               RefundFailed(
@@ -923,7 +925,7 @@ trait PaymentBehavior
                                     .withReasonMessage(reasonMessage)
                                     .withInitializedByClient(initializedByClient)
                                     .withPaymentType(transaction.paymentType)
-                                ) :+ upsertedEvent
+                                ) :+ paymentAccountUpsertedEvent
                               )
                               .thenRun(_ => Refunded(transaction.id, transaction.status) ~> replyTo)
                           } else {
@@ -940,7 +942,7 @@ trait PaymentBehavior
                                     .withOrderUuid(orderUuid)
                                     .withResultMessage(transaction.resultMessage)
                                     .withTransaction(transaction)
-                                ) :+ upsertedEvent
+                                ) :+ paymentAccountUpsertedEvent
                               )
                               .thenRun(_ =>
                                 RefundFailed(
@@ -3351,10 +3353,10 @@ trait PaymentBehavior
     bankAccountId: String
   )(implicit
     context: ActorContext[_],
-    paymentClientSettings: PaymentClientSettings
+    softPayClientSettings: SoftPayClientSettings
   ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     implicit val system: ActorSystem[_] = context.system
-    val clientId = paymentAccount.clientId.orElse(Option(paymentClientSettings.clientId))
+    val clientId = paymentAccount.clientId.orElse(Option(softPayClientSettings.clientId))
     val paymentProvider = loadPaymentProvider(clientId)
     import paymentProvider._
     mandate(creditedAccount, creditedUserId, bankAccountId) match {
@@ -3424,7 +3426,7 @@ trait PaymentBehavior
   )(implicit
     system: ActorSystem[_],
     log: Logger,
-    paymentClientSettings: PaymentClientSettings
+    softPayClientSettings: SoftPayClientSettings
   ): Option[PaymentAccount] = {
     val pa = PaymentAccount.defaultInstance.withUser(user).copy(clientId = clientId)
     val uuid = pa.externalUuidWithProfile
@@ -3458,7 +3460,7 @@ trait PaymentBehavior
             paymentAccount.copy(clientId =
               paymentAccount.clientId
                 .orElse(clientId)
-                .orElse(Option(paymentClientSettings.clientId))
+                .orElse(Option(softPayClientSettings.clientId))
             )
           )
         }
@@ -3702,7 +3704,7 @@ trait PaymentBehavior
   )(implicit
     system: ActorSystem[_],
     log: Logger,
-    paymentClientSettings: PaymentClientSettings
+    softPayClientSettings: SoftPayClientSettings
   ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     keyValueDao.addKeyValue(
       transaction.id,
@@ -3730,7 +3732,7 @@ trait PaymentBehavior
         if (transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated) {
           log.debug("Order-{} paid in: {} -> {}", orderUuid, transaction.id, asJson(transaction))
           val clientId = paymentAccount.clientId.orElse(
-            Option(paymentClientSettings.clientId)
+            Option(softPayClientSettings.clientId)
           )
           val paymentProvider = loadPaymentProvider(clientId)
           import paymentProvider._
@@ -3845,7 +3847,7 @@ trait PaymentBehavior
   )(implicit
     system: ActorSystem[_],
     log: Logger,
-    paymentClientSettings: PaymentClientSettings
+    softPayClientSettings: SoftPayClientSettings
   ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     keyValueDao.addKeyValue(
       transaction.id,
@@ -3882,7 +3884,7 @@ trait PaymentBehavior
             transaction.id,
             asJson(transaction)
           )
-          val clientId = paymentAccount.clientId.orElse(Option(paymentClientSettings.clientId))
+          val clientId = paymentAccount.clientId.orElse(Option(softPayClientSettings.clientId))
           val paymentProvider = loadPaymentProvider(clientId)
           import paymentProvider._
           val registerCardEvents: List[ExternalSchedulerEvent] =
@@ -3965,14 +3967,14 @@ trait PaymentBehavior
     maybeStatus: Option[KycDocument.KycDocumentStatus] = None
   )(implicit
     system: ActorSystem[_],
-    paymentClientSettings: PaymentClientSettings
+    softPayClientSettings: SoftPayClientSettings
   ): (KycDocumentValidationReport, List[ExternalSchedulerEvent]) = {
     var events: List[ExternalSchedulerEvent] = List.empty
     val lastUpdated = now()
 
     val userId = paymentAccount.userId.getOrElse("")
 
-    val clientId = paymentAccount.clientId.orElse(Option(paymentClientSettings.clientId))
+    val clientId = paymentAccount.clientId.orElse(Option(softPayClientSettings.clientId))
     val paymentProvider = loadPaymentProvider(clientId)
     import paymentProvider._
     val report = loadDocumentStatus(userId, documentId)
