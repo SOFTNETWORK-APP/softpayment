@@ -10,8 +10,8 @@ import app.softnetwork.payment.api.{
   ClientServer,
   MockClientServer,
   MockPaymentServer,
-  PaymentClientTestKit,
-  PaymentServer
+  PaymentServer,
+  SoftPayClientTestKit
 }
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.{
@@ -51,7 +51,7 @@ trait PaymentTestKit
     extends SchedulerTestKit
     with PaymentGuardian
     with AllNotificationsTestKit
-    with PaymentClientTestKit {
+    with SoftPayClientTestKit {
   _: Suite =>
 
   /** @return
@@ -72,17 +72,12 @@ trait PaymentTestKit
   def loadApiKey(clientId: String): Future[Option[ApiKey]] =
     MockPaymentBehavior.softPaymentAccountDao.loadApiKey(clientId)
 
-  def clientId: String = settings.clientId
+  def clientId: String = provider.clientId
 
   override lazy val config: Config = akkaConfig
     .withFallback(ConfigFactory.load("softnetwork-in-memory-persistence.conf"))
     .withFallback(
-      ConfigFactory.parseString(
-        s"""
-         |payment.client-id = "$clientId"
-         |payment.api-key = "${settings.apiKey}"
-         |""".stripMargin
-      )
+      ConfigFactory.parseString(softPayClientSettings)
     )
     .withFallback(ConfigFactory.load())
 
