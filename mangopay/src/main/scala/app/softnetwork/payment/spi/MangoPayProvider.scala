@@ -23,7 +23,7 @@ import com.mangopay.entities.subentities.{BrowserInfo => MangoPayBrowserInfo, _}
 import app.softnetwork.payment.model.{RecurringPayment, _}
 import app.softnetwork.payment.config.{MangoPay, MangoPaySettings}
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
-import app.softnetwork.payment.model.PaymentUser.PaymentUserType
+import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model.SoftPaymentAccount.Client.Provider
 
 import scala.util.{Failure, Success, Try}
@@ -205,7 +205,7 @@ trait MangoPayProvider extends PaymentProvider {
     * @return
     *   provider user id
     */
-  def createOrUpdateNaturalUser(maybeNaturalUser: Option[PaymentUser]): Option[String] = {
+  def createOrUpdateNaturalUser(maybeNaturalUser: Option[NaturalUser]): Option[String] = {
     maybeNaturalUser match {
       case Some(naturalUser) =>
         import naturalUser._
@@ -222,10 +222,10 @@ trait MangoPayProvider extends PaymentProvider {
             user.setTag(externalUuid)
             user.setNationality(CountryIso.valueOf(nationality))
             user.setCountryOfResidence(CountryIso.valueOf(countryOfResidence))
-            paymentUserType match {
+            naturalUserType match {
               case Some(value) =>
                 value match {
-                  case PaymentUserType.PAYER => user.setUserCategory(UserCategory.PAYER)
+                  case NaturalUserType.PAYER => user.setUserCategory(UserCategory.PAYER)
                   case _ =>
                     user.setUserCategory(UserCategory.OWNER)
                     user.setTermsAndConditionsAccepted(true)
@@ -307,10 +307,10 @@ trait MangoPayProvider extends PaymentProvider {
             )
             user.setEmail(legalRepresentative.email)
             user.setCompanyNumber(siret)
-            legalRepresentative.paymentUserType match {
+            legalRepresentative.naturalUserType match {
               case Some(value) =>
                 value match {
-                  case PaymentUserType.PAYER => user.setUserCategory(UserCategory.PAYER)
+                  case NaturalUserType.PAYER => user.setUserCategory(UserCategory.PAYER)
                   case _ =>
                     user.setUserCategory(UserCategory.OWNER)
                     user.setTermsAndConditionsAccepted(true)

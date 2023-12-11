@@ -5,7 +5,7 @@ import app.softnetwork.protobuf.ScalaPBSerializers
 import ScalaPBSerializers.GeneratedEnumSerializer
 import app.softnetwork.account.model.Account
 import app.softnetwork.account.serialization.accountFormats
-import app.softnetwork.payment.api.{LegalUserType, TransactionStatus}
+import app.softnetwork.payment.api.TransactionStatus
 import org.json4s.Formats
 
 import scala.language.implicitConversions
@@ -20,7 +20,7 @@ package object serialization {
       GeneratedEnumSerializer(KycDocument.KycDocumentType.enumCompanion),
       GeneratedEnumSerializer(UboDeclaration.UboDeclarationStatus.enumCompanion),
       GeneratedEnumSerializer(Transaction.PaymentType.enumCompanion),
-      GeneratedEnumSerializer(PaymentUser.PaymentUserType.enumCompanion),
+      GeneratedEnumSerializer(NaturalUser.NaturalUserType.enumCompanion),
       GeneratedEnumSerializer(LegalUser.LegalUserType.enumCompanion),
       GeneratedEnumSerializer(PaymentAccount.PaymentAccountStatus.enumCompanion),
       GeneratedEnumSerializer(BankAccount.MandateStatus.enumCompanion),

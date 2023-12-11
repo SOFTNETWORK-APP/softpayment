@@ -14,7 +14,7 @@ import app.softnetwork.payment.message.PaymentEvents._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.message.TransactionEvents._
 import app.softnetwork.payment.model.LegalUser.LegalUserType
-import app.softnetwork.payment.model.PaymentUser.PaymentUserType
+import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.spi._
 import app.softnetwork.persistence._
@@ -214,7 +214,7 @@ trait PaymentBehavior
                 createOrUpdatePaymentAccount(
                   Some(
                     paymentAccount.withNaturalUser(
-                      user.withPaymentUserType(PaymentUserType.PAYER)
+                      user.withNaturalUserType(NaturalUserType.PAYER)
                     )
                   )
                 )
@@ -240,7 +240,7 @@ trait PaymentBehavior
                                 user
                                   .withUserId(userId)
                                   .withWalletId(walletId)
-                                  .withPaymentUserType(PaymentUserType.PAYER)
+                                  .withNaturalUserType(NaturalUserType.PAYER)
                               )
                             )
                             .withLastUpdated(lastUpdated)
@@ -311,7 +311,7 @@ trait PaymentBehavior
                             paymentAccount
                               .copy(
                                 user = PaymentAccount.User.NaturalUser(
-                                  user.withUserId(userId).withPaymentUserType(PaymentUserType.PAYER)
+                                  user.withUserId(userId).withNaturalUserType(NaturalUserType.PAYER)
                                 )
                               )
                               .withLastUpdated(lastUpdated)
@@ -327,7 +327,7 @@ trait PaymentBehavior
                       .withDocument(
                         paymentAccount
                           .withNaturalUser(
-                            user.withPaymentUserType(PaymentUserType.PAYER)
+                            user.withNaturalUserType(NaturalUserType.PAYER)
                           )
                           .withLastUpdated(lastUpdated)
                       )
@@ -1998,9 +1998,9 @@ trait PaymentBehavior
                               userId = previousLegalUser.legalRepresentative.userId,
                               walletId = previousLegalUser.legalRepresentative.walletId
                             )
-                            .withPaymentUserType(
-                              updatedLegalUser.legalRepresentative.paymentUserType
-                                .getOrElse(PaymentUserType.COLLECTOR)
+                            .withNaturalUserType(
+                              updatedLegalUser.legalRepresentative.naturalUserType
+                                .getOrElse(NaturalUserType.COLLECTOR)
                             ),
                           uboDeclaration = previousLegalUser.uboDeclaration,
                           lastAcceptedTermsOfPSP = previousLegalUser.lastAcceptedTermsOfPSP
@@ -2011,9 +2011,9 @@ trait PaymentBehavior
                       PaymentAccount.User.LegalUser(
                         updatedLegalUser.copy(
                           legalRepresentative =
-                            updatedLegalUser.legalRepresentative.withPaymentUserType(
-                              updatedLegalUser.legalRepresentative.paymentUserType.getOrElse(
-                                PaymentUserType.COLLECTOR
+                            updatedLegalUser.legalRepresentative.withNaturalUserType(
+                              updatedLegalUser.legalRepresentative.naturalUserType.getOrElse(
+                                NaturalUserType.COLLECTOR
                               )
                             )
                         )
@@ -2027,15 +2027,15 @@ trait PaymentBehavior
                             userId = previousNaturalUser.userId,
                             walletId = previousNaturalUser.walletId
                           )
-                          .withPaymentUserType(
-                            updatedNaturalUser.paymentUserType.getOrElse(PaymentUserType.COLLECTOR)
+                          .withNaturalUserType(
+                            updatedNaturalUser.naturalUserType.getOrElse(NaturalUserType.COLLECTOR)
                           )
                       )
                     } else if (updatedUser.isNaturalUser) {
                       val updatedNaturalUser = updatedUser.naturalUser.get
                       PaymentAccount.User.NaturalUser(
-                        updatedNaturalUser.withPaymentUserType(
-                          updatedNaturalUser.paymentUserType.getOrElse(PaymentUserType.COLLECTOR)
+                        updatedNaturalUser.withNaturalUserType(
+                          updatedNaturalUser.naturalUserType.getOrElse(NaturalUserType.COLLECTOR)
                         )
                       )
                     } else {

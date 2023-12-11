@@ -28,7 +28,7 @@ case class LegalUserView(
   legalUserType: LegalUser.LegalUserType,
   legalName: String,
   siret: String,
-  legalRepresentative: PaymentUserView,
+  legalRepresentative: NaturalUserView,
   legalRepresentativeAddress: AddressView,
   headQuartersAddress: AddressView,
   uboDeclaration: Option[UboDeclarationView] = None,

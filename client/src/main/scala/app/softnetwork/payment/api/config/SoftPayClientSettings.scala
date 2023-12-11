@@ -2,7 +2,7 @@ package app.softnetwork.payment.api.config
 
 import akka.actor.typed.ActorSystem
 import com.typesafe.config.{Config, ConfigFactory}
-import org.softnetwork.session.model.{ApiKey, JwtClaims}
+import org.softnetwork.session.model.JwtClaims
 
 import java.nio.file.{Path, Paths}
 

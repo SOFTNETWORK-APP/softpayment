@@ -7,7 +7,7 @@ import java.time.Instant
 
 trait PaymentAccountDecorator { self: PaymentAccount =>
 
-  lazy val maybeUser: Option[PaymentUser] = {
+  lazy val maybeUser: Option[NaturalUser] = {
     if (user.isLegalUser) {
       Some(getLegalUser.legalRepresentative)
     } else if (user.isNaturalUser) {
@@ -116,7 +116,7 @@ trait PaymentAccountDecorator { self: PaymentAccount =>
 case class PaymentAccountView(
   createdDate: Instant,
   lastUpdated: Instant,
-  naturalUser: Option[PaymentUserView] = None,
+  naturalUser: Option[NaturalUserView] = None,
   legalUser: Option[LegalUserView] = None,
   cards: Seq[CardView] = Seq.empty,
   bankAccount: Option[BankAccountView] = None,

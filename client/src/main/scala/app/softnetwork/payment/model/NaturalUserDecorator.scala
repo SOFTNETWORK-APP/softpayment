@@ -2,13 +2,13 @@ package app.softnetwork.payment.model
 
 import app.softnetwork.payment.model
 
-trait PaymentUserDecorator { self: PaymentUser =>
+trait NaturalUserDecorator { self: NaturalUser =>
   lazy val externalUuidWithProfile: String = computeExternalUuidWithProfile(externalUuid, profile)
 
-  lazy val view: PaymentUserView = model.PaymentUserView(self)
+  lazy val view: NaturalUserView = NaturalUserView(self)
 }
 
-case class PaymentUserView(
+case class NaturalUserView(
   userId: Option[String] = None,
   firstName: String,
   lastName: String,
@@ -18,13 +18,13 @@ case class PaymentUserView(
   countryOfResidence: String,
   externalUuid: String,
   profile: Option[String] = None,
-  paymentUserType: Option[PaymentUser.PaymentUserType] = None
+  naturalUserType: Option[NaturalUser.NaturalUserType] = None
 )
 
-object PaymentUserView {
-  def apply(paymentUser: PaymentUser): PaymentUserView = {
+object NaturalUserView {
+  def apply(paymentUser: NaturalUser): NaturalUserView = {
     import paymentUser._
-    PaymentUserView(
+    NaturalUserView(
       userId,
       firstName,
       lastName,
@@ -34,7 +34,7 @@ object PaymentUserView {
       countryOfResidence,
       externalUuid,
       profile,
-      paymentUserType
+      naturalUserType
     )
   }
 }

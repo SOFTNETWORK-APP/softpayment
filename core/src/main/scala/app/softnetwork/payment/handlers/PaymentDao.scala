@@ -84,7 +84,7 @@ trait PaymentDao extends PaymentHandler {
   @InternalApi
   private[payment] def preRegisterCard(
     orderUuid: String,
-    user: PaymentUser,
+    user: NaturalUser,
     currency: String = "EUR",
     clientId: Option[String] = None
   )(implicit

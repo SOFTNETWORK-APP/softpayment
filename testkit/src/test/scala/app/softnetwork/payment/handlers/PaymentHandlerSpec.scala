@@ -58,7 +58,7 @@ class PaymentHandlerSpec
               assert(naturalUser.userId.isDefined)
               assert(naturalUser.walletId.isDefined)
               assert(
-                naturalUser.paymentUserType.getOrElse(PaymentUser.PaymentUserType.COLLECTOR).isPayer
+                naturalUser.naturalUserType.getOrElse(NaturalUser.NaturalUserType.COLLECTOR).isPayer
               )
             case other => fail(other.toString)
           }
@@ -177,8 +177,8 @@ class PaymentHandlerSpec
               )
               sellerBankAccountId = paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
               assert(
-                paymentAccount.getNaturalUser.paymentUserType
-                  .getOrElse(PaymentUser.PaymentUserType.PAYER)
+                paymentAccount.getNaturalUser.naturalUserType
+                  .getOrElse(NaturalUser.NaturalUserType.PAYER)
                   .isCollector
               )
             case other => fail(other.toString)
@@ -226,8 +226,8 @@ class PaymentHandlerSpec
               sellerBankAccountId = paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
 //              assert(sellerBankAccountId != previousBankAccountId)
               assert(
-                paymentAccount.getNaturalUser.paymentUserType
-                  .getOrElse(PaymentUser.PaymentUserType.PAYER)
+                paymentAccount.getNaturalUser.naturalUserType
+                  .getOrElse(NaturalUser.NaturalUserType.PAYER)
                   .isCollector
               )
             case other => fail(other.toString)

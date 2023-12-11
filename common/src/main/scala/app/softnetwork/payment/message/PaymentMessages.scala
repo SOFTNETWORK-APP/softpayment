@@ -32,7 +32,7 @@ object PaymentMessages {
     */
   case class PreRegisterCard(
     orderUuid: String,
-    user: PaymentUser,
+    user: NaturalUser,
     currency: String = "EUR",
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
@@ -558,7 +558,7 @@ object PaymentMessages {
 
   case class BankAccountCommand(
     bankAccount: BankAccount,
-    user: Either[PaymentUser, LegalUser],
+    user: Either[NaturalUser, LegalUser],
     acceptedTermsOfPSP: Option[Boolean] = None
   )
 
@@ -566,7 +566,7 @@ object PaymentMessages {
 
     def apply(
       bankAccount: BankAccount,
-      naturalUser: PaymentUser,
+      naturalUser: NaturalUser,
       acceptedTermsOfPSP: Option[Boolean]
     ): BankAccountCommand = BankAccountCommand(bankAccount, Left(naturalUser), acceptedTermsOfPSP)
 

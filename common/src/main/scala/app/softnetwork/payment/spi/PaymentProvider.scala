@@ -39,7 +39,7 @@ private[payment] trait PaymentProvider {
     * @return
     *   provider user id
     */
-  def createOrUpdateNaturalUser(maybeNaturalUser: Option[PaymentUser]): Option[String]
+  def createOrUpdateNaturalUser(maybeNaturalUser: Option[NaturalUser]): Option[String]
 
   /** @param maybeLegalUser
     *   - legal user to create

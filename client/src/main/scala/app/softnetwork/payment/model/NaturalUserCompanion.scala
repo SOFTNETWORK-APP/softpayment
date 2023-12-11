@@ -1,6 +1,6 @@
 package app.softnetwork.payment.model
 
-trait PaymentUserCompanion {
+trait NaturalUserCompanion {
   def apply(
     firstName: String,
     lastName: String,
@@ -8,8 +8,8 @@ trait PaymentUserCompanion {
     nationality: Option[String],
     birthday: String,
     countryOfResidence: Option[String]
-  ): PaymentUser = {
-    PaymentUser.defaultInstance
+  ): NaturalUser = {
+    NaturalUser.defaultInstance
       .withFirstName(firstName)
       .withLastName(lastName)
       .withEmail(email)

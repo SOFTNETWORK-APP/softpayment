@@ -57,14 +57,14 @@ message BankAccount {
     optional MandateScheme mandateScheme = 14 [default = MANDATE_SEPA];
 }
 
-message PaymentUser {
-    enum PaymentUserType {
+message NaturalUser {
+    enum NaturalUserType {
         PAYER = 0;
         COLLECTOR = 1;
     }
     option (scalapb.message).extends = "ProtobufDomainObject";
-    option (scalapb.message).extends = "PaymentUserDecorator";
-    option (scalapb.message).companion_extends = "PaymentUserCompanion";
+    option (scalapb.message).extends = "NaturalUserDecorator";
+    option (scalapb.message).companion_extends = "NaturalUserCompanion";
     required string firstName = 1;
     required string lastName = 2;
     required string email = 3;
@@ -75,7 +75,7 @@ message PaymentUser {
     optional string walletId = 8;
     required string externalUuid = 9;
     optional string profile = 10;
-    optional PaymentUserType paymentUserType = 11;
+    optional NaturalUserType naturalUserType = 11;
 //    optional string secondaryWalletId = 12;
 }
 
@@ -90,7 +90,7 @@ message LegalUser {
     required LegalUserType legalUserType = 1;
     required string legalName = 2;
     required string siret = 3;
-    required PaymentUser legalRepresentative = 4;
+    required NaturalUser legalRepresentative = 4;
     required Address legalRepresentativeAddress = 5;
     required Address headQuartersAddress = 6;
     optional UboDeclaration uboDeclaration = 7;
@@ -114,7 +114,7 @@ message PaymentAccount {
     required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.time.Instant"];
     required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.time.Instant"];
     oneof user {
-        PaymentUser naturalUser = 4;
+        NaturalUser naturalUser = 4;
         LegalUser legalUser = 5;
     }
     repeated Card cards = 6;
