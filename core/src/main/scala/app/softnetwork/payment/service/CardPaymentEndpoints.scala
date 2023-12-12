@@ -21,7 +21,7 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   def payment(payment: Payment): PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPayAccount.SoftPayClient], SD),
+    (Option[SoftPayAccount.Client], SD),
     (Option[String], Option[String], Option[String], Option[String], Payment),
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

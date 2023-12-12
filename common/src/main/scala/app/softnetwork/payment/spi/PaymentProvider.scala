@@ -12,7 +12,7 @@ private[payment] trait PaymentProvider {
 
   protected lazy val mlog: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
 
-  implicit def provider: SoftPayAccount.SoftPayClient.SoftPayProvider
+  implicit def provider: SoftPayAccount.Client.Provider
 
   /** @param maybePaymentAccount
     *   - payment account to create or update
@@ -374,7 +374,7 @@ private[payment] trait PaymentProvider {
   /** @return
     *   client fees
     */
-  def client: Option[SoftPayAccount.SoftPayClient]
+  def client: Option[SoftPayAccount.Client]
 
   def clientFees(): Option[Double]
 

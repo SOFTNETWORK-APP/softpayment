@@ -21,7 +21,7 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
 
   implicit def companion: SessionDataCompanion[SD]
 
-  implicit def toSession(client: SoftPayAccount.SoftPayClient): SD = {
+  implicit def toSession(client: SoftPayAccount.Client): SD = {
     var session = companion.newSession
       .withAdmin(false)
       .withAnonymous(false)
@@ -31,14 +31,14 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
   }
 
   def encodeClient(
-    client: SoftPayAccount.SoftPayClient
+    client: SoftPayAccount.Client
   ): String = {
     clientSessionManager(client).clientSessionManager.encode(client)
   }
 
   def decodeClient(data: String): Option[SD] = manager.clientSessionManager.decode(data).toOption
 
-  def clientSessionManager(client: SoftPayAccount.SoftPayClient): SessionManager[SD] = {
+  def clientSessionManager(client: SoftPayAccount.Client): SessionManager[SD] = {
     implicit val innerSessionConfig: SessionConfig =
       sessionConfig.copy(
         jwt = sessionConfig.jwt.copy(
@@ -68,7 +68,7 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
     }
   }
 
-  def clientSessionManager(client: Option[SoftPayAccount.SoftPayClient]): SessionManager[SD] = {
+  def clientSessionManager(client: Option[SoftPayAccount.Client]): SessionManager[SD] = {
     client match {
       case Some(c) =>
         implicit val innerSessionConfig: SessionConfig =

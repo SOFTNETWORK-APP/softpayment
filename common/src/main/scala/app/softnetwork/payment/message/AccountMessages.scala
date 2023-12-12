@@ -17,15 +17,14 @@ object AccountMessages {
   case class SoftPaySignUp(
     login: String,
     password: String,
-    provider: SoftPayAccount.SoftPayClient.SoftPayProvider,
+    provider: SoftPayAccount.Client.Provider,
     override val confirmPassword: Option[String] = None,
     override val profile: Option[BasicAccountProfile] = None
   ) extends SignUp
 
-  case class RegisterProvider(provider: SoftPayAccount.SoftPayClient.SoftPayProvider)
-      extends AccountCommand
+  case class RegisterProvider(provider: SoftPayAccount.Client.Provider) extends AccountCommand
 
-  case class RegisterAccountWithProvider(provider: SoftPayAccount.SoftPayClient.SoftPayProvider)
+  case class RegisterAccountWithProvider(provider: SoftPayAccount.Client.Provider)
       extends AccountCommand
       with EntityCommand {
     override def id: String = provider.clientId
@@ -48,18 +47,17 @@ object AccountMessages {
 
   case class OAuthClient(token: String) extends LookupAccountCommand
 
-  case class ProviderRegistered(client: SoftPayAccount.SoftPayClient) extends AccountCommandResult
+  case class ProviderRegistered(client: SoftPayAccount.Client) extends AccountCommandResult
 
   case class AccountWithProviderRegistered(account: SoftPayAccount) extends AccountCommandResult
 
-  case class ClientLoaded(client: SoftPayAccount.SoftPayClient) extends AccountCommandResult
+  case class ClientLoaded(client: SoftPayAccount.Client) extends AccountCommandResult
 
   case class ApiKeysLoaded(apiKeys: Seq[ApiKey]) extends AccountCommandResult
 
   case class ApiKeyLoaded(apiKey: ApiKey) extends AccountCommandResult
 
-  case class OAuthClientSucceededResult(client: SoftPayAccount.SoftPayClient)
-      extends AccountCommandResult
+  case class OAuthClientSucceededResult(client: SoftPayAccount.Client) extends AccountCommandResult
 
   case object ProviderAlreadyRegistered extends AccountErrorMessage("provider.already.registered")
 

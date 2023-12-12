@@ -43,13 +43,13 @@ object MangoPay extends StrictLogging {
 
   var mangoPayApis: Map[String, MangoPayApi] = Map.empty
 
-  lazy val softPayProvider: SoftPayAccount.SoftPayClient.SoftPayProvider =
-    SoftPayAccount.SoftPayClient.SoftPayProvider.defaultInstance
-      .withProviderType(SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType.MANGOPAY)
+  lazy val softPayProvider: SoftPayAccount.Client.Provider =
+    SoftPayAccount.Client.Provider.defaultInstance
+      .withProviderType(SoftPayAccount.Client.Provider.ProviderType.MANGOPAY)
       .withProviderId(MangoPaySettings.MangoPayConfig.clientId)
       .withProviderApiKey(MangoPaySettings.MangoPayConfig.apiKey)
 
-  def apply(provider: SoftPayAccount.SoftPayClient.SoftPayProvider): MangoPayApi = {
+  def apply(provider: SoftPayAccount.Client.Provider): MangoPayApi = {
     mangoPayApis.get(provider.providerId) match {
       case Some(mangoPayApi) => mangoPayApi
       case _                 =>

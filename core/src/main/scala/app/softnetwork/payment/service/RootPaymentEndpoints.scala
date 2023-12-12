@@ -36,7 +36,7 @@ trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   lazy val requiredSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPayAccount.SoftPayClient], SD),
+    (Option[SoftPayAccount.Client], SD),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
@@ -54,7 +54,7 @@ trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   lazy val optionalSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPayAccount.SoftPayClient], Option[SD]),
+    (Option[SoftPayAccount.Client], Option[SD]),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

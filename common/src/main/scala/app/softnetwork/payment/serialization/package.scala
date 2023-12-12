@@ -31,7 +31,7 @@ package object serialization {
       GeneratedEnumSerializer(RecurringPayment.RecurringPaymentFrequency.enumCompanion),
       GeneratedEnumSerializer(RecurringPayment.RecurringCardPaymentStatus.enumCompanion),
       GeneratedEnumSerializer(
-        SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType.enumCompanion
+        SoftPayAccount.Client.Provider.ProviderType.enumCompanion
       )
     )
 

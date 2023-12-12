@@ -59,12 +59,12 @@ trait ClientServer extends ClientServiceApi with SoftPayAccountDao {
       AccountMessages.SoftPaySignUp(
         principal,
         credentials,
-        SoftPayAccount.SoftPayClient.SoftPayProvider(
+        SoftPayAccount.Client.Provider(
           providerId,
           providerApiKey,
-          SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType
+          SoftPayAccount.Client.Provider.ProviderType
             .fromName(providerType.name)
-            .getOrElse(SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType.MANGOPAY)
+            .getOrElse(SoftPayAccount.Client.Provider.ProviderType.MANGOPAY)
         )
       )
     ) map {

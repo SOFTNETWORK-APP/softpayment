@@ -17,12 +17,12 @@ trait ClientSessionDirectives[SD <: SessionData with SessionDataDecorator[SD]]
   _: SessionMaterials[SD] =>
 
   @InternalApi
-  private[payment] def clientDirective: Directive1[Option[SoftPayAccount.SoftPayClient]] =
+  private[payment] def clientDirective: Directive1[Option[SoftPayAccount.Client]] =
     authenticateOAuth2Async(AccountSettings.Realm, oauthClient).optional
 
   @InternalApi
   private[payment] def requiredClientSession(
-    body: (Option[SoftPayAccount.SoftPayClient], SD) => Route
+    body: (Option[SoftPayAccount.Client], SD) => Route
   ): Route =
     clientDirective { client =>
       requiredSession(sc(clientSessionManager(client)), gt) { session =>
@@ -32,7 +32,7 @@ trait ClientSessionDirectives[SD <: SessionData with SessionDataDecorator[SD]]
 
   @InternalApi
   private[payment] def optionalClientSession(
-    body: (Option[SoftPayAccount.SoftPayClient], Option[SD]) => Route
+    body: (Option[SoftPayAccount.Client], Option[SD]) => Route
   ): Route =
     clientDirective { client =>
       optionalSession(sc(clientSessionManager(client)), gt) { session =>
@@ -41,7 +41,7 @@ trait ClientSessionDirectives[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
   @InternalApi
-  private[payment] def oauthClient: Credentials => Future[Option[SoftPayAccount.SoftPayClient]] = {
+  private[payment] def oauthClient: Credentials => Future[Option[SoftPayAccount.Client]] = {
     case _ @Credentials.Provided(token) => softPayAccountDao.authenticateClient(Some(token))
     case _                              => Future.successful(None)
   }

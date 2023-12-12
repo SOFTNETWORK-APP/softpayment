@@ -4,10 +4,10 @@ import app.softnetwork.account.model.AccountStatus
 import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.security.sha256
 
-trait SoftPayProviderDecorator { self: SoftPayAccount.SoftPayClient.SoftPayProvider =>
+trait SoftPayProviderDecorator { self: SoftPayAccount.Client.Provider =>
   lazy val clientId = s"$providerId.${providerType.name.toLowerCase}"
 
-  lazy val client: SoftPayAccount.SoftPayClient = {
+  lazy val client: SoftPayAccount.Client = {
     PaymentProviders.paymentProvider(self).client match {
       case Some(client) =>
         client.withClientApiKey(sha256(self.providerApiKey))

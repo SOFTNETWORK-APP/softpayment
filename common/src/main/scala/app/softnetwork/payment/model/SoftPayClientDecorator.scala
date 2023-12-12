@@ -2,7 +2,7 @@ package app.softnetwork.payment.model
 
 import app.softnetwork.account.model.BearerTokenGenerator
 
-trait SoftPayClientDecorator { _: SoftPayAccount.SoftPayClient =>
+trait SoftPayClientDecorator { _: SoftPayAccount.Client =>
 
   def generateApiKey(): String = BearerTokenGenerator.generateSHAToken(clientId)
 
@@ -25,7 +25,7 @@ case class SoftPayClientView(
 )
 
 object SoftPayClientView {
-  def apply(client: SoftPayAccount.SoftPayClient): SoftPayClientView = {
+  def apply(client: SoftPayAccount.Client): SoftPayClientView = {
     import client._
     SoftPayClientView(
       clientId,

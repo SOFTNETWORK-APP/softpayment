@@ -4,8 +4,8 @@ import app.softnetwork.payment.config.MangoPay
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
 import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model.RecurringPayment.RecurringCardPaymentState
-import app.softnetwork.payment.model.SoftPayAccount.SoftPayClient
-import app.softnetwork.payment.model.SoftPayAccount.SoftPayClient.SoftPayProvider
+import app.softnetwork.payment.model.SoftPayAccount.Client
+import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model.{RecurringPayment, _}
 import app.softnetwork.persistence._
 import app.softnetwork.time.DateExtensions
@@ -1239,9 +1239,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
-  override def client: Option[SoftPayAccount.SoftPayClient] =
+  override def client: Option[SoftPayAccount.Client] =
     Some(
-      SoftPayAccount.SoftPayClient.defaultInstance
+      SoftPayAccount.Client.defaultInstance
         .withProvider(provider)
         .withClientId(provider.clientId)
     )
@@ -1722,14 +1722,14 @@ case class RecurringCardPaymentRegistration(
 )
 
 class MockMangoPayProviderFactory extends PaymentProviderSpi {
-  override val providerType: SoftPayProvider.SoftPayProviderType =
-    SoftPayProvider.SoftPayProviderType.MOCK
+  override val providerType: Provider.ProviderType =
+    Provider.ProviderType.MOCK
 
-  override def paymentProvider(p: SoftPayClient.SoftPayProvider): MockMangoPayProvider =
+  override def paymentProvider(p: Client.Provider): MockMangoPayProvider =
     new MockMangoPayProvider {
-      override implicit def provider: SoftPayProvider = p
+      override implicit def provider: Provider = p
     }
 
-  override def softPaymentProvider: SoftPayProvider =
+  override def softPaymentProvider: Provider =
     MangoPay.softPayProvider.withProviderType(providerType)
 }

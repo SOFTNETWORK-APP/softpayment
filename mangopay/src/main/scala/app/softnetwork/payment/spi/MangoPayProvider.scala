@@ -24,7 +24,7 @@ import app.softnetwork.payment.model.{RecurringPayment, _}
 import app.softnetwork.payment.config.{MangoPay, MangoPaySettings}
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
 import app.softnetwork.payment.model.NaturalUser.NaturalUserType
-import app.softnetwork.payment.model.SoftPayAccount.SoftPayClient.SoftPayProvider
+import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 
 import scala.util.{Failure, Success, Try}
 import app.softnetwork.persistence._
@@ -2082,11 +2082,11 @@ trait MangoPayProvider extends PaymentProvider {
     }
   }
 
-  override def client: Option[SoftPayAccount.SoftPayClient] = {
+  override def client: Option[SoftPayAccount.Client] = {
     Try(MangoPay(provider).getClientApi.get()) match {
       case Success(client) =>
         Some(
-          SoftPayAccount.SoftPayClient.defaultInstance
+          SoftPayAccount.Client.defaultInstance
             .withClientId(client.getClientId + "." + provider.providerType.name.toLowerCase)
             .withProvider(provider)
             .copy(
@@ -2593,14 +2593,14 @@ trait MangoPayProvider extends PaymentProvider {
 }
 
 class MangoPayProviderFactory extends PaymentProviderSpi {
-  override val providerType: SoftPayProvider.SoftPayProviderType =
-    SoftPayProvider.SoftPayProviderType.MANGOPAY
+  override val providerType: Provider.ProviderType =
+    Provider.ProviderType.MANGOPAY
 
-  override def paymentProvider(p: SoftPayAccount.SoftPayClient.SoftPayProvider): MangoPayProvider =
+  override def paymentProvider(p: SoftPayAccount.Client.Provider): MangoPayProvider =
     new MangoPayProvider {
-      override implicit val provider: SoftPayAccount.SoftPayClient.SoftPayProvider = p
+      override implicit val provider: SoftPayAccount.Client.Provider = p
     }
 
-  override def softPaymentProvider: SoftPayAccount.SoftPayClient.SoftPayProvider =
+  override def softPaymentProvider: SoftPayAccount.Client.Provider =
     MangoPay.softPayProvider
 }

@@ -22,11 +22,11 @@ option (scalapb.options) = {
 
 message SoftPayAccount {
 
-  message SoftPayClient {
+  message Client {
 
-    message SoftPayProvider {
+    message Provider {
 
-      enum SoftPayProviderType{
+      enum ProviderType{
         MOCK = -1;
         MANGOPAY = 0;
         STRIPE = 1;
@@ -35,13 +35,13 @@ message SoftPayAccount {
       option (scalapb.message).extends = "SoftPayProviderDecorator";
       required string providerId = 1;
       required string providerApiKey = 2;
-      required SoftPayProviderType providerType = 3 [default = MANGOPAY];
+      required ProviderType providerType = 3 [default = MANGOPAY];
 
     }
 
     option (scalapb.message).extends = "SoftPayClientDecorator";
 
-    required SoftPayProvider provider = 1;
+    required Provider provider = 1;
     required string clientId = 2;
     optional string clientApiKey = 3;
     optional string name = 4;
@@ -82,5 +82,5 @@ message SoftPayAccount {
   optional bool fromAnonymous = 19;
   repeated app.softnetwork.account.model.Application applications = 20;
 
-  repeated SoftPayClient clients = 21;
+  repeated Client clients = 21;
 }

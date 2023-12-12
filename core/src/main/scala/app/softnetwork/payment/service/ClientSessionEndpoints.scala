@@ -38,7 +38,7 @@ trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
   @InternalApi
   private[payment] def requiredClientSession: PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPayAccount.SoftPayClient], SD), Unit, Unit, Seq[
+  ], (Option[SoftPayAccount.Client], SD), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = clientSession(Some(true))
@@ -59,7 +59,7 @@ trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
   @InternalApi
   private[payment] def optionalClientSession: PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPayAccount.SoftPayClient], Option[SD]), Unit, Unit, Seq[
+  ], (Option[SoftPayAccount.Client], Option[SD]), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = clientSession(Some(false))
@@ -78,7 +78,7 @@ trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     required: Option[Boolean]
   ): PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPayAccount.SoftPayClient], SessionResult[SD]), Unit, Unit, Seq[
+  ], (Option[SoftPayAccount.Client], SessionResult[SD]), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = sc.session(gt, required)

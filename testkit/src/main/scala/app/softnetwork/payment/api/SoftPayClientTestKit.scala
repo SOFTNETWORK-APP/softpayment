@@ -6,9 +6,9 @@ import app.softnetwork.security.sha256
 
 trait SoftPayClientTestKit {
 
-  def provider: SoftPayAccount.SoftPayClient.SoftPayProvider =
+  def provider: SoftPayAccount.Client.Provider =
     MangoPay.softPayProvider.withProviderType(
-      SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType.MOCK
+      SoftPayAccount.Client.Provider.ProviderType.MOCK
     )
 
   def softPayClientSettings: String =
