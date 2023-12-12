@@ -30,7 +30,9 @@ package object serialization {
       GeneratedEnumSerializer(RecurringPayment.RecurringPaymentType.enumCompanion),
       GeneratedEnumSerializer(RecurringPayment.RecurringPaymentFrequency.enumCompanion),
       GeneratedEnumSerializer(RecurringPayment.RecurringCardPaymentStatus.enumCompanion),
-      GeneratedEnumSerializer(SoftPaymentAccount.Client.Provider.ProviderType.enumCompanion)
+      GeneratedEnumSerializer(
+        SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType.enumCompanion
+      )
     )
 
   implicit def transactionStatusToTransactionResponseStatus(
@@ -67,12 +69,12 @@ package object serialization {
     }
   }
 
-  implicit def accountToSoftPaymentAccount(account: Account): SoftPaymentAccount = {
+  implicit def accountToSoftPaymentAccount(account: Account): SoftPayAccount = {
     account match {
-      case a: SoftPaymentAccount => a
+      case a: SoftPayAccount => a
       case _ =>
         import account._
-        SoftPaymentAccount.defaultInstance
+        SoftPayAccount.defaultInstance
           .withApplications(applications)
           .withCreatedDate(createdDate)
           .withCredentials(credentials)

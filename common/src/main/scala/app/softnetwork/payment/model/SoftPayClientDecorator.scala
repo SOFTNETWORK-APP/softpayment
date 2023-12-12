@@ -2,14 +2,14 @@ package app.softnetwork.payment.model
 
 import app.softnetwork.account.model.BearerTokenGenerator
 
-trait SoftPaymentClientDecorator { _: SoftPaymentAccount.Client =>
+trait SoftPayClientDecorator { _: SoftPayAccount.SoftPayClient =>
 
   def generateApiKey(): String = BearerTokenGenerator.generateSHAToken(clientId)
 
-  lazy val view: SoftPaymentClientView = SoftPaymentClientView(this)
+  lazy val view: SoftPayClientView = SoftPayClientView(this)
 }
 
-case class SoftPaymentClientView(
+case class SoftPayClientView(
   clientId: String,
   clientApiKey: Option[String] = None,
   name: Option[String] = None,
@@ -24,10 +24,10 @@ case class SoftPaymentClientView(
   address: Option[AddressView] = None
 )
 
-object SoftPaymentClientView {
-  def apply(client: SoftPaymentAccount.Client): SoftPaymentClientView = {
+object SoftPayClientView {
+  def apply(client: SoftPayAccount.SoftPayClient): SoftPayClientView = {
     import client._
-    SoftPaymentClientView(
+    SoftPayClientView(
       clientId,
       clientApiKey,
       name,

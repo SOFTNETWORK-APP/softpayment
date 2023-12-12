@@ -3,7 +3,7 @@ package app.softnetwork.payment.service
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
@@ -21,7 +21,7 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   def payment(payment: Payment): PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], SD),
+    (Option[SoftPayAccount.SoftPayClient], SD),
     (Option[String], Option[String], Option[String], Option[String], Payment),
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

@@ -12,8 +12,8 @@ import app.softnetwork.payment.launch.PaymentRoutes
 import app.softnetwork.payment.service.{
   MangoPayPaymentService,
   PaymentService,
-  SoftPaymentAccountService,
-  SoftPaymentOAuthService
+  SoftPayAccountService,
+  SoftPayOAuthService
 }
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.CsrfCheck
@@ -50,7 +50,7 @@ trait MangoPayRoutes[SD <: SessionData with SessionDataDecorator[SD]] extends Pa
     DefaultAccountView[DefaultProfileView, DefaultAccountDetailsView],
     SD
   ] = sys =>
-    new SoftPaymentAccountService[SD] with SessionMaterials[SD] {
+    new SoftPayAccountService[SD] with SessionMaterials[SD] {
       override implicit def manager(implicit
         sessionConfig: SessionConfig,
         companion: SessionDataCompanion[SD]
@@ -66,7 +66,7 @@ trait MangoPayRoutes[SD <: SessionData with SessionDataDecorator[SD]] extends Pa
     }
 
   override def oauthService: ActorSystem[_] => OAuthService[SD] = sys =>
-    new SoftPaymentOAuthService[SD] with SessionMaterials[SD] {
+    new SoftPayOAuthService[SD] with SessionMaterials[SD] {
       override implicit def manager(implicit
         sessionConfig: SessionConfig,
         companion: SessionDataCompanion[SD]

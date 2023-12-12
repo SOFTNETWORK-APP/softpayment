@@ -8,11 +8,11 @@ import akka.http.scaladsl.server.directives.Credentials
 import app.softnetwork.account.config.AccountSettings
 import app.softnetwork.api.server.GrpcService
 import app.softnetwork.concurrent.Completion
-import app.softnetwork.payment.handlers.SoftPaymentAccountDao
+import app.softnetwork.payment.handlers.SoftPayAccountDao
 
 import scala.concurrent.Future
 
-class PaymentGrpcService(server: PaymentServer, softPaymentAccountDao: SoftPaymentAccountDao)
+class PaymentGrpcService(server: PaymentServer, softPayAccountDao: SoftPayAccountDao)
     extends GrpcService
     with Completion {
   override def grpcService: ActorSystem[_] => PartialFunction[HttpRequest, Future[HttpResponse]] =
@@ -23,7 +23,7 @@ class PaymentGrpcService(server: PaymentServer, softPaymentAccountDao: SoftPayme
       AccountSettings.Realm,
       {
         case _ @Credentials.Provided(token) =>
-          softPaymentAccountDao.authenticateClient(Some(token))(system)
+          softPayAccountDao.authenticateClient(Some(token))(system)
         case _ => Future.successful(None)
       }
     ).optional {

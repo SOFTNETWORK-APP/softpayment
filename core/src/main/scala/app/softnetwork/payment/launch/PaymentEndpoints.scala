@@ -5,7 +5,7 @@ import app.softnetwork.account.launch.AccountEndpoints
 import app.softnetwork.account.message.BasicAccountSignUp
 import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.api.server.{ApiEndpoints, Endpoint}
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.payment.service.PaymentServiceEndpoints
 import app.softnetwork.persistence.schema.SchemaProvider
@@ -15,7 +15,7 @@ import org.json4s.Formats
 
 trait PaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     extends AccountEndpoints[
-      SoftPaymentAccount,
+      SoftPayAccount,
       BasicAccountProfile,
       BasicAccountSignUp,
       SD

@@ -8,8 +8,8 @@ import app.softnetwork.payment.launch.PaymentEndpoints
 import app.softnetwork.payment.service.{
   MangoPayPaymentServiceEndpoints,
   PaymentServiceEndpoints,
-  SoftPaymentAccountServiceEndpoints,
-  SoftPaymentOAuthServiceEndpoints
+  SoftPayAccountServiceEndpoints,
+  SoftPayOAuthServiceEndpoints
 }
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.CsrfCheck
@@ -42,7 +42,7 @@ trait MangoPayEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   override def accountEndpoints
     : ActorSystem[_] => AccountServiceEndpoints[message.BasicAccountSignUp, SD] = sys =>
-    new SoftPaymentAccountServiceEndpoints[SD] with SessionMaterials[SD] {
+    new SoftPayAccountServiceEndpoints[SD] with SessionMaterials[SD] {
       override def log: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(getClass)
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
@@ -59,7 +59,7 @@ trait MangoPayEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
   override def oauthEndpoints: ActorSystem[_] => OAuthServiceEndpoints[SD] = sys =>
-    new SoftPaymentOAuthServiceEndpoints[SD] with SessionMaterials[SD] {
+    new SoftPayOAuthServiceEndpoints[SD] with SessionMaterials[SD] {
       override def log: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(getClass)
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext

@@ -9,7 +9,7 @@ import app.softnetwork.account.model.{
   DefaultProfileView
 }
 import app.softnetwork.api.server.ApiRoute
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.payment.service.PaymentService
 import app.softnetwork.persistence.schema.SchemaProvider
@@ -19,7 +19,7 @@ import org.json4s.Formats
 
 trait PaymentRoutes[SD <: SessionData with SessionDataDecorator[SD]]
     extends AccountRoutes[
-      SoftPaymentAccount,
+      SoftPayAccount,
       BasicAccountProfile,
       DefaultProfileView,
       DefaultAccountDetailsView,

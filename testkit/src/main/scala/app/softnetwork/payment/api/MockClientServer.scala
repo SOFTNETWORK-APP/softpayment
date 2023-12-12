@@ -1,10 +1,10 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.handlers.MockSoftPaymentAccountDao
+import app.softnetwork.payment.handlers.MockSoftPayAccountDao
 import org.slf4j.{Logger, LoggerFactory}
 
-trait MockClientServer extends ClientServer with MockSoftPaymentAccountDao
+trait MockClientServer extends ClientServer with MockSoftPayAccountDao
 
 object MockClientServer {
   def apply(sys: ActorSystem[_]): MockClientServer = {

@@ -9,22 +9,23 @@ import app.softnetwork.account.message.{
 }
 import app.softnetwork.account.model.BasicAccountProfile
 import app.softnetwork.payment.annotation.InternalApi
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.persistence.message.EntityCommand
 import org.softnetwork.session.model.ApiKey
 
 object AccountMessages {
-  case class SoftPaymentSignUp(
+  case class SoftPaySignUp(
     login: String,
     password: String,
-    provider: SoftPaymentAccount.Client.Provider,
+    provider: SoftPayAccount.SoftPayClient.SoftPayProvider,
     override val confirmPassword: Option[String] = None,
     override val profile: Option[BasicAccountProfile] = None
   ) extends SignUp
 
-  case class RegisterProvider(provider: SoftPaymentAccount.Client.Provider) extends AccountCommand
+  case class RegisterProvider(provider: SoftPayAccount.SoftPayClient.SoftPayProvider)
+      extends AccountCommand
 
-  case class RegisterProviderAccount(provider: SoftPaymentAccount.Client.Provider)
+  case class RegisterAccountWithProvider(provider: SoftPayAccount.SoftPayClient.SoftPayProvider)
       extends AccountCommand
       with EntityCommand {
     override def id: String = provider.clientId
@@ -47,25 +48,25 @@ object AccountMessages {
 
   case class OAuthClient(token: String) extends LookupAccountCommand
 
-  case class ProviderRegistered(client: SoftPaymentAccount.Client) extends AccountCommandResult
+  case class ProviderRegistered(client: SoftPayAccount.SoftPayClient) extends AccountCommandResult
 
-  case class ProviderAccountRegistered(account: SoftPaymentAccount) extends AccountCommandResult
+  case class AccountWithProviderRegistered(account: SoftPayAccount) extends AccountCommandResult
 
-  case class ClientLoaded(client: SoftPaymentAccount.Client) extends AccountCommandResult
+  case class ClientLoaded(client: SoftPayAccount.SoftPayClient) extends AccountCommandResult
 
   case class ApiKeysLoaded(apiKeys: Seq[ApiKey]) extends AccountCommandResult
 
   case class ApiKeyLoaded(apiKey: ApiKey) extends AccountCommandResult
 
-  case class OAuthClientSucceededResult(client: SoftPaymentAccount.Client)
+  case class OAuthClientSucceededResult(client: SoftPayAccount.SoftPayClient)
       extends AccountCommandResult
 
   case object ProviderAlreadyRegistered extends AccountErrorMessage("provider.already.registered")
 
   case object ProviderNotRegistered extends AccountErrorMessage("provider.not.registered")
 
-  case object ProviderAccountNotRegistered
-      extends AccountErrorMessage("provider.account.not.registered")
+  case object AccountWithProviderNotRegistered
+      extends AccountErrorMessage("account.with.provider.not.registered")
 
   case object ClientNotFound extends AccountErrorMessage("client.not.found")
 

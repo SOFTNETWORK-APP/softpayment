@@ -11,7 +11,7 @@ import app.softnetwork.account.message.{
   Tokens
 }
 import app.softnetwork.account.service.OAuthService
-import app.softnetwork.payment.handlers.SoftPaymentAccountTypeKey
+import app.softnetwork.payment.handlers.SoftPayAccountTypeKey
 import app.softnetwork.payment.message.AccountMessages.{GenerateClientToken, RefreshClientToken}
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.config.Settings
@@ -20,9 +20,9 @@ import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.SessionConfig
 import org.json4s.Formats
 
-trait SoftPaymentOAuthService[SD <: SessionData with SessionDataDecorator[SD]]
+trait SoftPayOAuthService[SD <: SessionData with SessionDataDecorator[SD]]
     extends OAuthService[SD]
-    with SoftPaymentAccountTypeKey
+    with SoftPayAccountTypeKey
     with ClientSessionDirectives[SD] {
   _: SessionMaterials[SD] =>
 

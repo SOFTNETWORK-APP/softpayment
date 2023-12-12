@@ -4,7 +4,7 @@ import "scalapb/scalapb.proto";
 import "google/protobuf/timestamp.proto";
 import "model/payment/client.proto";
 
-package app.softnetwork.payment.message.SoftPaymentAccountEvents;
+package app.softnetwork.payment.message.SoftPayAccountEvents;
 
 option (scalapb.options) = {
   single_file: true
@@ -15,36 +15,36 @@ option (scalapb.options) = {
   import: "app.softnetwork.serialization._"
   import: "app.softnetwork.account.message._"
   import: "app.softnetwork.payment.model._"
-  import: "app.softnetwork.payment.message.SoftPaymentAccountEvents._"
+  import: "app.softnetwork.payment.message.SoftPayAccountEvents._"
   import: "app.softnetwork.payment.serialization._"
   preserve_unknown_fields: false
-  preamble: "sealed trait SoftPaymentAccountEvent extends AccountEvent"
+  preamble: "sealed trait SoftPayAccountEvent extends AccountEvent"
 };
 
-message SoftPaymentAccountCreatedEvent {
+message SoftPayAccountCreatedEvent {
   option (scalapb.message).extends = "ProtobufEvent";
-  option (scalapb.message).extends = "SoftPaymentAccountEvent";
-  option (scalapb.message).extends = "AccountCreatedEvent[SoftPaymentAccount]";
-  required app.softnetwork.payment.model.SoftPaymentAccount document = 1;
+  option (scalapb.message).extends = "SoftPayAccountEvent";
+  option (scalapb.message).extends = "AccountCreatedEvent[SoftPayAccount]";
+  required app.softnetwork.payment.model.SoftPayAccount document = 1;
 }
 
-message SoftPaymentAccountProviderRegisteredEvent {
+message SoftPayAccountProviderRegisteredEvent {
   option (scalapb.message).extends = "ProtobufEvent";
-  option (scalapb.message).extends = "SoftPaymentAccountEvent";
-  required app.softnetwork.payment.model.SoftPaymentAccount.Client client = 1;
+  option (scalapb.message).extends = "SoftPayAccountEvent";
+  required app.softnetwork.payment.model.SoftPayAccount.SoftPayClient client = 1;
   required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
 }
 
-message SoftPaymentAccountTokenRegisteredEvent {
+message SoftPayAccountTokenRegisteredEvent {
   option (scalapb.message).extends = "ProtobufEvent";
-  option (scalapb.message).extends = "SoftPaymentAccountEvent";
-  required app.softnetwork.payment.model.SoftPaymentAccount.Client client = 1;
+  option (scalapb.message).extends = "SoftPayAccountEvent";
+  required app.softnetwork.payment.model.SoftPayAccount.SoftPayClient client = 1;
   required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
 }
 
-message SoftPaymentAccountTokenRefreshedEvent {
+message SoftPayAccountTokenRefreshedEvent {
   option (scalapb.message).extends = "ProtobufEvent";
-  option (scalapb.message).extends = "SoftPaymentAccountEvent";
-  required app.softnetwork.payment.model.SoftPaymentAccount.Client client = 1;
+  option (scalapb.message).extends = "SoftPayAccountEvent";
+  required app.softnetwork.payment.model.SoftPayAccount.SoftPayClient client = 1;
   required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
 }

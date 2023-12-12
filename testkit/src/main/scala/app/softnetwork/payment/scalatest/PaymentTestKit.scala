@@ -16,9 +16,9 @@ import app.softnetwork.payment.api.{
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.{
   MockPaymentHandler,
-  MockSoftPaymentAccountDao,
-  MockSoftPaymentAccountHandler,
-  SoftPaymentAccountDao
+  MockSoftPayAccountDao,
+  MockSoftPayAccountHandler,
+  SoftPayAccountDao
 }
 import app.softnetwork.payment.launch.PaymentGuardian
 import app.softnetwork.payment.message.PaymentMessages._
@@ -29,7 +29,7 @@ import app.softnetwork.payment.persistence.query.{
 }
 import app.softnetwork.payment.persistence.typed.{
   MockPaymentBehavior,
-  MockSoftPaymentAccountBehavior,
+  MockSoftPayAccountBehavior,
   PaymentBehavior
 }
 import app.softnetwork.persistence.launch.PersistentEntity
@@ -62,15 +62,15 @@ trait PaymentTestKit
   override def paymentBehavior: ActorSystem[_] => PaymentBehavior = _ => MockPaymentBehavior
 
   override def accountBehavior
-    : ActorSystem[_] => AccountBehavior[SoftPaymentAccount, BasicAccountProfile] = _ =>
-    MockSoftPaymentAccountBehavior
+    : ActorSystem[_] => AccountBehavior[SoftPayAccount, BasicAccountProfile] = _ =>
+    MockSoftPayAccountBehavior
 
   override def paymentServer: ActorSystem[_] => PaymentServer = system => MockPaymentServer(system)
 
   override def clientServer: ActorSystem[_] => ClientServer = system => MockClientServer(system)
 
   def loadApiKey(clientId: String): Future[Option[ApiKey]] =
-    MockPaymentBehavior.softPaymentAccountDao.loadApiKey(clientId)
+    MockPaymentBehavior.softPayAccountDao.loadApiKey(clientId)
 
   def clientId: String = provider.clientId
 
@@ -107,11 +107,11 @@ trait PaymentTestKit
   override def internalAccountEvents2AccountProcessorStream
     : ActorSystem[_] => InternalAccountEvents2AccountProcessorStream = sys =>
     new InternalAccountEvents2AccountProcessorStream
-      with MockSoftPaymentAccountHandler
+      with MockSoftPayAccountHandler
       with InMemoryJournalProvider
       with InMemoryOffsetProvider {
       lazy val log: Logger = LoggerFactory getLogger getClass.getName
-      override def tag: String = s"${MockSoftPaymentAccountBehavior.persistenceId}-to-internal"
+      override def tag: String = s"${MockSoftPayAccountBehavior.persistenceId}-to-internal"
       override lazy val forTests: Boolean = true
       override implicit def system: ActorSystem[_] = sys
     }
@@ -241,5 +241,5 @@ trait PaymentTestKit
     registerProvidersAccount(system)
   }
 
-  override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
+  override def softPayAccountDao: SoftPayAccountDao = MockSoftPayAccountDao
 }

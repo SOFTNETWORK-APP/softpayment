@@ -20,28 +20,28 @@ option (scalapb.options) = {
   preserve_unknown_fields: false
 };
 
-message SoftPaymentAccount {
+message SoftPayAccount {
 
-  message Client {
+  message SoftPayClient {
 
-    message Provider {
+    message SoftPayProvider {
 
-      enum ProviderType{
+      enum SoftPayProviderType{
         MOCK = -1;
         MANGOPAY = 0;
         STRIPE = 1;
       }
 
-      option (scalapb.message).extends = "ProviderDecorator";
+      option (scalapb.message).extends = "SoftPayProviderDecorator";
       required string providerId = 1;
       required string providerApiKey = 2;
-      required ProviderType providerType = 3 [default = MANGOPAY];
+      required SoftPayProviderType providerType = 3 [default = MANGOPAY];
 
     }
 
-    option (scalapb.message).extends = "SoftPaymentClientDecorator";
+    option (scalapb.message).extends = "SoftPayClientDecorator";
 
-    required Provider provider = 1;
+    required SoftPayProvider provider = 1;
     required string clientId = 2;
     optional string clientApiKey = 3;
     optional string name = 4;
@@ -60,8 +60,8 @@ message SoftPaymentAccount {
   option (scalapb.message).extends = "ProtobufDomainObject";
   option (scalapb.message).extends = "Account";
   option (scalapb.message).extends = "Timestamped";
-  option (scalapb.message).extends = "SoftPaymentAccountDecorator";
-  option (scalapb.message).companion_extends = "SoftPaymentAccountCompanion";
+  option (scalapb.message).extends = "SoftPayAccountDecorator";
+  option (scalapb.message).companion_extends = "SoftPayAccountCompanion";
   required string uuid = 1;
   required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.time.Instant"];
   required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.time.Instant"];
@@ -82,5 +82,5 @@ message SoftPaymentAccount {
   optional bool fromAnonymous = 19;
   repeated app.softnetwork.account.model.Application applications = 20;
 
-  repeated Client clients = 21;
+  repeated SoftPayClient clients = 21;
 }

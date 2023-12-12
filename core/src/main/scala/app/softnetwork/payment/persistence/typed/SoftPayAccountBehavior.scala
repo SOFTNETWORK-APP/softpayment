@@ -11,14 +11,14 @@ import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.notification.message.ExternalEntityToNotificationEvent
 import app.softnetwork.payment.cli.Main
 import app.softnetwork.payment.message.AccountMessages
-import app.softnetwork.payment.message.AccountMessages.SoftPaymentSignUp
-import app.softnetwork.payment.message.SoftPaymentAccountEvents.{
-  SoftPaymentAccountCreatedEvent,
-  SoftPaymentAccountProviderRegisteredEvent,
-  SoftPaymentAccountTokenRefreshedEvent,
-  SoftPaymentAccountTokenRegisteredEvent
+import app.softnetwork.payment.message.AccountMessages.SoftPaySignUp
+import app.softnetwork.payment.message.SoftPayAccountEvents.{
+  SoftPayAccountCreatedEvent,
+  SoftPayAccountProviderRegisteredEvent,
+  SoftPayAccountTokenRefreshedEvent,
+  SoftPayAccountTokenRegisteredEvent
 }
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.persistence.typed._
 import app.softnetwork.scheduler.message.SchedulerEvents.ExternalSchedulerEvent
@@ -28,17 +28,17 @@ import org.slf4j.Logger
 
 import java.time.Instant
 
-trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, BasicAccountProfile] {
+trait SoftPayAccountBehavior extends AccountBehavior[SoftPayAccount, BasicAccountProfile] {
   _: Generator =>
   override protected def createAccount(
     entityId: String,
     cmd: SignUp
-  )(implicit context: ActorContext[AccountCommand]): Option[SoftPaymentAccount] = {
+  )(implicit context: ActorContext[AccountCommand]): Option[SoftPayAccount] = {
     cmd match {
-      case SoftPaymentSignUp(_, _, provider, _, _) =>
+      case SoftPaySignUp(_, _, provider, _, _) =>
         PaymentProviders.paymentProvider(provider).client match {
           case Some(client) =>
-            SoftPaymentAccount(BasicAccount(cmd, Some(entityId)))
+            SoftPayAccount(BasicAccount(cmd, Some(entityId)))
               .map(account =>
                 account
                   .withClients(Seq(client.withClientApiKey(client.generateApiKey())))
@@ -50,7 +50,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
               )
           case _ => None
         }
-      case _ => SoftPaymentAccount(BasicAccount(cmd, Some(entityId)))
+      case _ => SoftPayAccount(BasicAccount(cmd, Some(entityId)))
     }
   }
 
@@ -62,9 +62,9 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
     BasicAccountProfileUpdatedEvent(uuid, profile, loginUpdated)
 
   override protected def createAccountCreatedEvent(
-    account: SoftPaymentAccount
-  )(implicit context: ActorContext[AccountCommand]): AccountCreatedEvent[SoftPaymentAccount] =
-    SoftPaymentAccountCreatedEvent(account)
+    account: SoftPayAccount
+  )(implicit context: ActorContext[AccountCommand]): AccountCreatedEvent[SoftPayAccount] =
+    SoftPayAccountCreatedEvent(account)
 
   /** @param entityId
     *   - entity identity
@@ -79,13 +79,13 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
     */
   override def handleCommand(
     entityId: String,
-    state: Option[SoftPaymentAccount],
+    state: Option[SoftPayAccount],
     command: AccountCommand,
     replyTo: Option[ActorRef[AccountCommandResult]],
     timers: TimerScheduler[AccountCommand]
   )(implicit
     context: ActorContext[AccountCommand]
-  ): Effect[ExternalSchedulerEvent, Option[SoftPaymentAccount]] = {
+  ): Effect[ExternalSchedulerEvent, Option[SoftPayAccount]] = {
     implicit val system: ActorSystem[_] = context.system
     command match {
       case AccountMessages.RegisterProvider(provider) =>
@@ -117,7 +117,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
                   accountKeyDao.addAccountKey(updatedClient.clientId, entityId)
                   Effect
                     .persist(
-                      SoftPaymentAccountProviderRegisteredEvent(
+                      SoftPayAccountProviderRegisteredEvent(
                         updatedClient,
                         Instant.now()
                       )
@@ -210,7 +210,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
                   accountKeyDao.addAccountKey(accessToken.refreshToken, entityId)
                   Effect
                     .persist(
-                      SoftPaymentAccountTokenRegisteredEvent(
+                      SoftPayAccountTokenRegisteredEvent(
                         client.withAccessToken(
                           accessToken.copy(
                             token = sha256(accessToken.token),
@@ -271,7 +271,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
                 accountKeyDao.addAccountKey(accessToken.refreshToken, entityId)
                 Effect
                   .persist(
-                    SoftPaymentAccountTokenRefreshedEvent(
+                    SoftPayAccountTokenRefreshedEvent(
                       client.withAccessToken(
                         accessToken.copy(
                           token = sha256(accessToken.token),
@@ -338,7 +338,7 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
             }
         }
 
-      case AccountMessages.RegisterProviderAccount(provider) =>
+      case AccountMessages.RegisterAccountWithProvider(provider) =>
         state match {
           case Some(account) =>
             val updatedClient = account.clients.find(_.clientId == provider.clientId) match {
@@ -352,20 +352,20 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
               .persist(
                 List(
                   AccountActivatedEvent(entityId, Some(Instant.now())),
-                  SoftPaymentAccountProviderRegisteredEvent(
+                  SoftPayAccountProviderRegisteredEvent(
                     updatedClient,
                     Instant.now()
                   )
                 )
               )
               .thenRun(state =>
-                AccountMessages.ProviderAccountRegistered(state.getOrElse(account)) ~> replyTo
+                AccountMessages.AccountWithProviderRegistered(state.getOrElse(account)) ~> replyTo
               )
           case _ =>
             val account = provider.account
             accountKeyDao.addAccountKey(provider.clientId, entityId)
-            Effect.persist(SoftPaymentAccountCreatedEvent(account)).thenRun { state =>
-              AccountMessages.ProviderAccountRegistered(state.getOrElse(account)) ~> replyTo
+            Effect.persist(SoftPayAccountCreatedEvent(account)).thenRun { state =>
+              AccountMessages.AccountWithProviderRegistered(state.getOrElse(account)) ~> replyTo
             }
         }
 
@@ -381,25 +381,25 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
     *   new state
     */
   override def handleEvent(
-    state: Option[SoftPaymentAccount],
+    state: Option[SoftPayAccount],
     event: ExternalSchedulerEvent
-  )(implicit context: ActorContext[_]): Option[SoftPaymentAccount] = {
+  )(implicit context: ActorContext[_]): Option[SoftPayAccount] = {
     event match {
-      case SoftPaymentAccountProviderRegisteredEvent(client, lastUpdated) =>
+      case SoftPayAccountProviderRegisteredEvent(client, lastUpdated) =>
         state.map(account => {
           account
             .withClients(account.clients.filterNot(_.clientId == client.clientId) :+ client)
             .withLastUpdated(lastUpdated)
         })
 
-      case SoftPaymentAccountTokenRegisteredEvent(client, lastUpdated) =>
+      case SoftPayAccountTokenRegisteredEvent(client, lastUpdated) =>
         state.map(account => {
           account
             .withClients(account.clients.filterNot(_.clientId == client.clientId) :+ client)
             .withLastUpdated(lastUpdated)
         })
 
-      case SoftPaymentAccountTokenRefreshedEvent(client, lastUpdated) =>
+      case SoftPayAccountTokenRefreshedEvent(client, lastUpdated) =>
         state.map(account => {
           account
             .withClients(account.clients.filterNot(_.clientId == client.clientId) :+ client)
@@ -412,11 +412,11 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
 
   private def inactiveAccount(
     entityId: String,
-    account: SoftPaymentAccount,
+    account: SoftPayAccount,
     replyTo: Option[ActorRef[AccountCommandResult]]
   )(implicit
     context: ActorContext[_]
-  ): Effect[ExternalEntityToNotificationEvent, Option[SoftPaymentAccount]] = {
+  ): Effect[ExternalEntityToNotificationEvent, Option[SoftPayAccount]] = {
     implicit val log: Logger = context.log
     implicit val system: ActorSystem[Nothing] = context.system
     def help(token: String): String = {
@@ -457,6 +457,6 @@ trait SoftPaymentAccountBehavior extends AccountBehavior[SoftPaymentAccount, Bas
   }
 }
 
-case object SoftPaymentAccountBehavior extends SoftPaymentAccountBehavior with DefaultGenerator {
-  override def persistenceId: String = "SoftPaymentAccount"
+case object SoftPayAccountBehavior extends SoftPayAccountBehavior with DefaultGenerator {
+  override def persistenceId: String = "SoftPayAccount"
 }

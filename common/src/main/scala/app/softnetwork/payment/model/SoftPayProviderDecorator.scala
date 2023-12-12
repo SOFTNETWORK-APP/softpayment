@@ -4,10 +4,10 @@ import app.softnetwork.account.model.AccountStatus
 import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.security.sha256
 
-trait ProviderDecorator { self: SoftPaymentAccount.Client.Provider =>
+trait SoftPayProviderDecorator { self: SoftPayAccount.SoftPayClient.SoftPayProvider =>
   lazy val clientId = s"$providerId.${providerType.name.toLowerCase}"
 
-  lazy val client: SoftPaymentAccount.Client = {
+  lazy val client: SoftPayAccount.SoftPayClient = {
     PaymentProviders.paymentProvider(self).client match {
       case Some(client) =>
         client.withClientApiKey(sha256(self.providerApiKey))
@@ -16,8 +16,8 @@ trait ProviderDecorator { self: SoftPaymentAccount.Client.Provider =>
     }
   }
 
-  lazy val account: SoftPaymentAccount = {
-    SoftPaymentAccount.defaultInstance
+  lazy val account: SoftPayAccount = {
+    SoftPayAccount.defaultInstance
       .withUuid(clientId)
       .withAnonymous(true)
       .withClients(Seq(client))

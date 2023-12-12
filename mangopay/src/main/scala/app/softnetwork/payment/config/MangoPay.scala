@@ -1,7 +1,7 @@
 package app.softnetwork.payment.config
 
 import MangoPaySettings._
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import com.mangopay.MangoPayApi
 import com.mangopay.core.enumerations.{EventType, HookStatus}
 import com.mangopay.entities.Hook
@@ -43,13 +43,13 @@ object MangoPay extends StrictLogging {
 
   var mangoPayApis: Map[String, MangoPayApi] = Map.empty
 
-  lazy val softPaymentProvider: SoftPaymentAccount.Client.Provider =
-    SoftPaymentAccount.Client.Provider.defaultInstance
-      .withProviderType(SoftPaymentAccount.Client.Provider.ProviderType.MANGOPAY)
+  lazy val softPayProvider: SoftPayAccount.SoftPayClient.SoftPayProvider =
+    SoftPayAccount.SoftPayClient.SoftPayProvider.defaultInstance
+      .withProviderType(SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType.MANGOPAY)
       .withProviderId(MangoPaySettings.MangoPayConfig.clientId)
       .withProviderApiKey(MangoPaySettings.MangoPayConfig.apiKey)
 
-  def apply(provider: SoftPaymentAccount.Client.Provider): MangoPayApi = {
+  def apply(provider: SoftPayAccount.SoftPayClient.SoftPayProvider): MangoPayApi = {
     mangoPayApis.get(provider.providerId) match {
       case Some(mangoPayApi) => mangoPayApi
       case _                 =>

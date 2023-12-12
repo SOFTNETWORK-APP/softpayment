@@ -1,14 +1,14 @@
 package app.softnetwork.payment.api
 
 import app.softnetwork.payment.config.MangoPay
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.security.sha256
 
 trait SoftPayClientTestKit {
 
-  def provider: SoftPaymentAccount.Client.Provider =
-    MangoPay.softPaymentProvider.withProviderType(
-      SoftPaymentAccount.Client.Provider.ProviderType.MOCK
+  def provider: SoftPayAccount.SoftPayClient.SoftPayProvider =
+    MangoPay.softPayProvider.withProviderType(
+      SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType.MOCK
     )
 
   def softPayClientSettings: String =

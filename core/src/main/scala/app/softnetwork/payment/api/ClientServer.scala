@@ -2,14 +2,14 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import app.softnetwork.account.message.Activate
-import app.softnetwork.payment.handlers.SoftPaymentAccountDao
+import app.softnetwork.payment.handlers.SoftPayAccountDao
 import app.softnetwork.payment.message.AccountMessages
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-trait ClientServer extends ClientServiceApi with SoftPaymentAccountDao {
+trait ClientServer extends ClientServiceApi with SoftPayAccountDao {
 
   implicit def system: ActorSystem[_]
 
@@ -56,15 +56,15 @@ trait ClientServer extends ClientServiceApi with SoftPaymentAccountDao {
   override def signUpClient(in: SignUpClientRequest): Future[SignUpClientResponse] = {
     import in._
     signUpClient(
-      AccountMessages.SoftPaymentSignUp(
+      AccountMessages.SoftPaySignUp(
         principal,
         credentials,
-        SoftPaymentAccount.Client.Provider(
+        SoftPayAccount.SoftPayClient.SoftPayProvider(
           providerId,
           providerApiKey,
-          SoftPaymentAccount.Client.Provider.ProviderType
+          SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType
             .fromName(providerType.name)
-            .getOrElse(SoftPaymentAccount.Client.Provider.ProviderType.MANGOPAY)
+            .getOrElse(SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType.MANGOPAY)
         )
       )
     ) map {

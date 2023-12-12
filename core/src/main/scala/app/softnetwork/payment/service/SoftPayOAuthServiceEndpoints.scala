@@ -11,7 +11,7 @@ import app.softnetwork.account.message.{
 }
 import app.softnetwork.account.service.OAuthServiceEndpoints
 import app.softnetwork.api.server.ApiErrors
-import app.softnetwork.payment.handlers.SoftPaymentAccountTypeKey
+import app.softnetwork.payment.handlers.SoftPayAccountTypeKey
 import app.softnetwork.payment.message.AccountMessages.{
   GenerateClientToken,
   OAuthClient,
@@ -34,9 +34,9 @@ import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
-trait SoftPaymentOAuthServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
+trait SoftPayOAuthServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     extends OAuthServiceEndpoints[SD]
-    with SoftPaymentAccountTypeKey
+    with SoftPayAccountTypeKey
     with ClientSession[SD] { _: SessionMaterials[SD] =>
 
   import app.softnetwork.serialization.serialization

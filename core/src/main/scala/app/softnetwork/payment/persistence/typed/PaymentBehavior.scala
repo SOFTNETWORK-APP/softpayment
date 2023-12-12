@@ -9,7 +9,7 @@ import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.config.PaymentSettings.{AkkaNodeRole, PayInStatementDescriptor}
-import app.softnetwork.payment.handlers.{PaymentDao, PaymentKvDao, SoftPaymentAccountDao}
+import app.softnetwork.payment.handlers.{PaymentDao, PaymentKvDao, SoftPayAccountDao}
 import app.softnetwork.payment.message.PaymentEvents._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.message.TransactionEvents._
@@ -57,7 +57,7 @@ trait PaymentBehavior
 
   def paymentDao: PaymentDao = PaymentDao
 
-  def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
+  def softPayAccountDao: SoftPayAccountDao = SoftPayAccountDao
 
   /** @return
     *   node role required to start this actor
@@ -4145,7 +4145,7 @@ trait PaymentBehavior
   )(implicit system: ActorSystem[_]): PaymentProvider = {
     PaymentProviders.paymentProvider(
       clientId
-        .flatMap(softPaymentAccountDao.loadProvider(_) complete () match {
+        .flatMap(softPayAccountDao.loadProvider(_) complete () match {
           case Success(s) => s
           case Failure(_) => None
         })

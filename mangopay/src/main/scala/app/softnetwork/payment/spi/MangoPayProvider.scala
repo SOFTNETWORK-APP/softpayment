@@ -24,7 +24,7 @@ import app.softnetwork.payment.model.{RecurringPayment, _}
 import app.softnetwork.payment.config.{MangoPay, MangoPaySettings}
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
 import app.softnetwork.payment.model.NaturalUser.NaturalUserType
-import app.softnetwork.payment.model.SoftPaymentAccount.Client.Provider
+import app.softnetwork.payment.model.SoftPayAccount.SoftPayClient.SoftPayProvider
 
 import scala.util.{Failure, Success, Try}
 import app.softnetwork.persistence._
@@ -2082,11 +2082,11 @@ trait MangoPayProvider extends PaymentProvider {
     }
   }
 
-  override def client: Option[SoftPaymentAccount.Client] = {
+  override def client: Option[SoftPayAccount.SoftPayClient] = {
     Try(MangoPay(provider).getClientApi.get()) match {
       case Success(client) =>
         Some(
-          SoftPaymentAccount.Client.defaultInstance
+          SoftPayAccount.SoftPayClient.defaultInstance
             .withClientId(client.getClientId + "." + provider.providerType.name.toLowerCase)
             .withProvider(provider)
             .copy(
@@ -2593,13 +2593,14 @@ trait MangoPayProvider extends PaymentProvider {
 }
 
 class MangoPayProviderFactory extends PaymentProviderSpi {
-  override val providerType: Provider.ProviderType = Provider.ProviderType.MANGOPAY
+  override val providerType: SoftPayProvider.SoftPayProviderType =
+    SoftPayProvider.SoftPayProviderType.MANGOPAY
 
-  override def paymentProvider(p: SoftPaymentAccount.Client.Provider): MangoPayProvider =
+  override def paymentProvider(p: SoftPayAccount.SoftPayClient.SoftPayProvider): MangoPayProvider =
     new MangoPayProvider {
-      override implicit val provider: SoftPaymentAccount.Client.Provider = p
+      override implicit val provider: SoftPayAccount.SoftPayClient.SoftPayProvider = p
     }
 
-  override def softPaymentProvider: SoftPaymentAccount.Client.Provider =
-    MangoPay.softPaymentProvider
+  override def softPaymentProvider: SoftPayAccount.SoftPayClient.SoftPayProvider =
+    MangoPay.softPayProvider
 }

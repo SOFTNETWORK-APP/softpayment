@@ -13,14 +13,14 @@ import app.softnetwork.payment.api.{
   PaymentGrpcService,
   PaymentServer
 }
-import app.softnetwork.payment.handlers.SoftPaymentAccountDao
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.handlers.SoftPayAccountDao
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.payment.persistence.data.paymentKvDao
 import app.softnetwork.payment.persistence.query.{
   PaymentCommandProcessorStream,
   Scheduler2PaymentProcessorStream
 }
-import app.softnetwork.payment.persistence.typed.{PaymentBehavior, SoftPaymentAccountBehavior}
+import app.softnetwork.payment.persistence.typed.{PaymentBehavior, SoftPayAccountBehavior}
 import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
@@ -30,7 +30,7 @@ import app.softnetwork.session.CsrfCheck
 
 import scala.concurrent.ExecutionContext
 
-trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountProfile] {
+trait PaymentGuardian extends AccountGuardian[SoftPayAccount, BasicAccountProfile] {
   _: SchemaProvider with CsrfCheck =>
 
   import app.softnetwork.persistence.launch.PersistenceGuardian._
@@ -38,8 +38,8 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
   def paymentBehavior: ActorSystem[_] => PaymentBehavior = _ => PaymentBehavior
 
   override def accountBehavior
-    : ActorSystem[_] => AccountBehavior[SoftPaymentAccount, BasicAccountProfile] = _ =>
-    SoftPaymentAccountBehavior
+    : ActorSystem[_] => AccountBehavior[SoftPayAccount, BasicAccountProfile] = _ =>
+    SoftPayAccountBehavior
 
   def paymentEntities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
     Seq(
@@ -70,9 +70,9 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
   override def systemVersion(): String =
     sys.env.getOrElse("VERSION", PaymentCoreBuildInfo.version)
 
-  def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
+  def softPayAccountDao: SoftPayAccountDao = SoftPayAccountDao
 
-  final override def accountDao: AccountDao = softPaymentAccountDao
+  final override def accountDao: AccountDao = softPayAccountDao
 
   def paymentServer: ActorSystem[_] => PaymentServer = system => PaymentServer(system)
 
@@ -80,14 +80,14 @@ trait PaymentGuardian extends AccountGuardian[SoftPaymentAccount, BasicAccountPr
 
   def paymentGrpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
     Seq(
-      new PaymentGrpcService(paymentServer(system), softPaymentAccountDao),
+      new PaymentGrpcService(paymentServer(system), softPayAccountDao),
       new ClientGrpcService(clientServer(system))
     )
 
   def registerProvidersAccount: ActorSystem[_] => Unit = system => {
     PaymentProviders.defaultPaymentProviders.foreach(provider => {
       implicit val ec: ExecutionContext = system.executionContext
-      softPaymentAccountDao.registerProviderAccount(provider)(system) map {
+      softPayAccountDao.registerAccountWithProvider(provider)(system) map {
         case Some(account) =>
           system.log.info(s"Registered provider account for ${provider.providerId}: $account")
         case _ =>

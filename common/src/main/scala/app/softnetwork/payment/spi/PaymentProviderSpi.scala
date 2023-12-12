@@ -1,11 +1,11 @@
 package app.softnetwork.payment.spi
 
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 
 trait PaymentProviderSpi {
-  def providerType: SoftPaymentAccount.Client.Provider.ProviderType
+  def providerType: SoftPayAccount.SoftPayClient.SoftPayProvider.SoftPayProviderType
 
-  def paymentProvider(p: SoftPaymentAccount.Client.Provider): PaymentProvider
+  def paymentProvider(p: SoftPayAccount.SoftPayClient.SoftPayProvider): PaymentProvider
 
-  def softPaymentProvider: SoftPaymentAccount.Client.Provider
+  def softPaymentProvider: SoftPayAccount.SoftPayClient.SoftPayProvider
 }

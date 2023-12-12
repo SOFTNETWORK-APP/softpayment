@@ -4,12 +4,12 @@ import akka.actor.typed.ActorSystem
 import app.softnetwork.account.message.BasicAccountSignUp
 import app.softnetwork.account.service.{AccountServiceEndpoints, OAuthServiceEndpoints}
 import app.softnetwork.api.server.Endpoint
-import app.softnetwork.payment.handlers.{MockSoftPaymentAccountDao, SoftPaymentAccountDao}
+import app.softnetwork.payment.handlers.{MockSoftPayAccountDao, SoftPayAccountDao}
 import app.softnetwork.payment.launch.PaymentEndpoints
 import app.softnetwork.payment.service.{
   MockPaymentServiceEndpoints,
-  MockSoftPaymentAccountServiceEndpoints,
-  MockSoftPaymentOAuthServiceEndpoints,
+  MockSoftPayAccountServiceEndpoints,
+  MockSoftPayOAuthServiceEndpoints,
   PaymentServiceEndpoints
 }
 import app.softnetwork.persistence.schema.SchemaProvider
@@ -45,7 +45,7 @@ trait PaymentEndpointsTestKit[SD <: SessionData with SessionDataDecorator[SD]]
       override implicit def sessionConfig: SessionConfig = self.sessionConfig
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
-      override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
+      override def softPayAccountDao: SoftPayAccountDao = MockSoftPayAccountDao
       override implicit def refreshTokenStorage: RefreshTokenStorage[SD] =
         self.refreshTokenStorage
       override implicit def companion: SessionDataCompanion[SD] = self.companion
@@ -56,7 +56,7 @@ trait PaymentEndpointsTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   override def accountEndpoints: ActorSystem[_] => AccountServiceEndpoints[BasicAccountSignUp, SD] =
     sys =>
-      new MockSoftPaymentAccountServiceEndpoints[SD] with SessionMaterials[SD] {
+      new MockSoftPayAccountServiceEndpoints[SD] with SessionMaterials[SD] {
         override implicit def manager(implicit
           sessionConfig: SessionConfig,
           companion: SessionDataCompanion[SD]
@@ -72,7 +72,7 @@ trait PaymentEndpointsTestKit[SD <: SessionData with SessionDataDecorator[SD]]
       }
 
   override def oauthEndpoints: ActorSystem[_] => OAuthServiceEndpoints[SD] = sys =>
-    new MockSoftPaymentOAuthServiceEndpoints[SD] with SessionMaterials[SD] {
+    new MockSoftPayOAuthServiceEndpoints[SD] with SessionMaterials[SD] {
       override implicit def manager(implicit
         sessionConfig: SessionConfig,
         companion: SessionDataCompanion[SD]
@@ -81,7 +81,7 @@ trait PaymentEndpointsTestKit[SD <: SessionData with SessionDataDecorator[SD]]
       override def log: Logger = LoggerFactory getLogger getClass.getName
       override implicit def system: ActorSystem[_] = sys
       override lazy val ec: ExecutionContext = sys.executionContext
-      override def softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
+      override def softPayAccountDao: SoftPayAccountDao = MockSoftPayAccountDao
       override implicit def refreshTokenStorage: RefreshTokenStorage[SD] =
         self.refreshTokenStorage
       override implicit def companion: SessionDataCompanion[SD] = self.companion

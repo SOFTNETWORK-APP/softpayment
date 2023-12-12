@@ -5,7 +5,7 @@ import app.softnetwork.api.server.ApiErrors
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.{ServiceWithSessionEndpoints, SessionMaterials}
@@ -36,7 +36,7 @@ trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   lazy val requiredSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], SD),
+    (Option[SoftPayAccount.SoftPayClient], SD),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
@@ -54,7 +54,7 @@ trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   lazy val optionalSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    (Option[SoftPaymentAccount.Client], Option[SD]),
+    (Option[SoftPayAccount.SoftPayClient], Option[SD]),
     Unit,
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

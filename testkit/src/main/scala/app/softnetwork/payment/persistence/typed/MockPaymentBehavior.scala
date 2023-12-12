@@ -2,9 +2,9 @@ package app.softnetwork.payment.persistence.typed
 
 import app.softnetwork.payment.handlers.{
   MockPaymentDao,
-  MockSoftPaymentAccountDao,
+  MockSoftPayAccountDao,
   PaymentDao,
-  SoftPaymentAccountDao
+  SoftPayAccountDao
 }
 
 object MockPaymentBehavior extends PaymentBehavior {
@@ -12,6 +12,6 @@ object MockPaymentBehavior extends PaymentBehavior {
 
   override lazy val paymentDao: PaymentDao = MockPaymentDao
 
-  override lazy val softPaymentAccountDao: SoftPaymentAccountDao = MockSoftPaymentAccountDao
+  override lazy val softPayAccountDao: SoftPayAccountDao = MockSoftPayAccountDao
 
 }

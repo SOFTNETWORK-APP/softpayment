@@ -2,7 +2,7 @@ package app.softnetwork.payment.service
 
 import app.softnetwork.account.config.AccountSettings
 import app.softnetwork.payment.annotation.InternalApi
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.{SessionEndpoints, SessionMaterials}
 import com.softwaremill.session.{
@@ -38,7 +38,7 @@ trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
   @InternalApi
   private[payment] def requiredClientSession: PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPaymentAccount.Client], SD), Unit, Unit, Seq[
+  ], (Option[SoftPayAccount.SoftPayClient], SD), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = clientSession(Some(true))
@@ -59,7 +59,7 @@ trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
   @InternalApi
   private[payment] def optionalClientSession: PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPaymentAccount.Client], Option[SD]), Unit, Unit, Seq[
+  ], (Option[SoftPayAccount.SoftPayClient], Option[SD]), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = clientSession(Some(false))
@@ -78,7 +78,7 @@ trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     required: Option[Boolean]
   ): PartialServerEndpointWithSecurityOutput[Seq[
     Option[String]
-  ], (Option[SoftPaymentAccount.Client], SessionResult[SD]), Unit, Unit, Seq[
+  ], (Option[SoftPayAccount.SoftPayClient], SessionResult[SD]), Unit, Unit, Seq[
     Option[String]
   ], Unit, Any, Future] = {
     val partial = sc.session(gt, required)
@@ -89,7 +89,7 @@ trait ClientSessionEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
       )
       .out(partial.securityOutput)
       .serverSecurityLogicWithOutput { inputs =>
-        softPaymentAccountDao.authenticateClient(inputs.head) flatMap { client =>
+        softPayAccountDao.authenticateClient(inputs.head) flatMap { client =>
           implicit val manager: SessionManager[SD] = clientSessionManager(client)
           sessionType match {
             case Session.SessionType.OneOffCookie | Session.SessionType.OneOffHeader => // oneOff

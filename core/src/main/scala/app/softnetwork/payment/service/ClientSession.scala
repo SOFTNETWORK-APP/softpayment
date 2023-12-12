@@ -1,8 +1,8 @@
 package app.softnetwork.payment.service
 
 import app.softnetwork.concurrent.Completion
-import app.softnetwork.payment.handlers.SoftPaymentAccountDao
-import app.softnetwork.payment.model.{computeExternalUuidWithProfile, SoftPaymentAccount}
+import app.softnetwork.payment.handlers.SoftPayAccountDao
+import app.softnetwork.payment.model.{computeExternalUuidWithProfile, SoftPayAccount}
 import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
 import org.softnetwork.session.model.ApiKey
@@ -15,13 +15,13 @@ import scala.util.{Failure, Success}
 trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Completion {
   self: SessionMaterials[SD] =>
 
-  def softPaymentAccountDao: SoftPaymentAccountDao = SoftPaymentAccountDao
+  def softPayAccountDao: SoftPayAccountDao = SoftPayAccountDao
 
   implicit def sessionConfig: SessionConfig
 
   implicit def companion: SessionDataCompanion[SD]
 
-  implicit def toSession(client: SoftPaymentAccount.Client): SD = {
+  implicit def toSession(client: SoftPayAccount.SoftPayClient): SD = {
     var session = companion.newSession
       .withAdmin(false)
       .withAnonymous(false)
@@ -31,14 +31,14 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
   }
 
   def encodeClient(
-    client: SoftPaymentAccount.Client
+    client: SoftPayAccount.SoftPayClient
   ): String = {
     clientSessionManager(client).clientSessionManager.encode(client)
   }
 
   def decodeClient(data: String): Option[SD] = manager.clientSessionManager.decode(data).toOption
 
-  def clientSessionManager(client: SoftPaymentAccount.Client): SessionManager[SD] = {
+  def clientSessionManager(client: SoftPayAccount.SoftPayClient): SessionManager[SD] = {
     implicit val innerSessionConfig: SessionConfig =
       sessionConfig.copy(
         jwt = sessionConfig.jwt.copy(
@@ -60,7 +60,7 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
   def sessionManager(clientId: Option[String]): SessionManager[SD] = {
     clientId match {
       case Some(id) =>
-        softPaymentAccountDao.loadClient(id) complete () match {
+        softPayAccountDao.loadClient(id) complete () match {
           case Success(s) => clientSessionManager(s)
           case Failure(_) => manager
         }
@@ -68,7 +68,7 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
     }
   }
 
-  def clientSessionManager(client: Option[SoftPaymentAccount.Client]): SessionManager[SD] = {
+  def clientSessionManager(client: Option[SoftPayAccount.SoftPayClient]): SessionManager[SD] = {
     client match {
       case Some(c) =>
         implicit val innerSessionConfig: SessionConfig =
@@ -84,7 +84,7 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
   }
 
   def loadApiKey(clientId: String): Future[Option[ApiKey]] =
-    softPaymentAccountDao.loadApiKey(clientId)
+    softPayAccountDao.loadApiKey(clientId)
 
   protected[payment] def externalUuidWithProfile(session: SD): String =
     computeExternalUuidWithProfile(session.id, session.profile)

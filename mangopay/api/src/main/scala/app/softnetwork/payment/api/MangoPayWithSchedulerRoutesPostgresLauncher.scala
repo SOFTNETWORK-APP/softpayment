@@ -1,7 +1,7 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.handlers.SoftPaymentAccountDao
+import app.softnetwork.payment.handlers.SoftPayAccountDao
 import app.softnetwork.payment.service.{MangoPayPaymentService, PaymentService}
 import app.softnetwork.persistence.jdbc.schema.{JdbcSchemaProvider, JdbcSchemaTypes}
 import app.softnetwork.persistence.schema.SchemaType

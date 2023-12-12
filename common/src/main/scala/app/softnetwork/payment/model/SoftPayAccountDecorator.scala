@@ -3,7 +3,7 @@ package app.softnetwork.payment.model
 import app.softnetwork.account.model.{BasicAccountProfile, Profile}
 import org.softnetwork.session.model.ApiKey
 
-trait SoftPaymentAccountDecorator { _: SoftPaymentAccount =>
+trait SoftPayAccountDecorator { _: SoftPayAccount =>
 
   override def newProfile(name: String): Profile =
     BasicAccountProfile.defaultInstance.withName(name)

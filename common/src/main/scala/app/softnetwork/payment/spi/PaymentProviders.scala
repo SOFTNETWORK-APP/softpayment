@@ -1,6 +1,6 @@
 package app.softnetwork.payment.spi
 
-import app.softnetwork.payment.model.SoftPaymentAccount
+import app.softnetwork.payment.model.SoftPayAccount
 
 import java.util.ServiceLoader
 import scala.collection.JavaConverters._
@@ -12,14 +12,14 @@ object PaymentProviders {
 
   private[this] var paymentProviders: Map[String, PaymentProvider] = Map.empty
 
-  private[this] def paymentProviderKey(provider: SoftPaymentAccount.Client.Provider) =
+  private[this] def paymentProviderKey(provider: SoftPayAccount.SoftPayClient.SoftPayProvider) =
     s"${provider.providerType}-${provider.providerId}"
 
-  def defaultPaymentProviders: Seq[SoftPaymentAccount.Client.Provider] =
+  def defaultPaymentProviders: Seq[SoftPayAccount.SoftPayClient.SoftPayProvider] =
     paymentProviderFactories.iterator().asScala.map(_.softPaymentProvider).toSeq
 
   def paymentProvider(
-    provider: SoftPaymentAccount.Client.Provider
+    provider: SoftPayAccount.SoftPayClient.SoftPayProvider
   ): PaymentProvider = {
     paymentProviders.get(paymentProviderKey(provider)) match {
       case Some(paymentProvider) => paymentProvider
