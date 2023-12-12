@@ -88,7 +88,7 @@ trait SoftPayAccountBehavior extends AccountBehavior[SoftPayAccount, BasicAccoun
   ): Effect[ExternalSchedulerEvent, Option[SoftPayAccount]] = {
     implicit val system: ActorSystem[_] = context.system
     command match {
-      case AccountMessages.RegisterProvider(provider) =>
+      case AccountMessages.RegisterClientWithProvider(provider) =>
         state match {
           case Some(account) =>
             if (
@@ -122,10 +122,12 @@ trait SoftPayAccountBehavior extends AccountBehavior[SoftPayAccount, BasicAccoun
                         Instant.now()
                       )
                     )
-                    .thenRun(_ => AccountMessages.ProviderRegistered(updatedClient) ~> replyTo)
+                    .thenRun(_ =>
+                      AccountMessages.ClientWithProviderRegistered(updatedClient) ~> replyTo
+                    )
                 case _ =>
                   Effect.none.thenRun { _ =>
-                    AccountMessages.ProviderNotRegistered ~> replyTo
+                    AccountMessages.ClientWithProviderNotRegistered ~> replyTo
                   }
               }
             }

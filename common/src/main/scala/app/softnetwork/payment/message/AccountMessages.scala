@@ -22,7 +22,8 @@ object AccountMessages {
     override val profile: Option[BasicAccountProfile] = None
   ) extends SignUp
 
-  case class RegisterProvider(provider: SoftPayAccount.Client.Provider) extends AccountCommand
+  case class RegisterClientWithProvider(provider: SoftPayAccount.Client.Provider)
+      extends AccountCommand
 
   case class RegisterAccountWithProvider(provider: SoftPayAccount.Client.Provider)
       extends AccountCommand
@@ -47,7 +48,8 @@ object AccountMessages {
 
   case class OAuthClient(token: String) extends LookupAccountCommand
 
-  case class ProviderRegistered(client: SoftPayAccount.Client) extends AccountCommandResult
+  case class ClientWithProviderRegistered(client: SoftPayAccount.Client)
+      extends AccountCommandResult
 
   case class AccountWithProviderRegistered(account: SoftPayAccount) extends AccountCommandResult
 
@@ -61,7 +63,8 @@ object AccountMessages {
 
   case object ProviderAlreadyRegistered extends AccountErrorMessage("provider.already.registered")
 
-  case object ProviderNotRegistered extends AccountErrorMessage("provider.not.registered")
+  case object ClientWithProviderNotRegistered
+      extends AccountErrorMessage("client.with.provider.not.registered")
 
   case object AccountWithProviderNotRegistered
       extends AccountErrorMessage("account.with.provider.not.registered")
