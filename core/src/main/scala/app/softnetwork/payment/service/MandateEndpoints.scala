@@ -36,7 +36,12 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       )
       .serverLogic(principal =>
         _ =>
-          run(CreateMandate(externalUuidWithProfile(principal._2))).map {
+          run(
+            CreateMandate(
+              externalUuidWithProfile(principal._2),
+              clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
+            )
+          ).map {
             case MandateCreated                 => Right(MandateCreated)
             case r: MandateConfirmationRequired => Right(r)
             case other                          => Left(error(other))

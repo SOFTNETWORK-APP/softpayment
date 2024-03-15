@@ -564,7 +564,12 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
         // check if a session exists
         requiredClientSession { (client, session) =>
           post {
-            run(CreateMandate(externalUuidWithProfile(session))) completeWith {
+            run(
+              CreateMandate(
+                externalUuidWithProfile(session),
+                clientId = client.map(_.clientId).orElse(session.clientId)
+              )
+            ) completeWith {
               case r: MandateConfirmationRequired =>
                 complete(HttpResponse(StatusCodes.OK, entity = r))
               case MandateCreated => complete(HttpResponse(StatusCodes.OK))

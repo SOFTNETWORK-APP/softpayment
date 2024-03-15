@@ -1347,7 +1347,8 @@ trait PaymentBehavior
                         creditedAccount,
                         paymentAccount,
                         creditedUserId,
-                        bankAccountId
+                        bankAccountId,
+                        clientId
                       )
                     }
                   case _ => Effect.none.thenRun(_ => BankAccountNotFound ~> replyTo)
@@ -1357,7 +1358,7 @@ trait PaymentBehavior
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
 
-      case _: CancelMandate =>
+      case cmd: CancelMandate =>
         state match {
           case Some(paymentAccount) =>
             if (paymentAccount.mandateExists && paymentAccount.mandateRequired) {
@@ -1369,9 +1370,11 @@ trait PaymentBehavior
                 )
                 .thenRun(_ => MandateNotCanceled ~> replyTo)
             } else {
-              val clientId = paymentAccount.clientId.orElse(
-                internalClientId
-              )
+              val clientId = paymentAccount.clientId
+                .orElse(cmd.clientId)
+                .orElse(
+                  internalClientId
+                )
               val paymentProvider = loadPaymentProvider(clientId)
               import paymentProvider._
               paymentAccount.bankAccount match {
@@ -3047,9 +3050,11 @@ trait PaymentBehavior
                                   nextDebitedAmount = cmd.nextDebitedAmount,
                                   nextFeesAmount = cmd.nextFeesAmount
                                 )
-                            val clientId = paymentAccount.clientId.orElse(
-                              internalClientId
-                            )
+                            val clientId = paymentAccount.clientId
+                              .orElse(cmd.clientId)
+                              .orElse(
+                                internalClientId
+                              )
                             val paymentProvider = loadPaymentProvider(clientId)
                             import paymentProvider._
                             registerRecurringCardPayment(
@@ -3350,14 +3355,16 @@ trait PaymentBehavior
     creditedAccount: String,
     paymentAccount: PaymentAccount,
     creditedUserId: String,
-    bankAccountId: String
+    bankAccountId: String,
+    clientId: Option[String] = None
   )(implicit
     context: ActorContext[_],
     softPayClientSettings: SoftPayClientSettings
   ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
     implicit val system: ActorSystem[_] = context.system
-    val clientId = paymentAccount.clientId.orElse(Option(softPayClientSettings.clientId))
-    val paymentProvider = loadPaymentProvider(clientId)
+    val _clientId =
+      paymentAccount.clientId.orElse(clientId).orElse(Option(softPayClientSettings.clientId))
+    val paymentProvider = loadPaymentProvider(_clientId)
     import paymentProvider._
     mandate(creditedAccount, creditedUserId, bankAccountId) match {
       case Some(mandateResult) =>

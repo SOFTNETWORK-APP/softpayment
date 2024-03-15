@@ -14,7 +14,6 @@ option (scalapb.options) = {
     import: "app.softnetwork.protobuf.ScalaPBTypeMappers._"
     import: "app.softnetwork.serialization._"
     import: "app.softnetwork.payment.model._"
-//    import: "app.softnetwork.payment.serialization._"
     preserve_unknown_fields: false
 };
 

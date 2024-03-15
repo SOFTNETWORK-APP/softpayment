@@ -186,6 +186,7 @@ message PayInWithCardPreAuthorizedCommandEvent{
     required string preAuthorizationId = 1;
     required string creditedAccount = 2;
     optional int32 debitedAmount = 3;
+    optional string clientId = 4;
 }
 
 message RefundCommandEvent{
@@ -197,6 +198,7 @@ message RefundCommandEvent{
     required string currency = 4 [default = "EUR"];
     required string reasonMessage = 5;
     required bool initializedByClient = 6;
+    optional string clientId = 7;
 }
 
 message PayOutCommandEvent{
@@ -208,6 +210,7 @@ message PayOutCommandEvent{
     required int32 feesAmount = 4;
     required string currency = 5 [default = "EUR"];
     optional string externalReference = 6;
+    optional string clientId = 7;
 }
 
 message TransferCommandEvent{
@@ -221,6 +224,7 @@ message TransferCommandEvent{
     required string currency = 6 [default = "EUR"];
     required bool payOutRequired = 7 [default = true];
     optional string externalReference = 8;
+    optional string clientId = 9;
 }
 
 message DirectDebitCommandEvent{
@@ -232,6 +236,7 @@ message DirectDebitCommandEvent{
     required string currency = 4 [default = "EUR"];
     required string statementDescriptor = 5;
     optional string externalReference = 6;
+    optional string clientId = 7;
 }
 
 message CreateOrUpdatePaymentAccountCommandEvent{
@@ -254,6 +259,7 @@ message RegisterRecurringPaymentCommandEvent {
     optional bool fixedNextAmount = 9;
     optional int32 nextDebitedAmount = 10;
     optional int32 nextFeesAmount = 11;
+    optional string clientId = 12;
 }
 
 message RecurringPaymentRegisteredEvent {
@@ -269,12 +275,14 @@ message CancelPreAuthorizationCommandEvent {
     option (scalapb.message).extends = "PaymentCommandEvent";
     required string orderUuid = 1;
     required string cardPreAuthorizedTransactionId = 2;
+    optional string clientId = 3;
 }
 
 message LoadDirectDebitTransactionCommandEvent {
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "PaymentCommandEvent";
     required string directDebitTransactionId = 1;
+    optional string clientId = 2;
 }
 
 message PaymentAccountCreatedOrUpdatedEvent {
@@ -290,6 +298,7 @@ message CancelMandateCommandEvent {
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "PaymentCommandEvent";
     required string externalUuid = 1;
+    optional string clientId = 2;
 }
 
 message MandateCancelationFailedEvent {

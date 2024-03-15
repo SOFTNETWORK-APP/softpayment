@@ -58,7 +58,12 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
           case evt: PayInWithCardPreAuthorizedCommandEvent =>
             import evt._
             val command =
-              PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount)
+              PayInWithCardPreAuthorized(
+                preAuthorizationId,
+                creditedAccount,
+                debitedAmount,
+                clientId
+              )
             !?(command) map {
               case _: PaidInResult =>
                 if (forTests) system.eventStream.tell(Publish(event))
@@ -77,7 +82,8 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
               refundAmount,
               currency,
               reasonMessage,
-              initializedByClient
+              initializedByClient,
+              clientId
             )
             !?(command) map {
               case _: Refunded =>
@@ -97,7 +103,8 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
               creditedAmount,
               feesAmount,
               currency,
-              externalReference
+              externalReference,
+              clientId
             )
             !?(command) map {
               case _: PaidOut =>
@@ -119,7 +126,8 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
               feesAmount,
               currency,
               payOutRequired,
-              externalReference
+              externalReference,
+              clientId
             )
             !?(command) map {
               case _: Transferred =>
@@ -139,7 +147,8 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
               feesAmount,
               currency,
               statementDescriptor,
-              externalReference
+              externalReference,
+              clientId
             )
             !?(command) map {
               case _: DirectDebited =>
@@ -153,7 +162,10 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
             }
           case evt: LoadDirectDebitTransactionCommandEvent =>
             import evt._
-            val command = LoadDirectDebitTransaction(directDebitTransactionId)
+            val command = LoadDirectDebitTransaction(
+              directDebitTransactionId,
+              clientId
+            )
             !?(command) map {
               case _: DirectDebited =>
                 if (forTests) system.eventStream.tell(Publish(event))
@@ -177,7 +189,8 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
               frequency,
               fixedNextAmount,
               nextDebitedAmount,
-              nextFeesAmount
+              nextFeesAmount,
+              clientId
             )
             !?(command) map {
               case _: RecurringPaymentRegistered =>
@@ -191,7 +204,11 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
             }
           case evt: CancelPreAuthorizationCommandEvent =>
             import evt._
-            val command = CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId)
+            val command = CancelPreAuthorization(
+              orderUuid,
+              cardPreAuthorizedTransactionId,
+              clientId
+            )
             !?(command) map {
               case _: PreAuthorizationCanceled =>
                 if (forTests) system.eventStream.tell(Publish(event))
@@ -204,7 +221,7 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
             }
           case evt: CancelMandateCommandEvent =>
             import evt._
-            val command = CancelMandate(externalUuid)
+            val command = CancelMandate(externalUuid, clientId)
             !?(command) map {
               case MandateCanceled =>
                 if (forTests) system.eventStream.tell(Publish(event))

@@ -18,6 +18,7 @@ object TokensCmd extends Cmd[TokensConfig] {
     OParser.sequence(
       programName(s"$shell $name"),
       head(shell, name, "[options]"),
+      note("Command to generate/refresh tokens"),
       opt[String]('r', "refreshToken")
         .action((x, c) => c.copy(refreshToken = Some(x)))
         .text("optional refresh token")

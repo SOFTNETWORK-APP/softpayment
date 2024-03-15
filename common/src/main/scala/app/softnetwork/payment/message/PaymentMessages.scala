@@ -726,8 +726,10 @@ object PaymentMessages {
 
   /** @param creditedAccount
     *   - account to whom the mandate would be added
+    * @param clientId
+    *   - optional client id
     */
-  case class CreateMandate(creditedAccount: String) extends PaymentCommandWithKey {
+  case class CreateMandate(creditedAccount: String, clientId: Option[String] = None) extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
