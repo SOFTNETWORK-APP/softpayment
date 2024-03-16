@@ -1,10 +1,9 @@
 package app.softnetwork.payment.service
 
-import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import app.softnetwork.payment.config.PaymentSettings.HooksRoute
-import app.softnetwork.payment.handlers.MangoPayPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
   InvalidateRegularUser,
   KycDocumentStatusUpdated,
@@ -19,11 +18,14 @@ import app.softnetwork.payment.message.PaymentMessages.{
   ValidateRegularUser
 }
 import app.softnetwork.payment.model.{BankAccount, KycDocument, UboDeclaration}
-import app.softnetwork.session.service.SessionService
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
+import app.softnetwork.session.service.SessionMaterials
 import com.mangopay.core.enumerations.EventType
-import org.slf4j.{Logger, LoggerFactory}
 
-trait MangoPayPaymentService extends GenericPaymentService with MangoPayPaymentHandler {
+trait MangoPayPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
+    extends PaymentService[SD]
+    with PaymentHandler {
+  _: SessionMaterials[SD] =>
 
   def completeWithKycDocumentUpdatedResult(
     eventType: String,
@@ -218,16 +220,6 @@ trait MangoPayPaymentService extends GenericPaymentService with MangoPayPaymentH
             complete(HttpResponse(StatusCodes.BadRequest))
         }
       }
-    }
-  }
-}
-
-object MangoPayPaymentService {
-  def apply(_system: ActorSystem[_], _sessionService: SessionService): MangoPayPaymentService = {
-    new MangoPayPaymentService {
-      lazy val log: Logger = LoggerFactory getLogger getClass.getName
-      override implicit def system: ActorSystem[_] = _system
-      override def sessionService: SessionService = _sessionService
     }
   }
 }

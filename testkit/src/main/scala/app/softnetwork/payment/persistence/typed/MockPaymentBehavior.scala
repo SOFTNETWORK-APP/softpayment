@@ -1,10 +1,17 @@
 package app.softnetwork.payment.persistence.typed
 
-import app.softnetwork.payment.handlers.{GenericPaymentDao, MockPaymentDao}
-import app.softnetwork.payment.spi.MockMangoPayProvider
+import app.softnetwork.payment.handlers.{
+  MockPaymentDao,
+  MockSoftPayAccountDao,
+  PaymentDao,
+  SoftPayAccountDao
+}
 
-case object MockPaymentBehavior extends GenericPaymentBehavior with MockMangoPayProvider {
+object MockPaymentBehavior extends PaymentBehavior {
   override def persistenceId = s"Mock${super.persistenceId}"
 
-  override lazy val paymentDao: GenericPaymentDao = MockPaymentDao
+  override lazy val paymentDao: PaymentDao = MockPaymentDao
+
+  override lazy val softPayAccountDao: SoftPayAccountDao = MockSoftPayAccountDao
+
 }

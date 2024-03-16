@@ -1,8 +1,11 @@
 package app.softnetwork.payment.spi
 
+import app.softnetwork.payment.config.MangoPay
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
-import app.softnetwork.payment.model.PaymentUser.PaymentUserType
+import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model.RecurringPayment.RecurringCardPaymentState
+import app.softnetwork.payment.model.SoftPayAccount.Client
+import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model.{RecurringPayment, _}
 import app.softnetwork.persistence._
 import app.softnetwork.time.DateExtensions
@@ -41,7 +44,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   provider user id
     */
-  override def createOrUpdateNaturalUser(maybeNaturalUser: Option[PaymentUser]): Option[String] =
+  override def createOrUpdateNaturalUser(maybeNaturalUser: Option[NaturalUser]): Option[String] =
     maybeNaturalUser match {
       case Some(naturalUser) =>
         import naturalUser._
@@ -57,10 +60,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
             user.setTag(externalUuid)
             user.setNationality(CountryIso.valueOf(nationality))
             user.setCountryOfResidence(CountryIso.valueOf(countryOfResidence))
-            paymentUserType match {
+            naturalUserType match {
               case Some(value) =>
                 value match {
-                  case PaymentUserType.PAYER => user.setUserCategory(UserCategory.PAYER)
+                  case NaturalUserType.PAYER => user.setUserCategory(UserCategory.PAYER)
                   case _ =>
                     user.setUserCategory(UserCategory.OWNER)
                     user.setTermsAndConditionsAccepted(true)
@@ -126,10 +129,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
             )
             user.setEmail(legalRepresentative.email)
             user.setCompanyNumber(siret)
-            legalRepresentative.paymentUserType match {
+            legalRepresentative.naturalUserType match {
               case Some(value) =>
                 value match {
-                  case PaymentUserType.PAYER => user.setUserCategory(UserCategory.PAYER)
+                  case NaturalUserType.PAYER => user.setUserCategory(UserCategory.PAYER)
                   case _ =>
                     user.setUserCategory(UserCategory.OWNER)
                     user.setTermsAndConditionsAccepted(true)
@@ -1236,6 +1239,13 @@ trait MockMangoPayProvider extends MangoPayProvider {
     }
   }
 
+  override def client: Option[SoftPayAccount.Client] =
+    Some(
+      SoftPayAccount.Client.defaultInstance
+        .withProvider(provider)
+        .withClientId(provider.clientId)
+    )
+
   /** @return
     *   client fees
     */
@@ -1710,3 +1720,16 @@ case class RecurringCardPaymentRegistration(
   currentState: RecurringCardPaymentState,
   registration: CreateRecurringPayment
 )
+
+class MockMangoPayProviderFactory extends PaymentProviderSpi {
+  override val providerType: Provider.ProviderType =
+    Provider.ProviderType.MOCK
+
+  override def paymentProvider(p: Client.Provider): MockMangoPayProvider =
+    new MockMangoPayProvider {
+      override implicit def provider: Provider = p
+    }
+
+  override def softPaymentProvider: Provider =
+    MangoPay.softPayProvider.withProviderType(providerType)
+}

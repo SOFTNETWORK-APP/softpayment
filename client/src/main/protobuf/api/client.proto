@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+import "scalapb/scalapb.proto";
+import "google/protobuf/wrappers.proto";
+
+package app.softnetwork.payment.api;
+
+option (scalapb.options) = {
+    import: "app.softnetwork.protobuf.ScalaPBTypeMappers._"
+    preserve_unknown_fields: false
+};
+
+service ClientServiceApi {
+    rpc SignUpClient (SignUpClientRequest) returns (SignUpClientResponse) {}
+    rpc ActivateClient (ActivateClientRequest) returns (ActivateClientResponse) {}
+    rpc GenerateClientTokens (GenerateClientTokensRequest) returns (ClientTokensResponse) {}
+    rpc RefreshClientTokens (RefreshClientTokensRequest) returns (ClientTokensResponse) {}
+}
+
+enum ProviderType {
+    MOCK = 0;
+    MANGOPAY = 1;
+//    STRIPE = 2;
+}
+
+message SignUpClientRequest {
+    string principal = 1;
+    string credentials = 2;
+    string provider_id = 3;
+    string provider_api_key = 4;
+    ProviderType provider_type = 5;
+}
+
+message ClientCreated {
+    string client_id = 1;
+    string client_secret = 2;
+}
+
+message SignUpClientResponse {
+    oneof signup {
+        ClientCreated client = 1;
+        string error = 2;
+    }
+}
+
+message ActivateClientRequest {
+    string token = 1;
+}
+
+message ActivateClientResponse {
+    oneof activation {
+        bool activated = 1;
+        string error = 2;
+    }
+}
+
+message Tokens {
+    string access_token = 1;
+    string token_type = 2;
+    int64 expires_in = 3;
+    string refresh_token = 4;
+    google.protobuf.Int64Value refresh_token_expires_in = 5;
+}
+
+message ClientTokensResponse {
+    oneof clientTokens {
+        Tokens tokens = 1;
+        string error = 2;
+    }
+}
+
+message GenerateClientTokensRequest {
+    string client_id = 1;
+    string client_secret = 2;
+    google.protobuf.StringValue scope = 3;
+}
+
+message RefreshClientTokensRequest {
+    string refresh_token = 1;
+}

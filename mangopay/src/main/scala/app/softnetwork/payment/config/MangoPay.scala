@@ -1,10 +1,10 @@
 package app.softnetwork.payment.config
 
 import MangoPaySettings._
+import app.softnetwork.payment.model.SoftPayAccount
 import com.mangopay.MangoPayApi
 import com.mangopay.core.enumerations.{EventType, HookStatus}
 import com.mangopay.entities.Hook
-
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.util.{Failure, Success, Try}
@@ -41,18 +41,24 @@ object MangoPay extends StrictLogging {
     lazy val payPalReturnUrl = s"""$BaseUrl/$paypalPath/$PayPalRoute"""
   }
 
-  var maybeMangoPayApi: Option[MangoPayApi] = None
+  var mangoPayApis: Map[String, MangoPayApi] = Map.empty
 
-  def apply(): MangoPayApi = {
-    maybeMangoPayApi match {
+  lazy val softPayProvider: SoftPayAccount.Client.Provider =
+    SoftPayAccount.Client.Provider.defaultInstance
+      .withProviderType(SoftPayAccount.Client.Provider.ProviderType.MANGOPAY)
+      .withProviderId(MangoPaySettings.MangoPayConfig.clientId)
+      .withProviderApiKey(MangoPaySettings.MangoPayConfig.apiKey)
+
+  def apply(provider: SoftPayAccount.Client.Provider): MangoPayApi = {
+    mangoPayApis.get(provider.providerId) match {
       case Some(mangoPayApi) => mangoPayApi
       case _                 =>
         // init MangoPay api
         import MangoPaySettings.MangoPayConfig._
         val mangoPayApi = new MangoPayApi
         mangoPayApi.getConfig.setBaseUrl(baseUrl)
-        mangoPayApi.getConfig.setClientId(clientId)
-        mangoPayApi.getConfig.setClientPassword(apiKey)
+        mangoPayApi.getConfig.setClientId(provider.providerId)
+        mangoPayApi.getConfig.setClientPassword(provider.providerApiKey)
         mangoPayApi.getConfig.setDebugMode(debug)
         // init MangoPay hooks
         import scala.collection.JavaConverters._
@@ -78,7 +84,7 @@ object MangoPay extends StrictLogging {
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_CREATED, hooks)
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_ACTIVATED, hooks)
         createOrUpdateHook(mangoPayApi, EventType.MANDATE_EXPIRED, hooks)
-        maybeMangoPayApi = Some(mangoPayApi)
+        mangoPayApis = mangoPayApis.updated(provider.providerId, mangoPayApi)
         mangoPayApi
     }
   }

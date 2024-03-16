@@ -1,20 +1,37 @@
 package app.softnetwork.payment.scalatest
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.config.PaymentSettings._
-import app.softnetwork.payment.handlers.MockPaymentHandler
-import app.softnetwork.payment.launch.PaymentGuardian
-import app.softnetwork.payment.message.PaymentMessages.{
-  KycDocumentStatusNotUpdated,
-  UboDeclarationStatusUpdated,
-  _
+import app.softnetwork.account.config.AccountSettings
+import app.softnetwork.account.model.BasicAccountProfile
+import app.softnetwork.account.persistence.query.AccountEventProcessorStreams.InternalAccountEvents2AccountProcessorStream
+import app.softnetwork.account.persistence.typed.AccountBehavior
+import app.softnetwork.notification.scalatest.AllNotificationsTestKit
+import app.softnetwork.payment.api.{
+  ClientServer,
+  MockClientServer,
+  MockPaymentServer,
+  PaymentServer,
+  SoftPayClientTestKit
 }
+import app.softnetwork.payment.config.PaymentSettings._
+import app.softnetwork.payment.handlers.{
+  MockPaymentHandler,
+  MockSoftPayAccountDao,
+  MockSoftPayAccountHandler,
+  SoftPayAccountDao
+}
+import app.softnetwork.payment.launch.PaymentGuardian
+import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.persistence.query.{
-  GenericPaymentCommandProcessorStream,
+  PaymentCommandProcessorStream,
   Scheduler2PaymentProcessorStream
 }
-import app.softnetwork.payment.persistence.typed.{GenericPaymentBehavior, MockPaymentBehavior}
+import app.softnetwork.payment.persistence.typed.{
+  MockPaymentBehavior,
+  MockSoftPayAccountBehavior,
+  PaymentBehavior
+}
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.{
   EventProcessorStream,
@@ -23,31 +40,57 @@ import app.softnetwork.persistence.query.{
 }
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.scheduler.scalatest.SchedulerTestKit
+import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.Suite
 import org.slf4j.{Logger, LoggerFactory}
+import org.softnetwork.session.model.ApiKey
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, Future}
 
-trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
+trait PaymentTestKit
+    extends SchedulerTestKit
+    with PaymentGuardian
+    with AllNotificationsTestKit
+    with SoftPayClientTestKit {
+  _: Suite =>
 
   /** @return
     *   roles associated with this node
     */
-  override def roles: Seq[String] = super.roles :+ AkkaNodeRole
+  override def roles: Seq[String] = super.roles :+ AkkaNodeRole :+ AccountSettings.AkkaNodeRole
 
-  override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
-    MockPaymentBehavior
+  override def paymentBehavior: ActorSystem[_] => PaymentBehavior = _ => MockPaymentBehavior
 
-  override def paymentCommandProcessorStream
-    : ActorSystem[_] => GenericPaymentCommandProcessorStream = sys =>
-    new GenericPaymentCommandProcessorStream
-      with MockPaymentHandler
-      with InMemoryJournalProvider
-      with InMemoryOffsetProvider {
-      lazy val log: Logger = LoggerFactory getLogger getClass.getName
-      override val forTests: Boolean = true
-      override implicit def system: ActorSystem[_] = sys
-    }
+  override def accountBehavior
+    : ActorSystem[_] => AccountBehavior[SoftPayAccount, BasicAccountProfile] = _ =>
+    MockSoftPayAccountBehavior
+
+  override def paymentServer: ActorSystem[_] => PaymentServer = system => MockPaymentServer(system)
+
+  override def clientServer: ActorSystem[_] => ClientServer = system => MockClientServer(system)
+
+  def loadApiKey(clientId: String): Future[Option[ApiKey]] =
+    MockPaymentBehavior.softPayAccountDao.loadApiKey(clientId)
+
+  def clientId: String = provider.clientId
+
+  override lazy val config: Config = akkaConfig
+    .withFallback(ConfigFactory.load("softnetwork-in-memory-persistence.conf"))
+    .withFallback(
+      ConfigFactory.parseString(softPayClientSettings)
+    )
+    .withFallback(ConfigFactory.load())
+
+  override def paymentCommandProcessorStream: ActorSystem[_] => PaymentCommandProcessorStream =
+    sys =>
+      new PaymentCommandProcessorStream
+        with MockPaymentHandler
+        with InMemoryJournalProvider
+        with InMemoryOffsetProvider {
+        lazy val log: Logger = LoggerFactory getLogger getClass.getName
+        override val forTests: Boolean = true
+        override implicit def system: ActorSystem[_] = sys
+      }
 
   override def scheduler2PaymentProcessorStream
     : ActorSystem[_] => Scheduler2PaymentProcessorStream = sys =>
@@ -61,15 +104,26 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
       override implicit def system: ActorSystem[_] = sys
     }
 
+  override def internalAccountEvents2AccountProcessorStream
+    : ActorSystem[_] => InternalAccountEvents2AccountProcessorStream = sys =>
+    new InternalAccountEvents2AccountProcessorStream
+      with MockSoftPayAccountHandler
+      with InMemoryJournalProvider
+      with InMemoryOffsetProvider {
+      lazy val log: Logger = LoggerFactory getLogger getClass.getName
+      override def tag: String = s"${MockSoftPayAccountBehavior.persistenceId}-to-internal"
+      override lazy val forTests: Boolean = true
+      override implicit def system: ActorSystem[_] = sys
+    }
+
   def payInFor3DS(
     orderUuid: String,
     transactionId: String,
     registerCard: Boolean,
     printReceipt: Boolean
   )(implicit
-    system: ActorSystem[_]
+    ec: ExecutionContext
   ): Future[Either[PayInFailed, Either[PaymentRedirection, PaidIn]]] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
     MockPaymentHandler !? PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt) map {
       case result: PaymentRedirection => Right(Left(result))
       case result: PaidIn             => Right(Right(result))
@@ -85,9 +139,8 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     registerCard: Boolean = true,
     printReceipt: Boolean = false
   )(implicit
-    system: ActorSystem[_]
+    ec: ExecutionContext
   ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
     MockPaymentHandler !? PreAuthorizeCardFor3DS(
       orderUuid,
       preAuthorizationId,
@@ -101,12 +154,12 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     }
   }
 
-  def payInFirstRecurringFor3DS(recurringPayInRegistrationId: String, transactionId: String)(
-    implicit system: ActorSystem[_]
-  ): Future[
+  def payInFirstRecurringFor3DS(
+    recurringPayInRegistrationId: String,
+    transactionId: String
+  )(implicit ec: ExecutionContext): Future[
     Either[FirstRecurringCardPaymentFailed, Either[PaymentRedirection, FirstRecurringPaidIn]]
   ] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
     MockPaymentHandler !? PayInFirstRecurringFor3DS(
       recurringPayInRegistrationId,
       transactionId
@@ -128,8 +181,7 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
   def updateKycDocumentStatus(
     kycDocumentId: String,
     status: Option[KycDocument.KycDocumentStatus] = None
-  )(implicit system: ActorSystem[_]): Future[Either[PaymentError, KycDocumentStatusUpdated]] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  )(implicit ec: ExecutionContext): Future[Either[PaymentError, KycDocumentStatusUpdated]] = {
     MockPaymentHandler !? UpdateKycDocumentStatus(kycDocumentId, status) map {
       case result: KycDocumentStatusUpdated => Right(result)
       case error: PaymentError              => Left(error)
@@ -140,18 +192,17 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
   def updateUboDeclarationStatus(
     uboDeclarationId: String,
     status: Option[UboDeclaration.UboDeclarationStatus] = None
-  )(implicit system: ActorSystem[_]): Future[Boolean] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  )(implicit ec: ExecutionContext): Future[Boolean] = {
     MockPaymentHandler !? UpdateUboDeclarationStatus(uboDeclarationId, status) map {
       case UboDeclarationStatusUpdated => true
       case _                           => false
     }
   }
 
-  def updateMandateStatus(mandateId: String, status: Option[BankAccount.MandateStatus] = None)(
-    implicit system: ActorSystem[_]
-  ): Future[Either[PaymentError, MandateStatusUpdated]] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  def updateMandateStatus(
+    mandateId: String,
+    status: Option[BankAccount.MandateStatus] = None
+  )(implicit ec: ExecutionContext): Future[Either[PaymentError, MandateStatusUpdated]] = {
     MockPaymentHandler !? UpdateMandateStatus(mandateId, status) map {
       case result: MandateStatusUpdated => Right(result)
       case error: PaymentError          => Left(error)
@@ -159,16 +210,14 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     }
   }
 
-  def validateRegularUser(userId: String)(implicit system: ActorSystem[_]): Future[Boolean] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  def validateRegularUser(userId: String)(implicit ec: ExecutionContext): Future[Boolean] = {
     MockPaymentHandler !? ValidateRegularUser(userId) map {
       case RegularUserValidated => true
       case _                    => false
     }
   }
 
-  def invalidateRegularUser(userId: String)(implicit system: ActorSystem[_]): Future[Boolean] = {
-    implicit val ec: ExecutionContextExecutor = system.executionContext
+  def invalidateRegularUser(userId: String)(implicit ec: ExecutionContext): Future[Boolean] = {
     MockPaymentHandler !? InvalidateRegularUser(userId) map {
       case RegularUserInvalidated => true
       case _                      => false
@@ -176,13 +225,21 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
   }
 
   override def entities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
-    schedulerEntities(sys) ++ sessionEntities(sys) ++ paymentEntities(sys)
+    schedulerEntities(sys) ++ sessionEntities(sys) ++ accountEntities(sys) ++ paymentEntities(
+      sys
+    ) ++ notificationEntities(sys)
 
   override def eventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
     schedulerEventProcessorStreams(sys) ++
-    paymentEventProcessorStreams(sys)
+    paymentEventProcessorStreams(sys) ++
+    accountEventProcessorStreams(sys) ++
+    notificationEventProcessorStreams(sys)
 
-  /*override def initSystem: ActorSystem[_] => Unit = system => {
+  override def initSystem: ActorSystem[_] => Unit = system => {
+    initAccountSystem(system)
     initSchedulerSystem(system)
-  }*/
+    registerProvidersAccount(system)
+  }
+
+  override def softPayAccountDao: SoftPayAccountDao = MockSoftPayAccountDao
 }

@@ -2,7 +2,7 @@ ThisBuild / organization := "app.softnetwork"
 
 name := "payment"
 
-ThisBuild / version := "0.5.0"
+ThisBuild / version := "0.6.0"
 
 ThisBuild / scalaVersion := "2.12.18"
 
@@ -29,20 +29,35 @@ ThisBuild / libraryDependencies ++= Seq(
 
 Test / parallelExecution := false
 
+lazy val client = project.in(file("client"))
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings, app.softnetwork.Info.infoSettings)
+  .enablePlugins(BuildInfoPlugin, AkkaGrpcPlugin, JavaAppPackaging, UniversalDeployPlugin)
+
 lazy val common = project.in(file("common"))
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
   .enablePlugins(AkkaGrpcPlugin)
+  .dependsOn(
+    client % "compile->compile;test->test;it->it"
+  )
 
 lazy val core = project.in(file("core"))
   .configs(IntegrationTest)
   .settings(Defaults.itSettings, app.softnetwork.Info.infoSettings)
-  .enablePlugins(BuildInfoPlugin)
+  .enablePlugins(BuildInfoPlugin, AkkaGrpcPlugin)
   .dependsOn(
     common % "compile->compile;test->test;it->it"
   )
 
 lazy val mangopay = project.in(file("mangopay"))
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .dependsOn(
+    core % "compile->compile;test->test;it->it"
+  )
+
+lazy val stripe = project.in(file("stripe"))
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
   .dependsOn(
@@ -65,6 +80,6 @@ lazy val testkit = project.in(file("testkit"))
   )
 
 lazy val root = project.in(file("."))
-  .aggregate(common, core, mangopay, testkit, api)
+  .aggregate(client, common, core, mangopay, stripe, testkit, api)
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)

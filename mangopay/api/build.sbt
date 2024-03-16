@@ -27,5 +27,5 @@ organization := "app.softnetwork.payment"
 name := "mangopay-api"
 
 libraryDependencies ++= Seq(
-  "app.softnetwork.scheduler" %% "scheduler-api" % Versions.scheduler
+  "app.softnetwork.notification" %% "notification-api" % Versions.notification
 )

@@ -12,6 +12,8 @@ import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentRouteTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
+import app.softnetwork.session.service.SessionMaterials
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -20,17 +22,26 @@ import java.time.LocalDate
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
-trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: ApiRoutes =>
+trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
+    extends AnyWordSpecLike
+    with PaymentRouteTestKit[SD] {
+  _: ApiRoutes with SessionMaterials[SD] =>
 
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
   import app.softnetwork.serialization._
 
-  lazy val client: PaymentClient = PaymentClient(typedSystem())
+  lazy val paymentClient: PaymentClient = PaymentClient(ts)
+
+  lazy val customerSession: SD with SessionDataDecorator[SD] =
+    companion.newSession.withId(customerUuid).withProfile(Some("customer")).withClientId(clientId)
+
+  lazy val sellerSession: SD with SessionDataDecorator[SD] =
+    companion.newSession.withId(sellerUuid).withProfile(Some("seller")).withClientId(clientId)
 
   "Payment service" must {
     "pre register card" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Get(s"/$RootPath/$PaymentPath/$CardRoute")
       ) ~> routes ~> check {
@@ -103,7 +114,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
     }
 
     "not create bank account with wrong iban" in {
-      createSession(sellerUuid, Some("seller"))
+      createNewSession(sellerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$BankRoute",
@@ -329,7 +340,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
     }
 
     "pay in / out with pre authorized card" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$PreAuthorizeCardRoute",
@@ -345,7 +356,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         preAuthorizationId = responseAs[CardPreAuthorized].transactionId
-        client.payInWithCardPreAuthorized(
+        paymentClient.payInWithCardPreAuthorized(
           preAuthorizationId,
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           None
@@ -353,7 +364,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
           case Success(result) =>
             assert(result.transactionId.isDefined)
             assert(result.error.isEmpty)
-            client.payOut(
+            paymentClient.payOut(
               orderUuid,
               computeExternalUuidWithProfile(sellerUuid, Some("seller")),
               100,
@@ -372,7 +383,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
     }
 
     "pay in / out with 3ds" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder
@@ -407,7 +418,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          client.payOut(
+          paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             5100,
@@ -425,7 +436,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
     }
 
     "pay in / out with PayPal" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder
@@ -456,7 +467,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          client.payOut(
+          paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             5100,
@@ -474,7 +485,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
     }
 
     "create mandate" in {
-      createSession(sellerUuid, Some("seller"))
+      createNewSession(sellerSession)
       withHeaders(
         Post(s"/$RootPath/$PaymentPath/$MandateRoute")
       ) ~> routes ~> check {
@@ -553,7 +564,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
     }
 
     "register recurring card payment" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Post(
           s"/$RootPath/$PaymentPath/$RecurringPaymentRoute",
@@ -630,7 +641,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
     }
 
     "cancel mandate" in {
-      createSession(sellerUuid, Some("seller"))
+      createNewSession(sellerSession)
       withHeaders(
         Delete(s"/$RootPath/$PaymentPath/$MandateRoute")
       ) ~> routes ~> check {
@@ -662,7 +673,7 @@ trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: A
     }
 
     "disable card" in {
-      createSession(customerUuid, Some("customer"))
+      createNewSession(customerSession)
       withHeaders(
         Delete(s"/$RootPath/$PaymentPath/$CardRoute?cardId=$cardId")
       ) ~> routes ~> check {

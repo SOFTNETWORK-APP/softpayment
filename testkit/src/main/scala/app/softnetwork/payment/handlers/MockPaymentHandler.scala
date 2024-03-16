@@ -6,4 +6,4 @@ object MockPaymentHandler extends MockPaymentHandler {
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 }
 
-trait MockPaymentHandler extends GenericPaymentHandler with MockPaymentTypeKey
+trait MockPaymentHandler extends PaymentHandler with MockPaymentTypeKey

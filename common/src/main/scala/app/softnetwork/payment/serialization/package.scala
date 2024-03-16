@@ -3,9 +3,10 @@ package app.softnetwork.payment
 import app.softnetwork.payment.model._
 import app.softnetwork.protobuf.ScalaPBSerializers
 import ScalaPBSerializers.GeneratedEnumSerializer
-import app.softnetwork.payment.api.{LegalUserType, TransactionStatus}
+import app.softnetwork.account.model.Account
+import app.softnetwork.account.serialization.accountFormats
+import app.softnetwork.payment.api.TransactionStatus
 import org.json4s.Formats
-import app.softnetwork.serialization._
 
 import scala.language.implicitConversions
 
@@ -13,13 +14,13 @@ import scala.language.implicitConversions
   */
 package object serialization {
 
-  val paymentFormats: Formats = commonFormats ++
+  val paymentFormats: Formats = accountFormats ++
     Seq(
       GeneratedEnumSerializer(KycDocument.KycDocumentStatus.enumCompanion),
       GeneratedEnumSerializer(KycDocument.KycDocumentType.enumCompanion),
       GeneratedEnumSerializer(UboDeclaration.UboDeclarationStatus.enumCompanion),
       GeneratedEnumSerializer(Transaction.PaymentType.enumCompanion),
-      GeneratedEnumSerializer(PaymentUser.PaymentUserType.enumCompanion),
+      GeneratedEnumSerializer(NaturalUser.NaturalUserType.enumCompanion),
       GeneratedEnumSerializer(LegalUser.LegalUserType.enumCompanion),
       GeneratedEnumSerializer(PaymentAccount.PaymentAccountStatus.enumCompanion),
       GeneratedEnumSerializer(BankAccount.MandateStatus.enumCompanion),
@@ -28,7 +29,10 @@ package object serialization {
       GeneratedEnumSerializer(Transaction.TransactionType.enumCompanion),
       GeneratedEnumSerializer(RecurringPayment.RecurringPaymentType.enumCompanion),
       GeneratedEnumSerializer(RecurringPayment.RecurringPaymentFrequency.enumCompanion),
-      GeneratedEnumSerializer(RecurringPayment.RecurringCardPaymentStatus.enumCompanion)
+      GeneratedEnumSerializer(RecurringPayment.RecurringCardPaymentStatus.enumCompanion),
+      GeneratedEnumSerializer(
+        SoftPayAccount.Client.Provider.ProviderType.enumCompanion
+      )
     )
 
   implicit def transactionStatusToTransactionResponseStatus(
@@ -65,23 +69,32 @@ package object serialization {
     }
   }
 
-  implicit def LegalUserTypeToLegalResponseUserType(
-    legalUserType: LegalUser.LegalUserType
-  ): LegalUserType = {
-    legalUserType match {
-      case LegalUser.LegalUserType.BUSINESS     => LegalUserType.BUSINESS
-      case LegalUser.LegalUserType.SOLETRADER   => LegalUserType.SOLETRADER
-      case LegalUser.LegalUserType.ORGANIZATION => LegalUserType.ORGANIZATION
-    }
-  }
-
-  implicit def LegalResponseUserTypeToLegalUserType(
-    legalUserType: LegalUserType
-  ): LegalUser.LegalUserType = {
-    legalUserType match {
-      case LegalUserType.BUSINESS     => LegalUser.LegalUserType.BUSINESS
-      case LegalUserType.SOLETRADER   => LegalUser.LegalUserType.SOLETRADER
-      case LegalUserType.ORGANIZATION => LegalUser.LegalUserType.ORGANIZATION
+  implicit def accountToSoftPaymentAccount(account: Account): SoftPayAccount = {
+    account match {
+      case a: SoftPayAccount => a
+      case _ =>
+        import account._
+        SoftPayAccount.defaultInstance
+          .withApplications(applications)
+          .withCreatedDate(createdDate)
+          .withCredentials(credentials)
+          .withCurrentProfile(currentProfile.orNull)
+          .withDetails(details.orNull)
+          .withLastLogin(lastLogin.orNull)
+          .withLastUpdated(lastUpdated)
+          .withNbLoginFailures(nbLoginFailures)
+          .withPrincipal(principal)
+          .withProfiles(profiles)
+          .withRegistrations(registrations)
+          .withSecondaryPrincipals(secondaryPrincipals)
+          .withStatus(status)
+          .withUuid(uuid)
+          .withVerificationCode(verificationCode.orNull)
+          .withVerificationToken(verificationToken.orNull)
+          .copy(
+            anonymous = anonymous,
+            fromAnonymous = fromAnonymous
+          )
     }
   }
 }

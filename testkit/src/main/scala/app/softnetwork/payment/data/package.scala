@@ -1,6 +1,6 @@
 package app.softnetwork.payment
 
-import app.softnetwork.payment.model.{Address, CardPreRegistration, LegalUser, PaymentUser}
+import app.softnetwork.payment.model.{Address, CardPreRegistration, LegalUser, NaturalUser}
 import app.softnetwork.payment.model.UboDeclaration.UltimateBeneficialOwner
 import app.softnetwork.payment.model.UboDeclaration.UltimateBeneficialOwner.BirthPlace
 
@@ -25,8 +25,8 @@ package object data {
   val lastName = "lastName"
   val birthday = "26/12/1972"
   val email = "demo@softnetwork.fr"
-  val naturalUser: PaymentUser =
-    PaymentUser.defaultInstance
+  val naturalUser: NaturalUser =
+    NaturalUser.defaultInstance
       .withExternalUuid(customerUuid)
       .withFirstName(firstName)
       .withLastName(lastName)

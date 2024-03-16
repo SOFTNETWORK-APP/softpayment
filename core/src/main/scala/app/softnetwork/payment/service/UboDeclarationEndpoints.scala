@@ -1,9 +1,10 @@
 package app.softnetwork.payment.service
 
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.{UboDeclaration, UboDeclarationView}
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
@@ -12,12 +13,13 @@ import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
-trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
+trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
+  _: RootPaymentEndpoints[SD] with PaymentHandler =>
 
   import app.softnetwork.serialization._
 
   val addUboDeclaration: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.post
+    requiredSessionEndpoint.post
       .in(PaymentSettings.DeclarationRoute)
       .in(
         jsonBody[UboDeclaration.UltimateBeneficialOwner]
@@ -30,8 +32,8 @@ trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandl
               .description("The UBO successfully recorded")
           )
       )
-      .serverLogic(session => { ubo =>
-        run(CreateOrUpdateUbo(externalUuidWithProfile(session), ubo)).map {
+      .serverLogic(principal => { ubo =>
+        run(CreateOrUpdateUbo(externalUuidWithProfile(principal._2), ubo)).map {
           case r: UboCreatedOrUpdated => Right(r.ubo)
           case other                  => Left(error(other))
         }
@@ -39,7 +41,7 @@ trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandl
       .description("Record an UBO for the authenticated legal payment account")
 
   val loadUboDeclaration: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.get
+    requiredSessionEndpoint.get
       .in(PaymentSettings.DeclarationRoute)
       .out(
         statusCode(StatusCode.Ok)
@@ -48,9 +50,9 @@ trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandl
               .description("Ubo declaration of the authenticated legal payment account")
           )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ =>
-          run(GetUboDeclaration(externalUuidWithProfile(session))).map {
+          run(GetUboDeclaration(externalUuidWithProfile(principal._2))).map {
             case r: UboDeclarationLoaded => Right(r.declaration.view)
             case other                   => Left(error(other))
           }
@@ -58,7 +60,7 @@ trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandl
       .description("Load the Ubo declaration of the authenticated legal payment account")
 
   val validateUboDeclaration: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.put
+    requiredSessionEndpoint.put
       .in(PaymentSettings.DeclarationRoute)
       .out(
         statusCode(StatusCode.Ok).and(
@@ -67,9 +69,9 @@ trait UboDeclarationEndpoints { _: RootPaymentEndpoints with GenericPaymentHandl
           )
         )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ =>
-          run(ValidateUboDeclaration(externalUuidWithProfile(session))).map {
+          run(ValidateUboDeclaration(externalUuidWithProfile(principal._2))).map {
             case UboDeclarationAskedForValidation => Right(UboDeclarationAskedForValidation)
             case other                            => Left(error(other))
           }

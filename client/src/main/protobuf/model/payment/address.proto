@@ -1,0 +1,25 @@
+syntax = "proto2";
+
+import "scalapb/scalapb.proto";
+
+package app.softnetwork.payment.model;
+
+option (scalapb.options) = {
+    single_file: true
+    flat_package: true
+    import: "app.softnetwork.persistence.message._"
+    import: "app.softnetwork.persistence.model._"
+    import: "app.softnetwork.serialization._"
+    import: "app.softnetwork.payment.model._"
+    preserve_unknown_fields: false
+};
+
+message Address {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    option (scalapb.message).extends = "AddressDecorator";
+    required string addressLine = 1;
+    required string city = 2;
+    required string postalCode = 3;
+    required string country = 4 [default = "FR"];
+    optional string state = 5;
+}

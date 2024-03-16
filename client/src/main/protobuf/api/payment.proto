@@ -1,0 +1,197 @@
+syntax = "proto3";
+
+import "scalapb/scalapb.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
+import "model/payment/address.proto";
+import "model/payment/paymentUser.proto";
+
+package app.softnetwork.payment.api;
+
+option (scalapb.options) = {
+    import: "app.softnetwork.protobuf.ScalaPBTypeMappers._"
+    preserve_unknown_fields: false
+};
+
+service PaymentServiceApi {
+    rpc CreateOrUpdatePaymentAccount (CreateOrUpdatePaymentAccountRequest) returns (CreateOrUpdatePaymentAccountResponse) {}
+    rpc PayInWithCardPreAuthorized (PayInWithCardPreAuthorizedRequest) returns (TransactionResponse) {}
+    rpc CancelPreAuthorization (CancelPreAuthorizationRequest) returns (CancelPreAuthorizationResponse) {}
+    rpc Refund (RefundRequest) returns (TransactionResponse) {}
+    rpc PayOut (PayOutRequest) returns (TransactionResponse) {}
+    rpc Transfer (TransferRequest) returns (TransferResponse) {}
+    rpc DirectDebit (DirectDebitRequest) returns (TransactionResponse) {}
+    rpc LoadDirectDebitTransaction (LoadDirectDebitTransactionRequest) returns (TransactionResponse) {}
+    rpc RegisterRecurringPayment (RegisterRecurringPaymentRequest) returns (RegisterRecurringPaymentResponse) {}
+    rpc CancelMandate (CancelMandateRequest) returns (CancelMandateResponse) {}
+    rpc LoadBankAccountOwner (LoadBankAccountOwnerRequest) returns (LoadBankAccountOwnerResponse) {}
+    rpc LoadLegalUser(LoadLegalUserRequest) returns (LoadLegalUserResponse) {}
+}
+
+message CreateOrUpdatePaymentAccountRequest {
+    app.softnetwork.payment.model.PaymentAccount paymentAccount = 1;
+}
+
+message CreateOrUpdatePaymentAccountResponse {
+    bool succeeded = 1;
+}
+
+message PayInWithCardPreAuthorizedRequest {
+    string preAuthorizationId = 1;
+    string creditedAccount = 2;
+    google.protobuf.Int32Value debitedAmount = 3;
+    string clientId = 4;
+}
+
+enum TransactionStatus{
+    TRANSACTION_CREATED = 0;
+    TRANSACTION_SUCCEEDED = 1;
+    TRANSACTION_FAILED = 2;
+    TRANSACTION_NOT_SPECIFIED = 4;
+    TRANSACTION_FAILED_FOR_TECHNICAL_REASON = 5;
+}
+
+message TransactionResponse {
+    google.protobuf.StringValue transactionId = 1;
+    TransactionStatus transactionStatus = 2;
+    google.protobuf.StringValue error = 3;
+}
+
+message CancelPreAuthorizationRequest {
+    string orderUuid = 1;
+    string cardPreAuthorizedTransactionId = 2;
+    string clientId = 3;
+}
+
+message CancelPreAuthorizationResponse {
+    google.protobuf.BoolValue preAuthorizationCanceled = 1;
+}
+
+message RefundRequest {
+    string orderUuid = 1;
+    string payInTransactionId = 2;
+    int32 refundAmount = 3;
+    string currency = 4;
+    string reasonMessage = 5;
+    bool initializedByClient = 6;
+    string clientId = 7;
+}
+
+message PayOutRequest {
+    string orderUuid = 1;
+    string creditedAccount = 2;
+    int32 creditedAmount = 3;
+    int32 feesAmount = 4;
+    string currency = 5;
+    google.protobuf.StringValue externalReference = 6;
+    string clientId = 7;
+}
+
+message TransferRequest {
+    google.protobuf.StringValue orderUuid = 1;
+    string debitedAccount = 2;
+    string creditedAccount = 3;
+    int32 debitedAmount = 4;
+    int32 feesAmount = 5;
+    string currency = 6;
+    bool payOutRequired = 7;
+    google.protobuf.StringValue externalReference = 8;
+    string clientId = 9;
+}
+
+message TransferResponse {
+    google.protobuf.StringValue transferredTransactionId = 1;
+    TransactionStatus transferredTransactionStatus = 2;
+    google.protobuf.StringValue paidOutTransactionId = 3;
+    google.protobuf.StringValue error = 4;
+}
+
+message DirectDebitRequest {
+    string creditedAccount = 1;
+    int32 debitedAmount = 2;
+    int32 feesAmount = 3;
+    string currency = 4;
+    string statementDescriptor = 5;
+    google.protobuf.StringValue externalReference = 6;
+    string clientId = 7;
+}
+
+message LoadDirectDebitTransactionRequest {
+    string directDebitTransactionId = 1;
+    string clientId = 2;
+}
+
+message RegisterRecurringPaymentRequest {
+    enum RecurringPaymentFrequency {
+        UNKNOWN_PAYMENT_FREQUENCY = 0;
+        DAILY = 1;
+        WEEKLY = 2;
+        TWICE_A_MONTH = 3;
+        MONTHLY = 4;
+        BIMONTHLY = 5;
+        QUARTERLY = 6;
+        BIANNUAL = 7;
+        ANNUAL = 8;
+    }
+    enum RecurringPaymentType {
+        UNKNOWN_PAYMENT_TYPE = 0;
+        CARD = 1;
+        DIRECT_DEBIT = 2;
+    }
+    string debitedAccount = 1;
+    int32 firstDebitedAmount = 2;
+    int32 firstFeesAmount = 3;
+    string currency = 4;
+    RecurringPaymentType type = 5;
+    google.protobuf.Timestamp startDate = 6 [(scalapb.field).type = "java.util.Date"];
+    google.protobuf.Timestamp endDate = 7 [(scalapb.field).type = "java.util.Date"];
+    RecurringPaymentFrequency frequency = 8;
+    google.protobuf.BoolValue fixedNextAmount = 9;
+    google.protobuf.Int32Value nextDebitedAmount = 10;
+    google.protobuf.Int32Value nextFeesAmount = 11;
+    google.protobuf.StringValue statementDescriptor = 12;
+    google.protobuf.StringValue externalReference = 13;
+    string clientId = 14;
+}
+
+message RegisterRecurringPaymentResponse {
+    google.protobuf.StringValue recurringPaymentRegistrationId = 1;
+}
+
+message CancelMandateRequest {
+    string externalUuid = 1;
+    string clientId = 2;
+}
+
+message CancelMandateResponse {
+    bool succeeded = 1;
+}
+
+message LoadBankAccountOwnerRequest {
+    string externalUuid = 1;
+    string clientId = 2;
+}
+
+message LoadBankAccountOwnerResponse {
+    string ownerName = 1;
+    app.softnetwork.payment.model.Address ownerAddress = 2;
+}
+
+enum LegalUserType {
+    SOLETRADER = 0;
+    BUSINESS = 1;
+    ORGANIZATION = 2;
+}
+
+message LoadLegalUserRequest {
+    string externalUuid = 1;
+    string clientId = 2;
+}
+
+message LoadLegalUserResponse {
+    LegalUserType legalUserType = 1;
+    string legalName = 2;
+    string siret = 3;
+    app.softnetwork.payment.model.Address legalRepresentativeAddress = 4;
+    app.softnetwork.payment.model.Address headQuartersAddress = 5;
+}

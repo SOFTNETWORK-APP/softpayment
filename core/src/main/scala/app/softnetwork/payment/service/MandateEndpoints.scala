@@ -1,9 +1,10 @@
 package app.softnetwork.payment.service
 
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.payment.handlers.GenericPaymentHandler
+import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.MandateResult
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
@@ -12,12 +13,13 @@ import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
-trait MandateEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
+trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
+  _: RootPaymentEndpoints[SD] with PaymentHandler =>
 
   import app.softnetwork.serialization._
 
   val createMandate: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.post
+    requiredSessionEndpoint.post
       .in(PaymentSettings.MandateRoute)
       .out(
         oneOf[PaymentResult](
@@ -32,9 +34,14 @@ trait MandateEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
           )
         )
       )
-      .serverLogic(session =>
+      .serverLogic(principal =>
         _ =>
-          run(CreateMandate(externalUuidWithProfile(session))).map {
+          run(
+            CreateMandate(
+              externalUuidWithProfile(principal._2),
+              clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
+            )
+          ).map {
             case MandateCreated                 => Right(MandateCreated)
             case r: MandateConfirmationRequired => Right(r)
             case other                          => Left(error(other))
@@ -43,19 +50,24 @@ trait MandateEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
       .description("Create a mandate for the authenticated payment account")
 
   val cancelMandate: ServerEndpoint[Any with AkkaStreams, Future] =
-    secureEndpoint.delete
+    requiredSessionEndpoint.delete
       .in(PaymentSettings.MandateRoute)
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[MandateCanceled.type].description("Mandate canceled"))
       )
-      .serverLogic(session =>
+      .serverLogic { case (client, session) =>
         _ =>
-          run(CancelMandate(externalUuidWithProfile(session))).map {
+          run(
+            CancelMandate(
+              externalUuidWithProfile(session),
+              clientId = client.map(_.clientId).orElse(session.clientId)
+            )
+          ).map {
             case MandateCanceled => Right(MandateCanceled)
             case other           => Left(error(other))
           }
-      )
+      }
       .description("Create Mandate for the authenticated payment account")
 
   val updateMandateStatus: ServerEndpoint[Any with AkkaStreams, Future] =

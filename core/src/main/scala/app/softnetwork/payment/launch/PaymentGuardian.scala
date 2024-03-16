@@ -1,41 +1,61 @@
 package app.softnetwork.payment.launch
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.account.handlers.AccountDao
+import app.softnetwork.account.launch.AccountGuardian
+import app.softnetwork.account.model.BasicAccountProfile
+import app.softnetwork.account.persistence.typed.AccountBehavior
+import app.softnetwork.api.server.GrpcService
 import app.softnetwork.payment.PaymentCoreBuildInfo
+import app.softnetwork.payment.api.{
+  ClientGrpcService,
+  ClientServer,
+  PaymentGrpcService,
+  PaymentServer
+}
+import app.softnetwork.payment.handlers.SoftPayAccountDao
+import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.payment.persistence.data.paymentKvDao
 import app.softnetwork.payment.persistence.query.{
-  GenericPaymentCommandProcessorStream,
+  PaymentCommandProcessorStream,
   Scheduler2PaymentProcessorStream
 }
-import app.softnetwork.payment.persistence.typed.GenericPaymentBehavior
+import app.softnetwork.payment.persistence.typed.{PaymentBehavior, SoftPayAccountBehavior}
+import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.EventProcessorStream
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.persistence.typed.Singleton
 import app.softnetwork.session.CsrfCheck
-import app.softnetwork.session.launch.SessionGuardian
 
-trait PaymentGuardian extends SessionGuardian { _: SchemaProvider with CsrfCheck =>
+import scala.concurrent.ExecutionContext
+
+trait PaymentGuardian extends AccountGuardian[SoftPayAccount, BasicAccountProfile] {
+  _: SchemaProvider with CsrfCheck =>
 
   import app.softnetwork.persistence.launch.PersistenceGuardian._
 
-  def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior
+  def paymentBehavior: ActorSystem[_] => PaymentBehavior = _ => PaymentBehavior
+
+  override def accountBehavior
+    : ActorSystem[_] => AccountBehavior[SoftPayAccount, BasicAccountProfile] = _ =>
+    SoftPayAccountBehavior
 
   def paymentEntities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
     Seq(
-      paymentAccountBehavior(sys)
+      paymentBehavior(sys)
     )
 
   /** initialize all entities
     */
   override def entities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
-    sessionEntities(sys) ++ paymentEntities(sys)
+    sessionEntities(sys) ++ accountEntities(sys) ++ paymentEntities(sys)
 
   /** initialize all singletons
     */
   override def singletons: ActorSystem[_] => Seq[Singleton[_]] = _ => Seq(paymentKvDao)
 
-  def paymentCommandProcessorStream: ActorSystem[_] => GenericPaymentCommandProcessorStream
+  def paymentCommandProcessorStream: ActorSystem[_] => PaymentCommandProcessorStream
 
   def scheduler2PaymentProcessorStream: ActorSystem[_] => Scheduler2PaymentProcessorStream
 
@@ -45,8 +65,54 @@ trait PaymentGuardian extends SessionGuardian { _: SchemaProvider with CsrfCheck
   /** initialize all event processor streams
     */
   override def eventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
-    paymentEventProcessorStreams(sys)
+    paymentEventProcessorStreams(sys) ++ accountEventProcessorStreams(sys)
 
   override def systemVersion(): String =
     sys.env.getOrElse("VERSION", PaymentCoreBuildInfo.version)
+
+  def softPayAccountDao: SoftPayAccountDao = SoftPayAccountDao
+
+  final override def accountDao: AccountDao = softPayAccountDao
+
+  def paymentServer: ActorSystem[_] => PaymentServer = system => PaymentServer(system)
+
+  def clientServer: ActorSystem[_] => ClientServer = system => ClientServer(system)
+
+  def paymentGrpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
+    Seq(
+      new PaymentGrpcService(paymentServer(system), softPayAccountDao),
+      new ClientGrpcService(clientServer(system))
+    )
+
+  def registerProvidersAccount: ActorSystem[_] => Unit = system => {
+    PaymentProviders.defaultPaymentProviders.foreach(provider => {
+      implicit val ec: ExecutionContext = system.executionContext
+      softPayAccountDao.registerAccountWithProvider(provider)(system) map {
+        case Some(account) =>
+          system.log.info(s"Registered provider account for ${provider.providerId}: $account")
+        case _ =>
+          system.log.warn(s"Failed to register provider account for ${provider.providerId}")
+      }
+    })
+  }
+
+  override def initSystem: ActorSystem[_] => Unit = system => {
+    registerProvidersAccount(system)
+    super.initSystem(system)
+  }
+
+  override def banner: String =
+    """
+      |█████████              ██████   █████    ███████████                                                            █████
+      | ███░░░░░███            ███░░███ ░░███    ░░███░░░░░███                                                          ░░███
+      |░███    ░░░   ██████   ░███ ░░░  ███████   ░███    ░███  ██████   █████ ████ █████████████    ██████  ████████   ███████
+      |░░█████████  ███░░███ ███████   ░░░███░    ░██████████  ░░░░░███ ░░███ ░███ ░░███░░███░░███  ███░░███░░███░░███ ░░░███░
+      | ░░░░░░░░███░███ ░███░░░███░      ░███     ░███░░░░░░    ███████  ░███ ░███  ░███ ░███ ░███ ░███████  ░███ ░███   ░███
+      | ███    ░███░███ ░███  ░███       ░███ ███ ░███         ███░░███  ░███ ░███  ░███ ░███ ░███ ░███░░░   ░███ ░███   ░███ ███
+      |░░█████████ ░░██████   █████      ░░█████  █████       ░░████████ ░░███████  █████░███ █████░░██████  ████ █████  ░░█████
+      | ░░░░░░░░░   ░░░░░░   ░░░░░        ░░░░░  ░░░░░         ░░░░░░░░   ░░░░░███ ░░░░░ ░░░ ░░░░░  ░░░░░░  ░░░░ ░░░░░    ░░░░░
+      |                                                                   ███ ░███
+      |                                                                  ░░██████
+      |                                                                   ░░░░░░
+      |""".stripMargin
 }

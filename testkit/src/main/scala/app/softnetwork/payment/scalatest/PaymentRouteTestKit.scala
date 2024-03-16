@@ -1,23 +1,31 @@
 package app.softnetwork.payment.scalatest
 
+import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, Multipart, StatusCodes}
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.api.server.config.ServerSettings.RootPath
-import app.softnetwork.payment.api.PaymentGrpcServices
+import app.softnetwork.payment.api.PaymentGrpcServicesTestKit
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.scalatest.SessionTestKit
+import app.softnetwork.session.service.SessionMaterials
 import org.scalatest.Suite
 
 import java.nio.file.Paths
 
-trait PaymentRouteTestKit extends SessionTestKit with PaymentTestKit with PaymentGrpcServices {
-  _: Suite with ApiRoutes =>
+trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
+    extends SessionTestKit[SD]
+    with PaymentTestKit
+    with PaymentGrpcServicesTestKit {
+  _: Suite with ApiRoutes with SessionMaterials[SD] =>
 
   import app.softnetwork.serialization._
 
   override lazy val additionalConfig: String = paymentGrpcConfig
+
+  override implicit lazy val ts: ActorSystem[_] = typedSystem()
 
   override def beforeAll(): Unit = {
     initAndJoinCluster()

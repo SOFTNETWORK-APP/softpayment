@@ -33,6 +33,7 @@ trait PaymentSettings extends StrictLogging {
     config.getString("payment.event-streams.external-to-payment-account-tag")
 
   val AkkaNodeRole: String = config.getString("payment.akka-node-role")
+
 }
 
 object PaymentSettings extends PaymentSettings

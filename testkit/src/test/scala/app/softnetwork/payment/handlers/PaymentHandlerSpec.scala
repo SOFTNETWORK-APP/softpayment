@@ -1,7 +1,7 @@
 package app.softnetwork.payment.handlers
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.api.{PaymentClient, PaymentGrpcServer}
+import app.softnetwork.payment.api.{PaymentClient, PaymentGrpcServerTestKit}
 import app.softnetwork.payment.data._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.PaymentAccount.User
@@ -9,8 +9,10 @@ import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
+import app.softnetwork.session.config.Settings
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
+import org.softnetwork.session.model.Session
 
 import java.time.LocalDate
 import scala.language.implicitConversions
@@ -19,21 +21,25 @@ import scala.util.{Failure, Success}
 class PaymentHandlerSpec
     extends MockPaymentHandler
     with AnyWordSpecLike
-    with PaymentGrpcServer
-    with PaymentTestKit {
+    with PaymentTestKit
+    with PaymentGrpcServerTestKit {
 
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
-  implicit lazy val system: ActorSystem[_] = typedSystem()
+  implicit lazy val ts: ActorSystem[_] = typedSystem()
 
-  lazy val client: PaymentClient = PaymentClient(system)
+  override protected def sessionType: Session.SessionType =
+    Settings.Session.SessionContinuityAndTransport
+
+  lazy val paymentClient: PaymentClient = PaymentClient(ts)
 
   "Payment handler" must {
     "pre register card" in {
       !?(
         PreRegisterCard(
           orderUuid,
-          naturalUser.withProfile("customer")
+          naturalUser.withProfile("customer"),
+          clientId = Some(clientId)
         )
       ) await {
         case cardPreRegistered: CardPreRegistered =>
@@ -52,7 +58,7 @@ class PaymentHandlerSpec
               assert(naturalUser.userId.isDefined)
               assert(naturalUser.walletId.isDefined)
               assert(
-                naturalUser.paymentUserType.getOrElse(PaymentUser.PaymentUserType.COLLECTOR).isPayer
+                naturalUser.naturalUserType.getOrElse(NaturalUser.NaturalUserType.COLLECTOR).isPayer
               )
             case other => fail(other.toString)
           }
@@ -153,7 +159,8 @@ class PaymentHandlerSpec
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           BankAccount(None, ownerName, ownerAddress, iban, ""),
-          Some(User.NaturalUser(naturalUser.withExternalUuid(sellerUuid).withProfile("seller")))
+          Some(User.NaturalUser(naturalUser.withExternalUuid(sellerUuid).withProfile("seller"))),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -170,8 +177,8 @@ class PaymentHandlerSpec
               )
               sellerBankAccountId = paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
               assert(
-                paymentAccount.getNaturalUser.paymentUserType
-                  .getOrElse(PaymentUser.PaymentUserType.PAYER)
+                paymentAccount.getNaturalUser.naturalUserType
+                  .getOrElse(NaturalUser.NaturalUserType.PAYER)
                   .isCollector
               )
             case other => fail(other.toString)
@@ -199,7 +206,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -218,8 +226,8 @@ class PaymentHandlerSpec
               sellerBankAccountId = paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
 //              assert(sellerBankAccountId != previousBankAccountId)
               assert(
-                paymentAccount.getNaturalUser.paymentUserType
-                  .getOrElse(PaymentUser.PaymentUserType.PAYER)
+                paymentAccount.getNaturalUser.naturalUserType
+                  .getOrElse(NaturalUser.NaturalUserType.PAYER)
                   .isCollector
               )
             case other => fail(other.toString)
@@ -245,7 +253,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -272,7 +281,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -303,7 +313,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await { case r: BankAccountCreatedOrUpdated =>
         assert(!r.kycUpdated && !r.documentsUpdated && r.userUpdated)
@@ -330,7 +341,8 @@ class PaymentHandlerSpec
                 .withExternalUuid(sellerUuid)
                 .withProfile("seller")
             )
-          )
+          ),
+          clientId = Some(clientId)
         )
       ) await { case r: BankAccountCreatedOrUpdated =>
         assert(!r.kycUpdated && !r.documentsUpdated && r.userUpdated)
@@ -410,7 +422,8 @@ class PaymentHandlerSpec
               legalUser.withLegalRepresentative(legalUser.legalRepresentative.withProfile("seller"))
             )
           ),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -460,7 +473,8 @@ class PaymentHandlerSpec
                 )
             )
           ),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -496,7 +510,7 @@ class PaymentHandlerSpec
               sellerBankAccountId = paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
 //              assert(sellerBankAccountId != previousBankAccountId)
               uboDeclarationId = paymentAccount.getLegalUser.uboDeclaration.map(_.id).getOrElse("")
-              client.loadLegalUserDetails(
+              paymentClient.loadLegalUserDetails(
                 computeExternalUuidWithProfile(sellerUuid, Some("seller"))
               ) complete () match {
                 case Success(value) =>
@@ -536,7 +550,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -585,7 +600,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -600,7 +616,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount.withBic(""),
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -619,7 +636,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -789,7 +807,7 @@ class PaymentHandlerSpec
         case result: CardPreAuthorized =>
           val transactionId = result.transactionId
           preAuthorizationId = transactionId
-          client.payInWithCardPreAuthorized(
+          paymentClient.payInWithCardPreAuthorized(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             Some(110)
@@ -799,7 +817,7 @@ class PaymentHandlerSpec
               assert(result.error.getOrElse("") == "DebitedAmountAbovePreAuthorizationAmount")
             case Failure(f) => fail(f.getMessage)
           }
-          client.payInWithCardPreAuthorized(
+          paymentClient.payInWithCardPreAuthorized(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             Some(90)
@@ -820,7 +838,7 @@ class PaymentHandlerSpec
                   )
                 case other => fail(other.getClass.toString)
               }
-              client.payOut(
+              paymentClient.payOut(
                 orderUuid,
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
@@ -850,7 +868,7 @@ class PaymentHandlerSpec
         )
       ) await {
         case _: PaidIn =>
-          client.payOut(
+          paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             100,
@@ -898,7 +916,7 @@ class PaymentHandlerSpec
             )
           ) await {
             case _: PaidIn =>
-              client.payOut(
+              paymentClient.payOut(
                 orderUuid,
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
@@ -929,7 +947,7 @@ class PaymentHandlerSpec
       ) await {
         case result: PaidIn =>
           val payInTransactionId = result.transactionId
-          client.refund(
+          paymentClient.refund(
             orderUuid,
             payInTransactionId,
             101,
@@ -940,7 +958,7 @@ class PaymentHandlerSpec
             case Success(r) =>
               assert(r.transactionId.isEmpty)
               assert(r.error.getOrElse("") == "IllegalTransactionAmount")
-              client.refund(
+              paymentClient.refund(
                 orderUuid,
                 payInTransactionId,
                 50,
@@ -964,7 +982,8 @@ class PaymentHandlerSpec
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
           BankAccount(None, ownerName, ownerAddress, iban, bic),
-          Some(User.NaturalUser(naturalUser.withExternalUuid(vendorUuid).withProfile("vendor")))
+          Some(User.NaturalUser(naturalUser.withExternalUuid(vendorUuid).withProfile("vendor"))),
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -999,7 +1018,7 @@ class PaymentHandlerSpec
                   }
                 case other => fail(other.toString)
               }
-              client.transfer(
+              paymentClient.transfer(
                 Some(orderUuid),
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
@@ -1036,7 +1055,7 @@ class PaymentHandlerSpec
     }
 
     "direct debit" in {
-      client.directDebit(
+      paymentClient.directDebit(
         computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
         100,
         0,
