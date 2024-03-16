@@ -1,6 +1,10 @@
+import com.typesafe.sbt.packager.SettingsHelper.makeDeploymentSettings
+
 organization := "app.softnetwork.payment"
 
 name := "softpay"
+
+maintainer := "stephane.manciot@gmail.com"
 
 akkaGrpcGeneratedSources := Seq(AkkaGrpc.Client)
 
@@ -24,3 +28,5 @@ libraryDependencies ++= Seq(
 )
 
 Compile / mainClass := Some("app.softnetwork.payment.cli.Main")
+
+makeDeploymentSettings(Universal, packageBin in Universal, "zip")
