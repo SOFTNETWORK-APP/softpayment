@@ -4,6 +4,7 @@ import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.{BankAccountView, PaymentAccount}
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
@@ -12,7 +13,8 @@ import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
-trait BankAccountEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
+trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
+  _: RootPaymentEndpoints[SD] with GenericPaymentHandler =>
 
   import app.softnetwork.serialization._
 

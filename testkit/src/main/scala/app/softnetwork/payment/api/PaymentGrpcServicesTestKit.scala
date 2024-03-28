@@ -2,26 +2,19 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import app.softnetwork.api.server.GrpcService
 import app.softnetwork.api.server.scalatest.ServerTestKit
 import app.softnetwork.payment.launch.PaymentGuardian
-import app.softnetwork.scheduler.api.SchedulerGrpcServices
+import app.softnetwork.scheduler.api.{SchedulerGrpcServices, SchedulerGrpcServicesTestKit}
 import app.softnetwork.scheduler.launch.SchedulerGuardian
 
 import scala.concurrent.Future
 
-trait PaymentGrpcServices extends SchedulerGrpcServices {
+trait PaymentGrpcServicesTestKit extends SchedulerGrpcServicesTestKit {
   _: PaymentGuardian with SchedulerGuardian with ServerTestKit =>
 
-  override def grpcServices
-    : ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] = system =>
+  override def grpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
     paymentGrpcServices(system) ++ schedulerGrpcServices(system)
-
-  def paymentGrpcServices
-    : ActorSystem[_] => Seq[PartialFunction[HttpRequest, Future[HttpResponse]]] =
-    system =>
-      Seq(
-        PaymentServiceApiHandler.partial(MockPaymentServer(system))(system)
-      )
 
   def paymentGrpcConfig: String = schedulerGrpcConfig + s"""
                               |# Important: enable HTTP/2 in ActorSystem's config

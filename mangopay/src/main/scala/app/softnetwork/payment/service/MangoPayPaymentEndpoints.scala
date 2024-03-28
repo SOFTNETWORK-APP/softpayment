@@ -1,18 +1,19 @@
 package app.softnetwork.payment.service
 
-import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.MangoPayPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.{BankAccount, KycDocument, UboDeclaration}
-import app.softnetwork.session.service.SessionEndpoints
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
+import app.softnetwork.session.service.SessionMaterials
 import com.mangopay.core.enumerations.EventType
-import org.slf4j.{Logger, LoggerFactory}
 import sttp.tapir.server.ServerEndpoint.Full
 
 import scala.concurrent.Future
 
-trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaymentHandler {
+trait MangoPayPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
+    extends GenericPaymentEndpoints[SD]
+    with MangoPayPaymentHandler { _: SessionMaterials[SD] =>
 
   /** should be implemented by each payment provider
     */
@@ -251,17 +252,4 @@ trait MangoPayPaymentEndpoints extends GenericPaymentEndpoints with MangoPayPaym
         }
       }
 
-}
-
-object MangoPayPaymentEndpoints {
-  def apply(
-    _system: ActorSystem[_],
-    _sessionEndpoints: SessionEndpoints
-  ): MangoPayPaymentEndpoints = {
-    new MangoPayPaymentEndpoints {
-      lazy val log: Logger = LoggerFactory getLogger getClass.getName
-      override implicit def system: ActorSystem[_] = _system
-      override def sessionEndpoints: SessionEndpoints = _sessionEndpoints
-    }
-  }
 }

@@ -1,6 +1,7 @@
 package app.softnetwork.payment.scalatest
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.payment.api.{MockPaymentServer, PaymentServer}
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.MockPaymentHandler
 import app.softnetwork.payment.launch.PaymentGuardian
@@ -34,6 +35,8 @@ trait PaymentTestKit extends SchedulerTestKit with PaymentGuardian { _: Suite =>
     *   roles associated with this node
     */
   override def roles: Seq[String] = super.roles :+ AkkaNodeRole
+
+  override def paymentServer: ActorSystem[_] => PaymentServer = system => MockPaymentServer(system)
 
   override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
     MockPaymentBehavior

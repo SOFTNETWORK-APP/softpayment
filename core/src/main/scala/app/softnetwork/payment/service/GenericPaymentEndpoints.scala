@@ -3,6 +3,8 @@ package app.softnetwork.payment.service
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
+import app.softnetwork.session.service.SessionMaterials
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.Part
@@ -13,16 +15,16 @@ import sttp.tapir.server.ServerEndpoint.Full
 import scala.concurrent.Future
 import scala.language.{implicitConversions, postfixOps}
 
-trait GenericPaymentEndpoints
-    extends RootPaymentEndpoints
-    with CardEndpoints
-    with CardPaymentEndpoints
-    with BankAccountEndpoints
-    with KycDocumentEndpoints
-    with UboDeclarationEndpoints
-    with RecurringPaymentEndpoints
-    with MandateEndpoints {
-  _: GenericPaymentHandler =>
+trait GenericPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
+    extends RootPaymentEndpoints[SD]
+    with CardEndpoints[SD]
+    with CardPaymentEndpoints[SD]
+    with BankAccountEndpoints[SD]
+    with KycDocumentEndpoints[SD]
+    with UboDeclarationEndpoints[SD]
+    with RecurringPaymentEndpoints[SD]
+    with MandateEndpoints[SD] {
+  _: GenericPaymentHandler with SessionMaterials[SD] =>
 
   import app.softnetwork.serialization._
 

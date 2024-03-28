@@ -5,13 +5,14 @@ import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.{computeExternalUuidWithProfile, BrowserInfo}
 import app.softnetwork.persistence.service.Service
-import org.softnetwork.session.model.Session
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 
 import java.util.TimeZone
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 
-trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
+trait BasicPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
+    extends Service[PaymentCommand, PaymentResult] {
   _: GenericPaymentHandler =>
 
   def run(command: PaymentCommandWithKey)(implicit
@@ -37,7 +38,7 @@ trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
       case _                             => ApiErrors.BadRequest("Unknown")
     }
 
-  protected[payment] def externalUuidWithProfile(session: Session): String =
+  protected[payment] def externalUuidWithProfile(session: SD): String =
     computeExternalUuidWithProfile(session.id, session.profile)
 
   protected[payment] def extractBrowserInfo(

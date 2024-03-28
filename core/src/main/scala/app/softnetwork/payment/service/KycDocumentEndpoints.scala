@@ -5,6 +5,7 @@ import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.{KycDocument, KycDocumentValidationReport}
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
 import sttp.model.StatusCode
@@ -13,7 +14,8 @@ import sttp.tapir.server.ServerEndpoint
 
 import scala.concurrent.Future
 
-trait KycDocumentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
+trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
+  _: RootPaymentEndpoints[SD] with GenericPaymentHandler =>
 
   import app.softnetwork.serialization._
 

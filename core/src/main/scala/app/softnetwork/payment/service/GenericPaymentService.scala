@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import akka.actor.typed.ActorSystem
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.{Directives, Route}
 import app.softnetwork.api.server.DefaultComplete
@@ -14,7 +15,11 @@ import akka.http.scaladsl.server.directives.FileInfo
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
-import app.softnetwork.session.service.SessionService
+import app.softnetwork.session.service.{
+  ServiceWithSessionDirectives,
+  SessionMaterials,
+  SessionService
+}
 import com.softwaremill.session.CsrfDirectives.hmacTokenCsrfProtection
 import com.softwaremill.session.CsrfOptions.checkHeader
 import com.typesafe.scalalogging.StrictLogging
@@ -25,19 +30,21 @@ import org.softnetwork.session.model.Session
 import app.softnetwork.api.server._
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
+import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
+import com.softwaremill.session.SessionConfig
 
 import java.io.ByteArrayOutputStream
 import scala.concurrent.Await
-
 import scala.language.implicitConversions
 
-trait GenericPaymentService
+trait GenericPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     extends Directives
     with DefaultComplete
     with Json4sSupport
     with StrictLogging
-    with BasicPaymentService
-    with ApiRoute { _: GenericPaymentHandler =>
+    with BasicPaymentService[SD]
+    with ServiceWithSessionDirectives[PaymentCommand, PaymentResult, SD]
+    with ApiRoute { _: GenericPaymentHandler with SessionMaterials[SD] =>
 
   implicit def serialization: Serialization.type = jackson.Serialization
 
@@ -45,7 +52,11 @@ trait GenericPaymentService
 
   import Session._
 
-  def sessionService: SessionService
+  override implicit def ts: ActorSystem[_] = system
+
+  implicit def sessionConfig: SessionConfig
+
+  implicit def companion: SessionDataCompanion[SD]
 
   val route: Route = {
     pathPrefix(PaymentSettings.PaymentPath) {
@@ -68,7 +79,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      sessionService.requiredSession { session =>
+      requiredSession(sc, st) { session =>
         pathEnd {
           get {
             run(LoadCards(externalUuidWithProfile(session))) completeWith {
@@ -124,7 +135,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      sessionService.requiredSession { session =>
+      requiredSession(sc, st) { session =>
         get {
           pathEnd {
             run(LoadPaymentAccount(externalUuidWithProfile(session))) completeWith {
@@ -363,7 +374,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      sessionService.requiredSession { session =>
+      requiredSession(sc, st) { session =>
         pathEnd {
           get {
             run(LoadBankAccount(externalUuidWithProfile(session))) completeWith {
@@ -445,7 +456,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      sessionService.requiredSession { session =>
+      requiredSession(sc, st) { session =>
         pathEnd {
           get {
             run(GetUboDeclaration(externalUuidWithProfile(session))) completeWith {
@@ -485,7 +496,7 @@ trait GenericPaymentService
             // check anti CSRF token
             hmacTokenCsrfProtection(checkHeader) {
               // check if a session exists
-              sessionService.requiredSession { session =>
+              requiredSession(sc, st) { session =>
                 pathEnd {
                   get {
                     run(
@@ -543,7 +554,7 @@ trait GenericPaymentService
       // check anti CSRF token
       hmacTokenCsrfProtection(checkHeader) {
         // check if a session exists
-        sessionService.requiredSession { session =>
+        requiredSession(sc, st) { session =>
           post {
             run(CreateMandate(externalUuidWithProfile(session))) completeWith {
               case r: MandateConfirmationRequired =>
@@ -566,7 +577,7 @@ trait GenericPaymentService
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
-      sessionService.requiredSession { session =>
+      requiredSession(sc, st) { session =>
         get {
           pathPrefix(Segment) { recurringPaymentRegistrationId =>
             run(

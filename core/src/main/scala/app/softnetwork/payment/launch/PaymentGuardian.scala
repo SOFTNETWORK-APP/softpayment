@@ -1,7 +1,9 @@
 package app.softnetwork.payment.launch
 
 import akka.actor.typed.ActorSystem
+import app.softnetwork.api.server.GrpcService
 import app.softnetwork.payment.PaymentCoreBuildInfo
+import app.softnetwork.payment.api.{PaymentGrpcService, PaymentServer}
 import app.softnetwork.payment.persistence.data.paymentKvDao
 import app.softnetwork.payment.persistence.query.{
   GenericPaymentCommandProcessorStream,
@@ -49,4 +51,12 @@ trait PaymentGuardian extends SessionGuardian { _: SchemaProvider with CsrfCheck
 
   override def systemVersion(): String =
     sys.env.getOrElse("VERSION", PaymentCoreBuildInfo.version)
+
+  def paymentServer: ActorSystem[_] => PaymentServer
+
+  final def paymentGrpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
+    Seq(
+      new PaymentGrpcService(paymentServer(system))
+    )
+
 }

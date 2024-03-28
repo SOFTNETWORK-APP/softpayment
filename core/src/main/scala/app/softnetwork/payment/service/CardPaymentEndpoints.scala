@@ -3,6 +3,7 @@ package app.softnetwork.payment.service
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.GenericPaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import org.softnetwork.session.model.Session
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
@@ -13,13 +14,14 @@ import sttp.tapir.server.{PartialServerEndpointWithSecurityOutput, ServerEndpoin
 
 import scala.concurrent.Future
 
-trait CardPaymentEndpoints { _: RootPaymentEndpoints with GenericPaymentHandler =>
+trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
+  _: RootPaymentEndpoints[SD] with GenericPaymentHandler =>
 
   import app.softnetwork.serialization._
 
   def payment(payment: Payment): PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
-    Session,
+    SD,
     (Option[String], Option[String], Option[String], Option[String], Payment),
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),

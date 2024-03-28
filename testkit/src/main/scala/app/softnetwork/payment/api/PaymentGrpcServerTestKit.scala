@@ -6,9 +6,9 @@ import app.softnetwork.persistence.scalatest.InMemoryPersistenceTestKit
 import app.softnetwork.scheduler.launch.SchedulerGuardian
 import org.scalatest.Suite
 
-trait PaymentGrpcServer
+trait PaymentGrpcServerTestKit
     extends PersistenceScalatestGrpcTest
-    with PaymentGrpcServices
+    with PaymentGrpcServicesTestKit
     with InMemoryPersistenceTestKit { _: Suite with PaymentGuardian with SchedulerGuardian =>
   override lazy val additionalConfig: String = paymentGrpcConfig
 }

@@ -12,6 +12,8 @@ import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentRouteTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
+import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
+import app.softnetwork.session.service.SessionMaterials
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -20,7 +22,9 @@ import java.time.LocalDate
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
-trait PaymentServiceSpec extends AnyWordSpecLike with PaymentRouteTestKit { _: ApiRoutes =>
+trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
+    extends AnyWordSpecLike
+    with PaymentRouteTestKit[SD] { _: ApiRoutes with SessionMaterials[SD] =>
 
   lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
