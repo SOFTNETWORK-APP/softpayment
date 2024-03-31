@@ -5,7 +5,7 @@ import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
 
 trait MockPaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
-    extends MangoPayPaymentServiceEndpoints[SD]
+    extends PaymentServiceEndpoints[SD]
     with MockPaymentHandler {
   _: SessionMaterials[SD] =>
 }

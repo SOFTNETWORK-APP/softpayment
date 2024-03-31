@@ -27,7 +27,7 @@ class PaymentGrpcService(server: PaymentServer, softPayAccountDao: SoftPayAccoun
         case _ => Future.successful(None)
       }
     ).optional {
-      case (Some(client)) =>
+      case (Some(_)) =>
         handle(
           grpcService(system),
           Seq(

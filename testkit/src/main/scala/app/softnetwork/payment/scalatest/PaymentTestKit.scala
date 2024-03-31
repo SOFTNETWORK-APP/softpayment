@@ -2,22 +2,12 @@ package app.softnetwork.payment.scalatest
 
 import akka.actor.typed.ActorSystem
 import app.softnetwork.account.config.AccountSettings
-import app.softnetwork.account.model.BasicAccountProfile
-import app.softnetwork.account.persistence.query.AccountEventProcessorStreams.InternalAccountEvents2AccountProcessorStream
-import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.notification.scalatest.AllNotificationsTestKit
-import app.softnetwork.payment.api.{
-  ClientServer,
-  MockClientServer,
-  MockPaymentServer,
-  PaymentServer,
-  SoftPayClientTestKit
-}
+import app.softnetwork.payment.api._
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.handlers.{
   MockPaymentHandler,
   MockSoftPayAccountDao,
-  MockSoftPayAccountHandler,
   SoftPayAccountDao
 }
 import app.softnetwork.payment.launch.PaymentGuardian
@@ -30,7 +20,8 @@ import app.softnetwork.payment.persistence.query.{
 import app.softnetwork.payment.persistence.typed.{
   MockPaymentBehavior,
   MockSoftPayAccountBehavior,
-  PaymentBehavior
+  PaymentBehavior,
+  SoftPayAccountBehavior
 }
 import app.softnetwork.persistence.launch.PersistentEntity
 import app.softnetwork.persistence.query.{
@@ -49,8 +40,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait PaymentTestKit
     extends SchedulerTestKit
-    with PaymentGuardian
     with AllNotificationsTestKit
+    with PaymentGuardian
     with SoftPayClientTestKit {
   _: Suite =>
 
@@ -61,8 +52,7 @@ trait PaymentTestKit
 
   override def paymentBehavior: ActorSystem[_] => PaymentBehavior = _ => MockPaymentBehavior
 
-  override def accountBehavior
-    : ActorSystem[_] => AccountBehavior[SoftPayAccount, BasicAccountProfile] = _ =>
+  override def softPayAccountBehavior: ActorSystem[_] => SoftPayAccountBehavior = _ =>
     MockSoftPayAccountBehavior
 
   override def paymentServer: ActorSystem[_] => PaymentServer = system => MockPaymentServer(system)
@@ -101,18 +91,6 @@ trait PaymentTestKit
       lazy val log: Logger = LoggerFactory getLogger getClass.getName
       override val tag: String = SchedulerSettings.tag(MockPaymentBehavior.persistenceId)
       override val forTests: Boolean = true
-      override implicit def system: ActorSystem[_] = sys
-    }
-
-  override def internalAccountEvents2AccountProcessorStream
-    : ActorSystem[_] => InternalAccountEvents2AccountProcessorStream = sys =>
-    new InternalAccountEvents2AccountProcessorStream
-      with MockSoftPayAccountHandler
-      with InMemoryJournalProvider
-      with InMemoryOffsetProvider {
-      lazy val log: Logger = LoggerFactory getLogger getClass.getName
-      override def tag: String = s"${MockSoftPayAccountBehavior.persistenceId}-to-internal"
-      override lazy val forTests: Boolean = true
       override implicit def system: ActorSystem[_] = sys
     }
 
@@ -225,18 +203,16 @@ trait PaymentTestKit
   }
 
   override def entities: ActorSystem[_] => Seq[PersistentEntity[_, _, _, _]] = sys =>
-    schedulerEntities(sys) ++ sessionEntities(sys) ++ accountEntities(sys) ++ paymentEntities(
+    schedulerEntities(sys) ++ sessionEntities(sys) ++ paymentEntities(
       sys
     ) ++ notificationEntities(sys)
 
   override def eventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
     schedulerEventProcessorStreams(sys) ++
     paymentEventProcessorStreams(sys) ++
-    accountEventProcessorStreams(sys) ++
     notificationEventProcessorStreams(sys)
 
   override def initSystem: ActorSystem[_] => Unit = system => {
-    initAccountSystem(system)
     initSchedulerSystem(system)
     registerProvidersAccount(system)
   }

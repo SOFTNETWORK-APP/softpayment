@@ -8,6 +8,7 @@ import app.softnetwork.payment.api.PaymentClient
 import app.softnetwork.payment.data._
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.message.PaymentMessages._
+import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PaymentRouteTestKit
 import app.softnetwork.time._
@@ -331,7 +332,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "update declaration status" in {
       Get(
-        s"/$RootPath/$PaymentPath/$HooksRoute?EventType=UBO_DECLARATION_VALIDATED&RessourceId=$uboDeclarationId"
+        s"/$RootPath/$PaymentPath/$HooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=UBO_DECLARATION_VALIDATED&RessourceId=$uboDeclarationId"
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val declaration = loadDeclaration()
@@ -656,7 +657,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       assert(paymentAccount.paymentAccountStatus.isCompteOk)
       val userId = paymentAccount.legalUser.flatMap(_.legalRepresentative.userId).getOrElse("")
       Get(
-        s"/$RootPath/$PaymentPath/$HooksRoute?EventType=USER_KYC_LIGHT&RessourceId=$userId"
+        s"/$RootPath/$PaymentPath/$HooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=USER_KYC_LIGHT&RessourceId=$userId"
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         assert(loadPaymentAccount().paymentAccountStatus.isDocumentsKo)

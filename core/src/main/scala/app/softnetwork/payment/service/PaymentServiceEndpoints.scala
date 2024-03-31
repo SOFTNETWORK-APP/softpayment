@@ -1,8 +1,10 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model._
+import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
 import sttp.capabilities
@@ -30,7 +32,11 @@ trait PaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   /** should be implemented by each payment provider
     */
-  def hooks: Full[Unit, Unit, (String, String), Unit, Unit, Any, Future]
+  def hooks: List[Full[Unit, Unit, (String, String), Unit, Unit, Any, Future]] = {
+    PaymentProviders.hooksEndpoints.map { case (k, v) =>
+      v.hooks(rootEndpoint.in(PaymentSettings.HooksRoute).in(k))
+    }.toList
+  }
 
   val loadPaymentAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
@@ -58,10 +64,7 @@ trait PaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     uboDeclarationEndpoints ++
     mandateEndpoints ++
     recurringPaymentEndpoints ++
-    List(
-      loadPaymentAccount,
-      hooks
-    )
+    hooks :+ loadPaymentAccount
 
 }
 
