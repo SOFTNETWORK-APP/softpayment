@@ -2,7 +2,7 @@ ThisBuild / organization := "app.softnetwork"
 
 name := "payment"
 
-ThisBuild / version := "0.6.0"
+ThisBuild / version := "0.6.1"
 
 ThisBuild / scalaVersion := "2.12.18"
 
@@ -64,7 +64,7 @@ lazy val stripe = project.in(file("stripe"))
     core % "compile->compile;test->test;it->it"
   )
 
-lazy val api = project.in(file("mangopay/api"))
+lazy val api = project.in(file("api"))
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
   .enablePlugins(DockerComposePlugin, DockerPlugin, JavaAppPackaging)

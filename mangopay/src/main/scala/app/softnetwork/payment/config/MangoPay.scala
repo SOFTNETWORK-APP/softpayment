@@ -2,6 +2,7 @@ package app.softnetwork.payment.config
 
 import MangoPaySettings._
 import app.softnetwork.payment.model.SoftPayAccount
+import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import com.mangopay.MangoPayApi
 import com.mangopay.core.enumerations.{EventType, HookStatus}
 import com.mangopay.entities.Hook
@@ -34,7 +35,8 @@ object MangoPay extends StrictLogging {
 
     lazy val recurringPaymentFor3DS = s"$secureModeReturnUrl/$RecurringPaymentRoute"
 
-    lazy val hooksBaseUrl = s"""$BaseUrl/$hooksPath/$HooksRoute"""
+    lazy val hooksBaseUrl =
+      s"""$BaseUrl/$hooksPath/$HooksRoute/${Provider.ProviderType.MANGOPAY.name.toLowerCase}"""
 
     lazy val mandateReturnUrl = s"""$BaseUrl/$mandatePath/$MandateRoute"""
 

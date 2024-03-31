@@ -1,12 +1,20 @@
 package app.softnetwork.payment.spi
 
+import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.config.MangoPay
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
+import app.softnetwork.payment.handlers.MockPaymentHandler
 import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model.RecurringPayment.RecurringCardPaymentState
 import app.softnetwork.payment.model.SoftPayAccount.Client
 import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model.{RecurringPayment, _}
+import app.softnetwork.payment.service.{
+  HooksDirectives,
+  HooksEndpoints,
+  MangoPayHooksDirectives,
+  MangoPayHooksEndpoints
+}
 import app.softnetwork.persistence._
 import app.softnetwork.time.DateExtensions
 import com.mangopay.core.enumerations.{TransactionStatus => MangoPayTransactionStatus, _}
@@ -20,6 +28,7 @@ import com.mangopay.entities.{
   UboDeclaration => _,
   _
 }
+import org.json4s.Formats
 
 import java.text.SimpleDateFormat
 import java.util
@@ -1732,4 +1741,20 @@ class MockMangoPayProviderFactory extends PaymentProviderSpi {
 
   override def softPaymentProvider: Provider =
     MangoPay.softPayProvider.withProviderType(providerType)
+
+  override def hooksDirectives(implicit
+    _system: ActorSystem[_],
+    _formats: Formats
+  ): HooksDirectives =
+    new MangoPayHooksDirectives with MockPaymentHandler {
+      override implicit def system: ActorSystem[_] = _system
+      override implicit def formats: Formats = _formats
+      override def log: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(getClass)
+    }
+
+  override def hooksEndpoints(implicit _system: ActorSystem[_], formats: Formats): HooksEndpoints =
+    new MangoPayHooksEndpoints with MockPaymentHandler {
+      override implicit def system: ActorSystem[_] = _system
+      override def log: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(getClass)
+    }
 }

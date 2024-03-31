@@ -1,5 +1,7 @@
 package app.softnetwork.payment.spi
 
+import akka.actor.typed.ActorSystem
+
 import java.text.SimpleDateFormat
 import java.util
 import java.util.{Calendar, Date, TimeZone}
@@ -25,11 +27,18 @@ import app.softnetwork.payment.config.{MangoPay, MangoPaySettings}
 import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
 import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
+import app.softnetwork.payment.service.{
+  HooksDirectives,
+  HooksEndpoints,
+  MangoPayHooksDirectives,
+  MangoPayHooksEndpoints
+}
 
 import scala.util.{Failure, Success, Try}
 import app.softnetwork.persistence._
 import app.softnetwork.serialization.asJson
 import app.softnetwork.time.{epochSecondToDate, epochSecondToLocalDate, DateExtensions}
+import org.json4s.Formats
 
 import java.time.format.DateTimeFormatter
 import scala.language.implicitConversions
@@ -2603,4 +2612,20 @@ class MangoPayProviderFactory extends PaymentProviderSpi {
 
   override def softPaymentProvider: SoftPayAccount.Client.Provider =
     MangoPay.softPayProvider
+
+  override def hooksDirectives(implicit
+    _system: ActorSystem[_],
+    _formats: Formats
+  ): HooksDirectives =
+    new MangoPayHooksDirectives {
+      override implicit def system: ActorSystem[_] = _system
+      override implicit def formats: Formats = _formats
+      override def log: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(getClass)
+    }
+
+  override def hooksEndpoints(implicit _system: ActorSystem[_], formats: Formats): HooksEndpoints =
+    new MangoPayHooksEndpoints {
+      override implicit def system: ActorSystem[_] = _system
+      override def log: org.slf4j.Logger = org.slf4j.LoggerFactory.getLogger(getClass)
+    }
 }

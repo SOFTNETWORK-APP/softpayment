@@ -25,6 +25,7 @@ import org.json4s.jackson.Serialization
 import app.softnetwork.api.server._
 import app.softnetwork.payment.config.PaymentSettings._
 import app.softnetwork.payment.model._
+import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import com.softwaremill.session.SessionConfig
 
@@ -366,10 +367,14 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     }
   }
 
-  lazy val hooks: Route = pathPrefix(HooksRoute) {
-    pathEnd {
-      complete(HttpResponse(StatusCodes.NotImplemented))
+  private lazy val hooksRoutes: List[Route] = PaymentProviders.hooksDirectives.map { case (k, v) =>
+    pathPrefix(k) {
+      v.hooks
     }
+  }.toList
+
+  lazy val hooks: Route = pathPrefix(HooksRoute) {
+    concat(hooksRoutes: _*)
   }
 
   lazy val bank: Route = pathPrefix(BankRoute) {

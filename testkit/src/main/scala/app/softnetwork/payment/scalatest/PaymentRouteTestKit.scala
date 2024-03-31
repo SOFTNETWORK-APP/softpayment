@@ -6,7 +6,9 @@ import akka.http.scaladsl.model.{ContentTypes, Multipart, StatusCodes}
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.api.server.config.ServerSettings.RootPath
 import app.softnetwork.payment.api.PaymentGrpcServicesTestKit
+import app.softnetwork.payment.config.MangoPay
 import app.softnetwork.payment.config.PaymentSettings._
+import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model._
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.scalatest.SessionTestKit
@@ -116,7 +118,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
           val report = responseAs[KycDocumentValidationReport]
           assert(report.status == KycDocument.KycDocumentStatus.KYC_DOCUMENT_VALIDATION_ASKED)
           Get(
-            s"/$RootPath/$PaymentPath/$HooksRoute?EventType=KYC_SUCCEEDED&RessourceId=${report.id}"
+            s"/$RootPath/$PaymentPath/$HooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=KYC_SUCCEEDED&RessourceId=${report.id}"
           ) ~> routes ~> check {
             status shouldEqual StatusCodes.OK
             assert(
