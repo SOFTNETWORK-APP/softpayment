@@ -8,6 +8,7 @@ import app.softnetwork.account.persistence.typed.AccountBehavior
 import app.softnetwork.payment.PaymentCoreBuildInfo
 import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.persistence.launch.PersistentEntity
+import app.softnetwork.persistence.launch.PersistenceGuardian._
 import app.softnetwork.persistence.query.EventProcessorStream
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.CsrfCheck
@@ -15,8 +16,6 @@ import app.softnetwork.session.CsrfCheck
 trait SoftPayGuardian
     extends AccountGuardian[SoftPayAccount, BasicAccountProfile]
     with PaymentGuardian { _: SchemaProvider with CsrfCheck =>
-
-  import app.softnetwork.persistence.launch.PersistenceGuardian._
 
   override def accountBehavior
     : ActorSystem[_] => AccountBehavior[SoftPayAccount, BasicAccountProfile] =

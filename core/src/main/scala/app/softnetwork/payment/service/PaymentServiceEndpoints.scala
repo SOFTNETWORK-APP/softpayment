@@ -33,9 +33,9 @@ trait PaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
   /** should be implemented by each payment provider
     */
   def hooks: List[Full[Unit, Unit, (String, String), Unit, Unit, Any, Future]] = {
-    PaymentProviders.hooksEndpoints
-      .map(kv => kv._2.hooks(rootEndpoint.in(PaymentSettings.HooksRoute).in(kv._1)))
-      .toList
+    PaymentProviders.hooksEndpoints.map { case (k, v) =>
+      v.hooks(rootEndpoint.in(PaymentSettings.HooksRoute).in(k))
+    }.toList
   }
 
   val loadPaymentAccount: ServerEndpoint[Any with AkkaStreams, Future] =

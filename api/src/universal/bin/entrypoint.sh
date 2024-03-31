@@ -15,14 +15,11 @@ realpath () {
       TARGET_FILE=$(readlink "$TARGET_FILE")
       cd "$(dirname "$TARGET_FILE")"
       TARGET_FILE=$(basename "$TARGET_FILE")
-      COUNT=$(($COUNT + 1))
+      COUNT=$((COUNT + 1))
   done
 
   if [ "$TARGET_FILE" == "." -o "$TARGET_FILE" == ".." ]; then
     cd "$TARGET_FILE"
-    TARGET_FILEPATH=
-  else
-    TARGET_FILEPATH=/$TARGET_FILE
   fi
 
   # make sure we grab the actual windows path, instead of cygwin's path.
@@ -47,9 +44,9 @@ is_cygwin() {
 cygwinpath() {
   local file="$1"
   if is_cygwin; then
-    echo $(cygpath -w $file)
+    echo "$(cygpath -w $file)"
   else
-    echo $file
+    echo "$file"
   fi
 }
 
@@ -59,4 +56,4 @@ SCRIPTPATH=$(dirname "$SCRIPT")
 
 export CLUSTER_IP=$(hostname -i | awk '{print $1}')
 
-$SCRIPTPATH/softpay-api -DCLUSTER_MANAGEMENT_HOST="$CLUSTER_IP" "$@"
+"$SCRIPTPATH/softpay-api" -DCLUSTER_MANAGEMENT_HOST="$CLUSTER_IP" "$@"
