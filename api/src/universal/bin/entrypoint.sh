@@ -44,7 +44,7 @@ is_cygwin() {
 cygwinpath() {
   local file="$1"
   if is_cygwin; then
-    echo "$(cygpath -w $file)"
+    echo $(cygpath -w "$file")
   else
     echo "$file"
   fi
