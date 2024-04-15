@@ -1,7 +1,6 @@
 package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import app.softnetwork.api.server.SwaggerEndpoint
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.MangoPayPaymentHandler
@@ -16,13 +15,8 @@ import app.softnetwork.persistence.jdbc.query.{JdbcJournalProvider, JdbcOffsetPr
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.session.CsrfCheck
-import app.softnetwork.session.config.Settings
-import app.softnetwork.session.model.{
-  SessionData,
-  SessionDataCompanion,
-  SessionDataDecorator,
-  SessionManagers
-}
+import app.softnetwork.session.api.SessionDataApi
+import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.{RefreshTokenStorage, SessionConfig, SessionManager}
 import com.typesafe.config.Config
@@ -30,9 +24,11 @@ import org.slf4j.{Logger, LoggerFactory}
 import org.softnetwork.session.model.Session
 import sttp.tapir.swagger.SwaggerUIOptions
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-trait MangoPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends PaymentApplication {
+trait MangoPayApi[SD <: SessionData with SessionDataDecorator[SD]]
+    extends PaymentApplication
+    with SessionDataApi[SD] {
   self: SchemaProvider with CsrfCheck =>
 
   override def paymentAccountBehavior: ActorSystem[_] => GenericPaymentBehavior = _ =>
@@ -58,17 +54,6 @@ trait MangoPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends Payme
       override val tag: String = SchedulerSettings.tag(MangoPayPaymentBehavior.persistenceId)
       override implicit def system: ActorSystem[_] = sys
     }
-
-  implicit def sessionConfig: SessionConfig = Settings.Session.DefaultSessionConfig
-
-  implicit def companion: SessionDataCompanion[SD]
-
-  protected def manager: SessionManager[SD] = SessionManagers.basic
-
-  protected def refreshTokenStorage: ActorSystem[_] => RefreshTokenStorage[SD]
-
-  override protected def sessionType: Session.SessionType =
-    Settings.Session.SessionContinuityAndTransport
 
   override def paymentServer: ActorSystem[_] => PaymentServer = system => MangoPayServer(system)
 
