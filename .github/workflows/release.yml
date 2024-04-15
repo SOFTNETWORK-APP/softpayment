@@ -43,7 +43,7 @@ jobs:
       with:
         files: common/target/scala-2.12/coverage-report/cobertura.xml,core/target/scala-2.12/coverage-report/cobertura.xml,teskit/target/scala-2.12/coverage-report/cobertura.xml
         flags: unittests
-        fail_ci_if_error: true
+        fail_ci_if_error: false
         verbose: true
     - name: Publish
       run: sbt publish
