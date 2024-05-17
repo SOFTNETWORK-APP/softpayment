@@ -655,6 +655,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     val cardPreAuthorization = new CardPreAuthorization()
     cardPreAuthorization.setTag(orderUuid)
     cardPreAuthorization.setAuthorId(authorId)
+    cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
     cardPreAuthorization.setCardId(cardId)
     cardPreAuthorization.setDebitedFunds(new Money)
     cardPreAuthorization.getDebitedFunds.setAmount(debitedAmount)
