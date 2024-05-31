@@ -675,7 +675,6 @@ trait MockMangoPayProvider extends MangoPayProvider {
     cardPreAuthorization.setSecureModeRedirectUrl(
       s"${cardPreAuthorization.getSecureModeReturnUrl}&preAuthorizationId=${cardPreAuthorization.getId}"
     )
-    cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
     CardPreAuthorizations =
       CardPreAuthorizations.updated(cardPreAuthorization.getId, cardPreAuthorization)
 
