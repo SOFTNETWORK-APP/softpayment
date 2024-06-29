@@ -18,7 +18,6 @@ import akka.util.ByteString
 import app.softnetwork.session.service.{ServiceWithSessionDirectives, SessionMaterials}
 import com.softwaremill.session.CsrfDirectives.hmacTokenCsrfProtection
 import com.softwaremill.session.CsrfOptions.checkHeader
-import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 import org.json4s.{jackson, Formats}
 import org.json4s.jackson.Serialization
@@ -37,7 +36,6 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     extends Directives
     with DefaultComplete
     with Json4sSupport
-    with StrictLogging
     with BasicPaymentService
     with ServiceWithSessionDirectives[PaymentCommand, PaymentResult, SD]
     with ClientSessionDirectives[SD]

@@ -693,6 +693,7 @@ trait MangoPayProvider extends PaymentProvider {
       s"$preAuthorizeCardFor3DS/$orderUuid?registerCard=${registerCard
         .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
     )
+    cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
     val idempotencyKey =
       idempotency match {
         case Some(s) if s => Some(generateUUID())

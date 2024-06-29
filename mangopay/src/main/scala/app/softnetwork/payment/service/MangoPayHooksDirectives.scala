@@ -14,12 +14,12 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
     resourceId: String
   ): PaymentResult => Route = {
     case _: KycDocumentStatusUpdated =>
-      logger.info(
+      log.info(
         s"[Payment Hooks] KYC has been updated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
     case _ =>
-      logger.warn(
+      log.warn(
         s"[Payment Hooks] KYC has not been updated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
@@ -30,12 +30,12 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
     resourceId: String
   ): PaymentResult => Route = {
     case UboDeclarationStatusUpdated =>
-      logger.info(
+      log.info(
         s"[Payment Hooks] Ubo Declaration has been updated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
     case _ =>
-      logger.warn(
+      log.warn(
         s"[Payment Hooks] Ubo Declaration has not been updated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
@@ -46,12 +46,12 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
     resourceId: String
   ): PaymentResult => Route = {
     case RegularUserValidated =>
-      logger.info(
+      log.info(
         s"[Payment Hooks] Regular User has been validated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
     case _ =>
-      logger.warn(
+      log.warn(
         s"[Payment Hooks] Regular User has not been validated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
@@ -62,12 +62,12 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
     resourceId: String
   ): PaymentResult => Route = {
     case RegularUserInvalidated =>
-      logger.info(
+      log.info(
         s"[Payment Hooks] Regular User has been invalidated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
     case _ =>
-      logger.warn(
+      log.warn(
         s"[Payment Hooks] Regular User has not been invalidated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
@@ -78,12 +78,12 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
     resourceId: String
   ): PaymentResult => Route = {
     case _: MandateStatusUpdated =>
-      logger.info(
+      log.info(
         s"[Payment Hooks] Mandate has been updated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
     case _ =>
-      logger.warn(
+      log.warn(
         s"[Payment Hooks] Mandate has not been updated for $resourceId -> $eventType"
       )
       complete(HttpResponse(StatusCodes.OK))
@@ -194,11 +194,11 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
                   completeWithMandateStatusUpdatedResult(eventType, resourceId)
                 }
               case _ =>
-                logger.error(s"[Payment Hooks] Event $eventType for $resourceId is not supported")
+                log.error(s"[Payment Hooks] Event $eventType for $resourceId is not supported")
                 complete(HttpResponse(StatusCodes.BadRequest))
             }
           case None =>
-            logger.error(s"[Payment Hooks] Event $eventType for $resourceId is not supported")
+            log.error(s"[Payment Hooks] Event $eventType for $resourceId is not supported")
             complete(HttpResponse(StatusCodes.BadRequest))
         }
       }

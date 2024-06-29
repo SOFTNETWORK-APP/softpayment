@@ -8,11 +8,10 @@ import app.softnetwork.payment.cli.activate.ActivateClientCmd
 import app.softnetwork.payment.cli.clients.ClientsCmd
 import app.softnetwork.payment.cli.signup.SignUpClientCmd
 import app.softnetwork.payment.cli.tokens.TokensCmd
-import com.typesafe.scalalogging.StrictLogging
 
 import scala.util.{Failure, Success}
 
-object Main extends StrictLogging {
+object Main {
 
   def shell: String = "softpay"
 
@@ -22,7 +21,7 @@ object Main extends StrictLogging {
   }
 }
 
-class Main extends Completion with StrictLogging {
+class Main extends Completion {
   private[cli] val cmds: List[Cmd[_]] = List(
     SignUpClientCmd,
     ActivateClientCmd,
@@ -82,7 +81,7 @@ class Main extends Completion with StrictLogging {
                 message.foreach(println)
                 System.exit(exit)
               case Failure(f) =>
-                logger.error(s"Failed to run command ${cmd.name}", f)
+                Console.err.println(s"Failed to run command ${cmd.name}", f)
                 System.exit(1)
             }
         }

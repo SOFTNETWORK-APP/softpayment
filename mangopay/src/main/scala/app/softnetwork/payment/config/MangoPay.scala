@@ -6,13 +6,12 @@ import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import com.mangopay.MangoPayApi
 import com.mangopay.core.enumerations.{EventType, HookStatus}
 import com.mangopay.entities.Hook
-import com.typesafe.scalalogging.StrictLogging
 
 import scala.util.{Failure, Success, Try}
 
 /** Created by smanciot on 16/08/2018.
   */
-object MangoPay extends StrictLogging {
+object MangoPay {
 
   case class Config(
     clientId: String,
@@ -68,7 +67,7 @@ object MangoPay extends StrictLogging {
           Try(mangoPayApi.getHookApi.getAll) match {
             case Success(s) => s.asScala.toList
             case Failure(f) =>
-              logger.error(f.getMessage, f.getCause)
+              Console.err.println(f.getMessage, f.getCause)
               List.empty
           }
         createOrUpdateHook(mangoPayApi, EventType.KYC_SUCCEEDED, hooks)
@@ -102,7 +101,7 @@ object MangoPay extends StrictLogging {
         case Some(previousHook) =>
           previousHook.setStatus(HookStatus.ENABLED)
           previousHook.setUrl(s"$hooksBaseUrl")
-          logger.info(s"Updating Mangopay Hook ${previousHook.getId}")
+          Console.println(s"Updating Mangopay Hook ${previousHook.getId}")
           mangoPayApi.getHookApi.update(previousHook)
         case _ =>
           val hook = new Hook()
@@ -114,7 +113,7 @@ object MangoPay extends StrictLogging {
     } match {
       case Success(_) =>
       case Failure(f) =>
-        logger.error(s"$eventType -> ${f.getMessage}", f.getCause)
+        Console.err.println(s"$eventType -> ${f.getMessage}", f.getCause)
     }
   }
 }
