@@ -651,7 +651,7 @@ trait MangoPayProvider extends PaymentProvider {
     val cardPreAuthorization = new CardPreAuthorization()
     cardPreAuthorization.setTag(orderUuid)
     cardPreAuthorization.setAuthorId(authorId)
-    cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
+//    cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
     if (browserInfo.isDefined) {
       val bi = browserInfo.get
       import bi._
