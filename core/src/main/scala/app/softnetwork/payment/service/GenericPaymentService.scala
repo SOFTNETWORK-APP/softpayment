@@ -15,14 +15,9 @@ import akka.http.scaladsl.server.directives.FileInfo
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
-import app.softnetwork.session.service.{
-  ServiceWithSessionDirectives,
-  SessionMaterials,
-  SessionService
-}
+import app.softnetwork.session.service.{ServiceWithSessionDirectives, SessionMaterials}
 import com.softwaremill.session.CsrfDirectives.hmacTokenCsrfProtection
 import com.softwaremill.session.CsrfOptions.checkHeader
-import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 import org.json4s.{jackson, Formats}
 import org.json4s.jackson.Serialization
@@ -41,7 +36,6 @@ trait GenericPaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     extends Directives
     with DefaultComplete
     with Json4sSupport
-    with StrictLogging
     with BasicPaymentService[SD]
     with ServiceWithSessionDirectives[PaymentCommand, PaymentResult, SD]
     with ApiRoute { _: GenericPaymentHandler with SessionMaterials[SD] =>
