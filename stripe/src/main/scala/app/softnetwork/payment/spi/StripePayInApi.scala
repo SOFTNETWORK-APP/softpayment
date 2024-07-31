@@ -232,7 +232,6 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
 
           payInTransaction.ipAddress match {
             case Some(ipAddress) =>
-
               var onlineParams =
                 PaymentIntentCreateParams.MandateData.CustomerAcceptance.Online
                   .builder()
@@ -246,17 +245,17 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
 
               params
                 .setMandateData(
-                PaymentIntentCreateParams.MandateData
-                  .builder()
-                  .setCustomerAcceptance(
-                    PaymentIntentCreateParams.MandateData.CustomerAcceptance
-                      .builder()
-                      .setAcceptedAt((System.currentTimeMillis() / 1000).toInt)
-                      .setOnline(onlineParams.build())
-                      .build()
-                  )
-                  .build()
-              )
+                  PaymentIntentCreateParams.MandateData
+                    .builder()
+                    .setCustomerAcceptance(
+                      PaymentIntentCreateParams.MandateData.CustomerAcceptance
+                        .builder()
+                        .setAcceptedAt((System.currentTimeMillis() / 1000).toInt)
+                        .setOnline(onlineParams.build())
+                        .build()
+                    )
+                    .build()
+                )
 
             case _ =>
 
@@ -402,7 +401,6 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
 
           payInTransaction.ipAddress match {
             case Some(ipAddress) =>
-
               var onlineParams =
                 PaymentIntentCreateParams.MandateData.CustomerAcceptance.Online
                   .builder()
@@ -494,14 +492,14 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 returnUrl = Option(payment.getNextAction.getRedirectToUrl.getReturnUrl)
               )
             } else if (status == "requires_payment_method" || status == "requires_confirmation") {
-                transaction = transaction.copy(
-                  status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
-                  paymentClientSecret = Option(payment.getClientSecret),
-                  paymentClientReturnUrl = Option(
-                    s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=false&printReceipt=${payInTransaction.printReceipt
-                      .getOrElse(false)}&payment_intent=${payment.getId}"
-                  )
+              transaction = transaction.copy(
+                status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
+                paymentClientSecret = Option(payment.getClientSecret),
+                paymentClientReturnUrl = Option(
+                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=false&printReceipt=${payInTransaction.printReceipt
+                    .getOrElse(false)}&payment_intent=${payment.getId}"
                 )
+              )
             } else if (status == "succeeded" || status == "requires_capture") {
               transaction =
                 transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)

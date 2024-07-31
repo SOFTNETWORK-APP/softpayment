@@ -660,8 +660,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             payInTransactionId = result.transactionId
             assert(result.transactionStatus.isTransactionSucceeded)
           }*/
-        }
-        else if(status == StatusCodes.Accepted){
+        } else if (status == StatusCodes.Accepted) {
           val redirection = responseAs[PaymentRedirection].redirectUrl
           log.info(redirection)
 
@@ -698,8 +697,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
                 assert(result.transactionStatus.isTransactionSucceeded)
               }
           }
-        }
-        else{
+        } else {
           fail(s"Unexpected status -> $status")
         }
       }
