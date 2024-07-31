@@ -1538,7 +1538,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     recurringPaymentTransaction: RecurringPaymentTransaction
   ): Option[Transaction] = {
     RecurringCardPaymentRegistrations.get(
-      recurringPaymentTransaction.recurringPayInRegistrationId
+      recurringPaymentTransaction.recurringPaymentRegistrationId
     ) match {
       case Some(recurringPaymentRegistration) =>
         recurringPaymentTransaction.extension[Option[FirstRecurringPaymentTransaction]](
@@ -1547,7 +1547,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
           case Some(firstRecurringPaymentTransaction) =>
             import recurringPaymentTransaction._
             val recurringPayInCIT: RecurringPayInCIT = new RecurringPayInCIT
-            recurringPayInCIT.setRecurringPayInRegistrationId(recurringPayInRegistrationId)
+            recurringPayInCIT.setRecurringPayInRegistrationId(recurringPaymentRegistrationId)
             recurringPayInCIT.setIpAddress(firstRecurringPaymentTransaction.ipAddress.getOrElse(""))
             val debitedFunds = new Money
             debitedFunds.setAmount(debitedAmount)
@@ -1560,7 +1560,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             recurringPayInCIT.setTag(externalUuid)
             recurringPayInCIT.setStatementDescriptor(statementDescriptor)
             recurringPayInCIT.setSecureModeReturnURL(
-              s"${config.recurringPaymentReturnUrl}/$recurringPayInRegistrationId"
+              s"${config.recurringPaymentReturnUrl}/$recurringPaymentRegistrationId"
             )
 
             import recurringPaymentRegistration._
@@ -1595,7 +1595,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
 
             val previousState = recurringPaymentRegistration.currentState
             RecurringCardPaymentRegistrations = RecurringCardPaymentRegistrations.updated(
-              recurringPayInRegistrationId,
+              recurringPaymentRegistrationId,
               recurringPaymentRegistration.copy(
                 status = "pending",
                 currentState = RecurringCardPaymentState(
@@ -1624,13 +1624,13 @@ trait MockMangoPayProvider extends MangoPayProvider {
                   else None,
                 authorId = registration.getAuthorId,
                 creditedWalletId = Some(registration.getCreditedWalletId),
-                recurringPayInRegistrationId = Option(recurringPayInRegistrationId)
+                recurringPayInRegistrationId = Option(recurringPaymentRegistrationId)
               )
             )
           case _ =>
             import recurringPaymentTransaction._
             val recurringPayInMIT: RecurringPayInMIT = new RecurringPayInMIT
-            recurringPayInMIT.setRecurringPayInRegistrationId(recurringPayInRegistrationId)
+            recurringPayInMIT.setRecurringPayInRegistrationId(recurringPaymentRegistrationId)
             recurringPayInMIT.setStatementDescriptor(statementDescriptor)
             val debitedFunds = new Money
             debitedFunds.setAmount(debitedAmount)
@@ -1671,7 +1671,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
 
             val previousState = recurringPaymentRegistration.currentState
             RecurringCardPaymentRegistrations = RecurringCardPaymentRegistrations.updated(
-              recurringPayInRegistrationId,
+              recurringPaymentRegistrationId,
               recurringPaymentRegistration.copy(
                 status = "pending",
                 currentState = RecurringCardPaymentState(
@@ -1698,7 +1698,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
                 redirectUrl = None,
                 authorId = registration.getAuthorId,
                 creditedWalletId = Some(registration.getCreditedWalletId),
-                recurringPayInRegistrationId = Option(recurringPayInRegistrationId)
+                recurringPayInRegistrationId = Option(recurringPaymentRegistrationId)
               )
             )
         }

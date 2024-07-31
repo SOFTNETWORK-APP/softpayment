@@ -274,7 +274,7 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
           import payment._
           run(
-            PayInFirstRecurring(
+            ExecuteFirstRecurringPayment(
               recurringPaymentRegistrationId,
               externalUuidWithProfile(principal._2),
               if (browserInfo.isDefined) Some(ipAddress) else None,

@@ -253,7 +253,7 @@ message CardPreRegistration{
 
 message RecurringPaymentTransaction{
     option (scalapb.message).extends = "ProtobufDomainObject";
-    required string recurringPayInRegistrationId = 1;
+    required string recurringPaymentRegistrationId = 1;
     required string statementDescriptor = 2;
     required int32 debitedAmount = 3;
     required int32 feesAmount = 4;

@@ -1263,7 +1263,7 @@ class PaymentHandlerSpec
 
     "execute first recurring card payment" in {
       !?(
-        PayInFirstRecurring(
+        ExecuteFirstRecurringPayment(
           recurringPaymentRegistrationId,
           computeExternalUuidWithProfile(customerUuid, Some("customer"))
         )

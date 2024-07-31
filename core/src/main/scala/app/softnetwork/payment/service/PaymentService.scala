@@ -275,7 +275,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                     } ~ pathPrefix(recurringPaymentRoute) {
                       pathPrefix(Segment) { recurringPaymentRegistrationId =>
                         run(
-                          PayInFirstRecurring(
+                          ExecuteFirstRecurringPayment(
                             recurringPaymentRegistrationId,
                             externalUuidWithProfile(session),
                             if (browserInfo.isDefined) Some(ipAddress) else None,

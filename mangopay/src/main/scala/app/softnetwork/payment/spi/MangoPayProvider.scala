@@ -2472,7 +2472,7 @@ trait MangoPayProvider extends PaymentProvider {
       case Some(firstRecurringPaymentTransaction) =>
         import recurringPaymentTransaction._
         val recurringPayInCIT: RecurringPayInCIT = new RecurringPayInCIT
-        recurringPayInCIT.setRecurringPayInRegistrationId(recurringPayInRegistrationId)
+        recurringPayInCIT.setRecurringPayInRegistrationId(recurringPaymentRegistrationId)
         firstRecurringPaymentTransaction.ipAddress match {
           case Some(ipAddress) => recurringPayInCIT.setIpAddress(ipAddress)
           case _               =>
@@ -2504,7 +2504,7 @@ trait MangoPayProvider extends PaymentProvider {
         recurringPayInCIT.setTag(externalUuid)
         recurringPayInCIT.setStatementDescriptor(statementDescriptor)
         recurringPayInCIT.setSecureModeReturnURL(
-          s"${config.recurringPaymentReturnUrl}/$recurringPayInRegistrationId"
+          s"${config.recurringPaymentReturnUrl}/$recurringPaymentRegistrationId"
         )
         Try(
           MangoPay().getPayInApi.createRecurringPayInCIT(generateUUID(), recurringPayInCIT)
@@ -2536,7 +2536,7 @@ trait MangoPayProvider extends PaymentProvider {
                 ),
                 authorId = result.getAuthorId,
                 creditedWalletId = Option(result.getCreditedWalletId),
-                recurringPayInRegistrationId = Option(recurringPayInRegistrationId)
+                recurringPayInRegistrationId = Option(recurringPaymentRegistrationId)
               )
             )
           case Failure(f) =>
@@ -2546,7 +2546,7 @@ trait MangoPayProvider extends PaymentProvider {
       case _ =>
         import recurringPaymentTransaction._
         val recurringPayInMIT: RecurringPayInMIT = new RecurringPayInMIT
-        recurringPayInMIT.setRecurringPayInRegistrationId(recurringPayInRegistrationId)
+        recurringPayInMIT.setRecurringPayInRegistrationId(recurringPaymentRegistrationId)
         recurringPayInMIT.setStatementDescriptor(statementDescriptor)
         val debitedFunds = new Money
         debitedFunds.setAmount(debitedAmount)
@@ -2582,7 +2582,7 @@ trait MangoPayProvider extends PaymentProvider {
                 resultMessage = Option(result.getResultMessage).getOrElse(""),
                 authorId = result.getAuthorId,
                 creditedWalletId = Option(result.getCreditedWalletId),
-                recurringPayInRegistrationId = Option(recurringPayInRegistrationId)
+                recurringPayInRegistrationId = Option(recurringPaymentRegistrationId)
               )
             )
           case Failure(f) =>
