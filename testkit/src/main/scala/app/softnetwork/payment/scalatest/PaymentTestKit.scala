@@ -4,7 +4,7 @@ import akka.actor.typed.ActorSystem
 import app.softnetwork.account.config.AccountSettings
 import app.softnetwork.notification.scalatest.AllNotificationsTestKit
 import app.softnetwork.payment.api._
-import app.softnetwork.payment.config.PaymentSettings._
+import app.softnetwork.payment.config.PaymentSettings.PaymentConfig._
 import app.softnetwork.payment.handlers.{
   MockPaymentHandler,
   MockSoftPayAccountDao,
@@ -42,13 +42,13 @@ trait PaymentTestKit
     extends SchedulerTestKit
     with AllNotificationsTestKit
     with PaymentGuardian
-    with SoftPayClientTestKit {
+    with PaymentProviderTestKit {
   _: Suite =>
 
   /** @return
     *   roles associated with this node
     */
-  override def roles: Seq[String] = super.roles :+ AkkaNodeRole :+ AccountSettings.AkkaNodeRole
+  override def roles: Seq[String] = super.roles :+ akkaNodeRole :+ AccountSettings.AkkaNodeRole
 
   override def paymentBehavior: ActorSystem[_] => PaymentBehavior = _ => MockPaymentBehavior
 
@@ -67,7 +67,7 @@ trait PaymentTestKit
   override lazy val config: Config = akkaConfig
     .withFallback(ConfigFactory.load("softnetwork-in-memory-persistence.conf"))
     .withFallback(
-      ConfigFactory.parseString(softPayClientSettings)
+      ConfigFactory.parseString(providerSettings)
     )
     .withFallback(ConfigFactory.load())
 
@@ -94,7 +94,7 @@ trait PaymentTestKit
       override implicit def system: ActorSystem[_] = sys
     }
 
-  def payInFor3DS(
+  def payInCallback(
     orderUuid: String,
     transactionId: String,
     registerCard: Boolean,
@@ -102,7 +102,7 @@ trait PaymentTestKit
   )(implicit
     ec: ExecutionContext
   ): Future[Either[PayInFailed, Either[PaymentRedirection, PaidIn]]] = {
-    MockPaymentHandler !? PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt) map {
+    MockPaymentHandler !? PayInCallback(orderUuid, transactionId, registerCard, printReceipt) map {
       case result: PaymentRedirection => Right(Left(result))
       case result: PaidIn             => Right(Right(result))
       case error: PayInFailed         => Left(error)
@@ -111,7 +111,7 @@ trait PaymentTestKit
     }
   }
 
-  def preAuthorizeCardFor3DS(
+  def preAuthorizeCardCallback(
     orderUuid: String,
     preAuthorizationId: String,
     registerCard: Boolean = true,
@@ -119,7 +119,7 @@ trait PaymentTestKit
   )(implicit
     ec: ExecutionContext
   ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
-    MockPaymentHandler !? PreAuthorizeCardFor3DS(
+    MockPaymentHandler !? PreAuthorizeCardCallback(
       orderUuid,
       preAuthorizationId,
       registerCard,
@@ -132,13 +132,13 @@ trait PaymentTestKit
     }
   }
 
-  def payInFirstRecurringFor3DS(
+  def payInFirstRecurringPaymentCallback(
     recurringPayInRegistrationId: String,
     transactionId: String
   )(implicit ec: ExecutionContext): Future[
     Either[FirstRecurringCardPaymentFailed, Either[PaymentRedirection, FirstRecurringPaidIn]]
   ] = {
-    MockPaymentHandler !? PayInFirstRecurringFor3DS(
+    MockPaymentHandler !? FirstRecurringPaymentCallback(
       recurringPayInRegistrationId,
       transactionId
     ) map {

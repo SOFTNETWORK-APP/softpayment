@@ -20,7 +20,7 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val createMandate: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
-      .in(PaymentSettings.MandateRoute)
+      .in(PaymentSettings.PaymentConfig.mandateRoute)
       .out(
         oneOf[PaymentResult](
           oneOfVariant[MandateCreated.type](
@@ -51,7 +51,7 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val cancelMandate: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.delete
-      .in(PaymentSettings.MandateRoute)
+      .in(PaymentSettings.PaymentConfig.mandateRoute)
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[MandateCanceled.type].description("Mandate canceled"))
@@ -72,7 +72,7 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val updateMandateStatus: ServerEndpoint[Any with AkkaStreams, Future] =
     rootEndpoint
-      .in(PaymentSettings.MandateRoute)
+      .in(PaymentSettings.PaymentConfig.mandateRoute)
       .get
       .in(query[String]("MandateId").description("Mandate Id"))
       .out(

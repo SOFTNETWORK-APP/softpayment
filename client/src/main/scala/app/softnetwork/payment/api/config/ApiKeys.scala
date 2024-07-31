@@ -5,9 +5,8 @@ import java.nio.file.Paths
 object ApiKeys {
 
   private[this] lazy val filePath: String = {
-    val config = SoftPayClientSettings.SOFT_PAY_HOME + "/config"
-    Paths.get(config).toFile.mkdirs()
-    config + "/apiKeys.conf"
+    Paths.get(SoftPayClientSettings.SP_CONFIG).toFile.mkdirs()
+    SoftPayClientSettings.SP_CONFIG + "/apiKeys.conf"
   }
 
   private[this] def write(apiKeys: Map[String, String]): Unit = {

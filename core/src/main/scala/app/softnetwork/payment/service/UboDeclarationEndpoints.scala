@@ -7,7 +7,7 @@ import app.softnetwork.payment.model.{UboDeclaration, UboDeclarationView}
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
-import sttp.model.StatusCode
+import sttp.model.{HeaderNames, StatusCode}
 import sttp.tapir.json.json4s.jsonBody
 import sttp.tapir.server.ServerEndpoint
 
@@ -20,7 +20,7 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val addUboDeclaration: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
-      .in(PaymentSettings.DeclarationRoute)
+      .in(PaymentSettings.PaymentConfig.declarationRoute)
       .in(
         jsonBody[UboDeclaration.UltimateBeneficialOwner]
           .description("The UBO to declare for the authenticated legal payment account")
@@ -42,7 +42,7 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val loadUboDeclaration: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
-      .in(PaymentSettings.DeclarationRoute)
+      .in(PaymentSettings.PaymentConfig.declarationRoute)
       .out(
         statusCode(StatusCode.Ok)
           .and(
@@ -61,7 +61,9 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val validateUboDeclaration: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.put
-      .in(PaymentSettings.DeclarationRoute)
+      .in(clientIp)
+      .in(header[Option[String]](HeaderNames.UserAgent))
+      .in(PaymentSettings.PaymentConfig.declarationRoute)
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[UboDeclarationAskedForValidation.type].description(
@@ -69,13 +71,13 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           )
         )
       )
-      .serverLogic(principal =>
-        _ =>
-          run(ValidateUboDeclaration(externalUuidWithProfile(principal._2))).map {
+      .serverLogic(principal => { case (ipAddress, userAgent) =>
+        run(ValidateUboDeclaration(externalUuidWithProfile(principal._2), ipAddress, userAgent))
+          .map {
             case UboDeclarationAskedForValidation => Right(UboDeclarationAskedForValidation)
             case other                            => Left(error(other))
           }
-      )
+      })
       .description("Validate the Ubo declaration of the authenticated legal payment account")
 
   val uboDeclarationEndpoints

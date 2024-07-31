@@ -97,7 +97,7 @@ trait SoftPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends SoftPa
       override implicit def companion: SessionDataCompanion[SD] = self.companion
       override val applicationVersion: String = systemVersion()
       override val swaggerUIOptions: SwaggerUIOptions =
-        SwaggerUIOptions.default.pathPrefix(List("swagger", PaymentSettings.PaymentPath))
+        SwaggerUIOptions.default.pathPrefix(List("swagger", PaymentSettings.PaymentConfig.path))
     }
 
   def accountSwagger: ActorSystem[_] => SwaggerEndpoint = sys =>

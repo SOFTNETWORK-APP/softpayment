@@ -32,9 +32,9 @@ trait PaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   /** should be implemented by each payment provider
     */
-  def hooks: List[Full[Unit, Unit, (String, String), Unit, Unit, Any, Future]] = {
+  def hooks: List[Full[Unit, Unit, _, Unit, Unit, Any, Future]] = {
     PaymentProviders.hooksEndpoints.map { case (k, v) =>
-      v.hooks(rootEndpoint.in(PaymentSettings.HooksRoute).in(k))
+      v.hooks(rootEndpoint.in(PaymentSettings.PaymentConfig.hooksRoute).in(k))
     }.toList
   }
 

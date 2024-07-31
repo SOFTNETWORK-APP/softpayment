@@ -4,11 +4,12 @@ import akka.actor.typed.ActorSystem
 import app.softnetwork.api.server.GrpcService
 import app.softnetwork.api.server.scalatest.ServerTestKit
 import app.softnetwork.payment.launch.PaymentGuardian
+import app.softnetwork.persistence.scalatest.PersistenceTestKit
 import app.softnetwork.scheduler.api.SchedulerGrpcServicesTestKit
 import app.softnetwork.scheduler.launch.SchedulerGuardian
 
-trait PaymentGrpcServicesTestKit extends SchedulerGrpcServicesTestKit with SoftPayClientTestKit {
-  _: PaymentGuardian with SchedulerGuardian with ServerTestKit =>
+trait PaymentGrpcServicesTestKit extends SchedulerGrpcServicesTestKit with PaymentProviderTestKit {
+  _: PaymentGuardian with SchedulerGuardian with ServerTestKit with PersistenceTestKit =>
 
   override def grpcServices: ActorSystem[_] => Seq[GrpcService] = system =>
     paymentGrpcServices(system) ++ schedulerGrpcServices(system)
@@ -28,5 +29,6 @@ trait PaymentGrpcServicesTestKit extends SchedulerGrpcServicesTestKit with SoftP
                               |    port = $port
                               |    use-tls = false
                               |}
-                              |""".stripMargin + softPayClientSettings
+                              |payment.baseUrl = "http://$interface:$port/api"
+                              |""".stripMargin + providerSettings
 }

@@ -54,6 +54,8 @@ message BankAccount {
     optional string mandateId = 12;
     optional MandateStatus mandateStatus = 13;
     optional MandateScheme mandateScheme = 14 [default = MANDATE_SEPA];
+    optional string countryCode = 15;
+    optional string currency = 16;
 }
 
 message NaturalUser {
@@ -76,6 +78,10 @@ message NaturalUser {
     optional string profile = 10;
     optional NaturalUserType naturalUserType = 11;
 //    optional string secondaryWalletId = 12;
+    optional Address address = 13;
+    optional string phone = 14;
+    optional Business business = 15;
+    optional string title = 16;
 }
 
 message LegalUser {
@@ -94,6 +100,9 @@ message LegalUser {
     required Address headQuartersAddress = 6;
     optional UboDeclaration uboDeclaration = 7;
     optional google.protobuf.Timestamp lastAcceptedTermsOfPSP = 8 [(scalapb.field).type = "java.util.Date"];
+    optional string vatNumber = 9;
+    optional string phone = 10;
+    optional Business business = 11;
 }
 
 /**
@@ -123,6 +132,18 @@ message PaymentAccount {
     repeated Transaction transactions = 10;
     repeated RecurringPayment recurryingPayments = 11;
     optional string clientId = 12;
+}
+
+message Business {
+    required string merchantCategoryCode = 1;
+    required string website = 2;
+    optional BusinessSupport support = 3;
+}
+
+message BusinessSupport {
+    required string email = 1;
+    optional string phone = 2;
+    optional string url = 3;
 }
 
 message MandateResult{

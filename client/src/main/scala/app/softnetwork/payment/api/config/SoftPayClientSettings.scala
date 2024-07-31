@@ -18,7 +18,7 @@ case class SoftPayClientSettings(clientId: String, apiKey: String) {
   }
 
   private[payment] def select(): Unit = {
-    val config = SoftPayClientSettings.SOFT_PAY_HOME + "/config"
+    val config = SoftPayClientSettings.SP_ROOT + "/config"
     Paths.get(config).toFile.mkdirs()
     val application = Paths.get(config + "/application.conf").toFile
     application.createNewFile()
@@ -34,14 +34,18 @@ case class SoftPayClientSettings(clientId: String, apiKey: String) {
 }
 
 object SoftPayClientSettings {
-  lazy val SOFT_PAY_HOME: String =
+  lazy val SP_ROOT: String =
     sys.env.getOrElse(
-      "SOFT_PAY_HOME",
+      "SP_ROOT",
       Option(System.getProperty("user.home") + "/soft-pay").getOrElse(".")
     )
 
+  lazy val SP_CONFIG: String = sys.env.getOrElse("SP_CONFIG", SP_ROOT + "/config")
+
+  lazy val SP_SECRETS: String = sys.env.getOrElse("SP_SECRETS", SP_ROOT + "/secrets")
+
   def apply(system: ActorSystem[_]): SoftPayClientSettings = {
-    val clientConfigFile: Path = Paths.get(s"$SOFT_PAY_HOME/config/application.conf")
+    val clientConfigFile: Path = Paths.get(s"$SP_ROOT/config/application.conf")
     val systemConfig = system.settings.config.getConfig("payment")
     val clientConfig: Config = {
       if (

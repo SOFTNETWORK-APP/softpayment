@@ -1,8 +1,9 @@
 package app.softnetwork.payment.spi
 
 import akka.actor.typed.ActorSystem
-import app.softnetwork.payment.config.MangoPay
-import app.softnetwork.payment.config.MangoPaySettings.MangoPayConfig._
+import app.softnetwork.payment.annotation.InternalApi
+import app.softnetwork.payment.config.MangoPay.MangoPayConfig
+import app.softnetwork.payment.config.{MangoPaySettings, Payment, ProviderConfig}
 import app.softnetwork.payment.handlers.MockPaymentHandler
 import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model.RecurringPayment.RecurringCardPaymentState
@@ -28,6 +29,7 @@ import com.mangopay.entities.{
   UboDeclaration => _,
   _
 }
+import com.typesafe.config.Config
 import org.json4s.Formats
 
 import java.text.SimpleDateFormat
@@ -53,7 +55,13 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   provider user id
     */
-  override def createOrUpdateNaturalUser(maybeNaturalUser: Option[NaturalUser]): Option[String] =
+  @InternalApi
+  private[spi] override def createOrUpdateNaturalUser(
+    maybeNaturalUser: Option[NaturalUser],
+    acceptedTermsOfPSP: Boolean,
+    ipAddress: Option[String],
+    userAgent: Option[String]
+  ): Option[String] =
     maybeNaturalUser match {
       case Some(naturalUser) =>
         import naturalUser._
@@ -101,7 +109,13 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   provider user id
     */
-  override def createOrUpdateLegalUser(maybeLegalUser: Option[LegalUser]): Option[String] = {
+  @InternalApi
+  private[spi] override def createOrUpdateLegalUser(
+    maybeLegalUser: Option[LegalUser],
+    acceptedTermsOfPSP: Boolean,
+    ipAddress: Option[String],
+    userAgent: Option[String]
+  ): Option[String] = {
     maybeLegalUser match {
       case Some(legalUser) =>
         import legalUser._
@@ -427,7 +441,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   pay in transaction
     */
-  override def loadPayIn(
+  override def loadPayInTransaction(
     orderUuid: String,
     transactionId: String,
     recurringPayInRegistrationId: Option[String]
@@ -538,7 +552,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   Refund transaction
     */
-  override def loadRefund(orderUuid: String, transactionId: String): Option[Transaction] = None
+  override def loadRefundTransaction(
+    orderUuid: String,
+    transactionId: String
+  ): Option[Transaction] = None
 
   /** @param orderUuid
     *   - order unique id
@@ -547,7 +564,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   pay out transaction
     */
-  override def loadPayOut(orderUuid: String, transactionId: String): Option[Transaction] = None
+  override def loadPayOutTransaction(
+    orderUuid: String,
+    transactionId: String
+  ): Option[Transaction] = None
 
   /** @param transactionId
     *   - transaction id
@@ -628,28 +648,13 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   the first active bank account
     */
-  override def getActiveBankAccount(userId: String): Option[String] =
+  override def getActiveBankAccount(userId: String, currency: String): Option[String] =
     BankAccounts.values.filter(bankAccount =>
       bankAccount.getUserId == userId && bankAccount.isActive
     ) match {
       case bas if bas.nonEmpty =>
         Some(bas.toList.sortWith(_.getCreationDate > _.getCreationDate).head.getId)
       case _ => None
-    }
-
-  /** @param userId
-    *   - provider user id
-    * @param bankAccountId
-    *   - bank account id
-    * @return
-    *   whether this bank account exists and is active
-    */
-  override def checkBankAccount(userId: String, bankAccountId: String): Boolean =
-    BankAccounts.values.find(bankAccount =>
-      bankAccount.getUserId == userId && bankAccount.getId == bankAccountId
-    ) match {
-      case Some(ba) => ba.isActive
-      case _        => false
     }
 
   /** @param preAuthorizationTransaction
@@ -675,7 +680,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     cardPreAuthorization.setExecutionType(PreAuthorizationExecutionType.DIRECT)
     cardPreAuthorization.setSecureMode(SecureMode.DEFAULT)
     cardPreAuthorization.setSecureModeReturnUrl(
-      s"$preAuthorizeCardFor3DS/$orderUuid?registerCard=${registerCard
+      s"${config.preAuthorizeCardReturnUrl}/$orderUuid?registerCard=${registerCard
         .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
     )
 
@@ -756,53 +761,57 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   pay in with card pre authorized transaction result
     */
-  override def payInWithCardPreAuthorized(
-    payInWithCardPreAuthorizedTransaction: PayInWithCardPreAuthorizedTransaction,
+  private[spi] override def payInWithCardPreAuthorized(
+    payInWithCardPreAuthorizedTransaction: Option[PayInWithCardPreAuthorizedTransaction],
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
-    import payInWithCardPreAuthorizedTransaction._
-    val payIn = new PayIn()
-    payIn.setTag(orderUuid)
-    payIn.setCreditedWalletId(creditedWalletId)
-    payIn.setAuthorId(authorId)
-    payIn.setDebitedFunds(new Money)
-    payIn.getDebitedFunds.setAmount(debitedAmount)
-    payIn.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
-    payIn.setExecutionType(PayInExecutionType.DIRECT)
-    payIn.setFees(new Money)
-    payIn.getFees.setAmount(0) // fees are only set during transfer or payOut
-    payIn.getFees.setCurrency(CurrencyIso.valueOf(currency))
-    payIn.setPaymentType(PayInPaymentType.PREAUTHORIZED)
-    val paymentDetails = new PayInPaymentDetailsPreAuthorized
-    paymentDetails.setPreauthorizationId(cardPreAuthorizedTransactionId)
-    payIn.setPaymentDetails(paymentDetails)
+    payInWithCardPreAuthorizedTransaction match {
+      case Some(payInWithCardPreAuthorizedTransaction) =>
+        import payInWithCardPreAuthorizedTransaction._
+        val payIn = new PayIn()
+        payIn.setTag(orderUuid)
+        payIn.setCreditedWalletId(creditedWalletId)
+        payIn.setAuthorId(authorId)
+        payIn.setDebitedFunds(new Money)
+        payIn.getDebitedFunds.setAmount(debitedAmount)
+        payIn.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
+        payIn.setExecutionType(PayInExecutionType.DIRECT)
+        payIn.setFees(new Money)
+        payIn.getFees.setAmount(0) // fees are only set during transfer or payOut
+        payIn.getFees.setCurrency(CurrencyIso.valueOf(currency))
+        payIn.setPaymentType(PayInPaymentType.PREAUTHORIZED)
+        val paymentDetails = new PayInPaymentDetailsPreAuthorized
+        paymentDetails.setPreauthorizationId(cardPreAuthorizedTransactionId)
+        payIn.setPaymentDetails(paymentDetails)
 
-    payIn.setId(generateUUID())
-    payIn.setStatus(MangoPayTransactionStatus.SUCCEEDED)
-    payIn.setResultCode(OK)
-    payIn.setResultMessage(SUCCEEDED)
-    PayIns = PayIns.updated(payIn.getId, payIn)
-    Some(
-      Transaction()
-        .copy(
-          id = payIn.getId,
-          orderUuid = orderUuid,
-          nature = Transaction.TransactionNature.REGULAR,
-          `type` = Transaction.TransactionType.PAYIN,
-          status = payIn.getStatus,
-          amount = debitedAmount,
-          cardId = None,
-          fees = 0,
-          resultCode = Option(payIn.getResultCode).getOrElse(""),
-          resultMessage = Option(payIn.getResultMessage).getOrElse(""),
-          redirectUrl = None,
-          authorId = payIn.getAuthorId,
-          creditedWalletId = Option(payIn.getCreditedWalletId)
+        payIn.setId(generateUUID())
+        payIn.setStatus(MangoPayTransactionStatus.SUCCEEDED)
+        payIn.setResultCode(OK)
+        payIn.setResultMessage(SUCCEEDED)
+        PayIns = PayIns.updated(payIn.getId, payIn)
+        Some(
+          Transaction()
+            .copy(
+              id = payIn.getId,
+              orderUuid = orderUuid,
+              nature = Transaction.TransactionNature.REGULAR,
+              `type` = Transaction.TransactionType.PAYIN,
+              status = payIn.getStatus,
+              amount = debitedAmount,
+              cardId = None,
+              fees = 0,
+              resultCode = Option(payIn.getResultCode).getOrElse(""),
+              resultMessage = Option(payIn.getResultMessage).getOrElse(""),
+              redirectUrl = None,
+              authorId = payIn.getAuthorId,
+              creditedWalletId = Option(payIn.getCreditedWalletId)
+            )
+            .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
+            .withPreAuthorizationId(cardPreAuthorizedTransactionId)
+            .withPreAuthorizationDebitedAmount(preAuthorizationDebitedAmount)
         )
-        .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
-        .withPreAuthorizationId(cardPreAuthorizedTransactionId)
-        .withPreAuthorizationDebitedAmount(preAuthorizationDebitedAmount)
-    )
+      case _ => None
+    }
   }
 
   /** @param orderUuid
@@ -852,8 +861,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   pay in transaction result
     */
-  override def payIn(
-    maybePayInTransaction: Option[PayInTransaction],
+  private[spi] override def payInWithCard(
+    maybePayInTransaction: Option[PayInWithCardTransaction],
     idempotency: Option[Boolean] = None
   ): Option[Transaction] =
     maybePayInTransaction match {
@@ -881,7 +890,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
         // Secured Mode is activated from €100.
         executionDetails.setSecureMode(SecureMode.DEFAULT)
         executionDetails.setSecureModeReturnUrl(
-          s"$payInFor3DS/$orderUuid?registerCard=${registerCard
+          s"${config.payInReturnUrl}/$orderUuid?registerCard=${registerCard
             .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
         )
         payIn.setExecutionDetails(executionDetails)
@@ -923,65 +932,69 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   pay in with PayPal transaction result
     */
-  override def payInWithPayPal(
-    payInWithPayPalTransaction: PayInWithPayPalTransaction,
+  private[spi] override def payInWithPayPal(
+    payInWithPayPalTransaction: Option[PayInWithPayPalTransaction],
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
-    import payInWithPayPalTransaction._
-    val payIn = new PayIn()
-    payIn.setTag(orderUuid)
-    payIn.setCreditedWalletId(creditedWalletId)
-    payIn.setAuthorId(authorId)
-    payIn.setDebitedFunds(new Money)
-    payIn.getDebitedFunds.setAmount(debitedAmount)
-    payIn.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
-    payIn.setFees(new Money)
-    payIn.getFees.setAmount(0) // fees are only set during transfer or payOut
-    payIn.getFees.setCurrency(CurrencyIso.valueOf(currency))
-    payIn.setPaymentType(PayInPaymentType.PAYPAL)
-    val executionDetails = new PayInExecutionDetailsWeb()
-    executionDetails.setCulture(language)
-    executionDetails.setReturnUrl(
-      s"$payPalReturnUrl/$orderUuid?printReceipt=${printReceipt.getOrElse(false)}"
-    )
-    payIn.setExecutionDetails(executionDetails)
-    payIn.setExecutionType(PayInExecutionType.WEB)
+    payInWithPayPalTransaction match {
+      case Some(payInWithPayPalTransaction) =>
+        import payInWithPayPalTransaction._
+        val payIn = new PayIn()
+        payIn.setTag(orderUuid)
+        payIn.setCreditedWalletId(creditedWalletId)
+        payIn.setAuthorId(authorId)
+        payIn.setDebitedFunds(new Money)
+        payIn.getDebitedFunds.setAmount(debitedAmount)
+        payIn.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
+        payIn.setFees(new Money)
+        payIn.getFees.setAmount(0) // fees are only set during transfer or payOut
+        payIn.getFees.setCurrency(CurrencyIso.valueOf(currency))
+        payIn.setPaymentType(PayInPaymentType.PAYPAL)
+        val executionDetails = new PayInExecutionDetailsWeb()
+        executionDetails.setCulture(language)
+        executionDetails.setReturnUrl(
+          s"${config.payInReturnUrl}/$orderUuid?printReceipt=${printReceipt.getOrElse(false)}"
+        )
+        payIn.setExecutionDetails(executionDetails)
+        payIn.setExecutionType(PayInExecutionType.WEB)
 
-    payIn.setId(generateUUID())
-    payIn.setStatus(MangoPayTransactionStatus.CREATED)
-    payIn.setResultCode(OK)
-    payIn.setResultMessage(CREATED)
-    executionDetails.setRedirectUrl(
-      s"${executionDetails.getReturnUrl}&transactionId=${payIn.getId}"
-    )
-    PayIns = PayIns.updated(payIn.getId, payIn)
+        payIn.setId(generateUUID())
+        payIn.setStatus(MangoPayTransactionStatus.CREATED)
+        payIn.setResultCode(OK)
+        payIn.setResultMessage(CREATED)
+        executionDetails.setRedirectUrl(
+          s"${executionDetails.getReturnUrl}&transactionId=${payIn.getId}"
+        )
+        PayIns = PayIns.updated(payIn.getId, payIn)
 
-    Some(
-      Transaction().copy(
-        id = payIn.getId,
-        orderUuid = orderUuid,
-        nature = Transaction.TransactionNature.REGULAR,
-        `type` = Transaction.TransactionType.PAYIN,
-        status = payIn.getStatus,
-        amount = debitedAmount,
-        fees = 0,
-        resultCode = Option(payIn.getResultCode).getOrElse(""),
-        resultMessage = Option(payIn.getResultMessage).getOrElse(""),
-        redirectUrl = Option(
-          payIn.getExecutionDetails
-            .asInstanceOf[PayInExecutionDetailsWeb]
-            .getRedirectUrl
-        ),
-        returnUrl = Option(
-          payIn.getExecutionDetails
-            .asInstanceOf[PayInExecutionDetailsWeb]
-            .getReturnUrl
-        ),
-        authorId = payIn.getAuthorId,
-        creditedWalletId = Option(payIn.getCreditedWalletId),
-        paymentType = Transaction.PaymentType.PAYPAL
-      )
-    )
+        Some(
+          Transaction().copy(
+            id = payIn.getId,
+            orderUuid = orderUuid,
+            nature = Transaction.TransactionNature.REGULAR,
+            `type` = Transaction.TransactionType.PAYIN,
+            status = payIn.getStatus,
+            amount = debitedAmount,
+            fees = 0,
+            resultCode = Option(payIn.getResultCode).getOrElse(""),
+            resultMessage = Option(payIn.getResultMessage).getOrElse(""),
+            redirectUrl = Option(
+              payIn.getExecutionDetails
+                .asInstanceOf[PayInExecutionDetailsWeb]
+                .getRedirectUrl
+            ),
+            returnUrl = Option(
+              payIn.getExecutionDetails
+                .asInstanceOf[PayInExecutionDetailsWeb]
+                .getReturnUrl
+            ),
+            authorId = payIn.getAuthorId,
+            creditedWalletId = Option(payIn.getCreditedWalletId),
+            paymentType = Transaction.PaymentType.PAYPAL
+          )
+        )
+      case None => None
+    }
   }
 
   /** @param maybeUserId
@@ -1055,7 +1068,11 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   document validation report
     */
-  override def loadDocumentStatus(userId: String, documentId: String): KycDocumentValidationReport =
+  override def loadDocumentStatus(
+    userId: String,
+    documentId: String,
+    documentType: KycDocument.KycDocumentType
+  ): KycDocumentValidationReport =
     Documents.getOrElse(
       documentId,
       KycDocumentValidationReport.defaultInstance
@@ -1087,7 +1104,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     mandate.setExecutionType(MandateExecutionType.WEB)
     mandate.setMandateType(MandateType.DIRECT_DEBIT)
     mandate.setReturnUrl(
-      s"$mandateReturnUrl?externalUuid=$externalUuid&idempotencyKey=${idempotencyKey.getOrElse("")}"
+      s"${config.mandateReturnUrl}?externalUuid=$externalUuid&idempotencyKey=${idempotencyKey.getOrElse("")}"
     )
     mandate.setScheme(MandateScheme.SEPA)
     mandate.setStatus(MandateStatus.SUBMITTED)
@@ -1221,7 +1238,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @return
     *   transaction if it exists
     */
-  override def directDebitTransaction(
+  override def loadDirectDebitTransaction(
     walletId: String,
     transactionId: String,
     transactionDate: Date
@@ -1331,7 +1348,9 @@ trait MockMangoPayProvider extends MangoPayProvider {
     */
   override def validateDeclaration(
     userId: String,
-    uboDeclarationId: String
+    uboDeclarationId: String,
+    ipAddress: String,
+    userAgent: String
   ): Option[UboDeclaration] = {
     UboDeclarations.get(uboDeclarationId) match {
       case Some(uboDeclaration) =>
@@ -1541,7 +1560,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
             recurringPayInCIT.setTag(externalUuid)
             recurringPayInCIT.setStatementDescriptor(statementDescriptor)
             recurringPayInCIT.setSecureModeReturnURL(
-              s"$recurringPaymentFor3DS/$recurringPayInRegistrationId"
+              s"${config.recurringPaymentReturnUrl}/$recurringPayInRegistrationId"
             )
 
             import recurringPaymentRegistration._
@@ -1730,17 +1749,46 @@ case class RecurringCardPaymentRegistration(
   registration: CreateRecurringPayment
 )
 
+case class MockMangoPayConfig(config: MangoPayConfig)
+    extends ProviderConfig(
+      config.clientId,
+      config.apiKey,
+      config.baseUrl,
+      config.version,
+      config.debug,
+      config.secureModePath,
+      config.hooksPath,
+      config.mandatePath,
+      config.paypalPath
+    )
+    with MangoPayConfig {
+  override def `type`: Provider.ProviderType = Provider.ProviderType.MOCK
+  override val technicalErrors: Set[String] = config.technicalErrors
+
+  override def paymentConfig: Payment.Config = config.paymentConfig
+
+  override def withPaymentConfig(paymentConfig: Payment.Config): MangoPayConfig =
+    this.copy(config = config.withPaymentConfig(paymentConfig))
+}
+
 class MockMangoPayProviderFactory extends PaymentProviderSpi {
+  @volatile private[this] var _config: Option[MangoPayConfig] = None
+
   override val providerType: Provider.ProviderType =
     Provider.ProviderType.MOCK
 
   override def paymentProvider(p: Client.Provider): MockMangoPayProvider =
     new MockMangoPayProvider {
       override implicit def provider: Provider = p
+      override implicit def config: MangoPayConfig =
+        _config.getOrElse(MockMangoPayConfig(MangoPaySettings.MangoPayConfig))
     }
 
-  override def softPaymentProvider: Provider =
-    MangoPay.softPayProvider.withProviderType(providerType)
+  override def softPaymentProvider(config: Config): Provider = {
+    val mangoPayConfig = MockMangoPayConfig(MangoPaySettings(config).MangoPayConfig)
+    _config = Some(mangoPayConfig)
+    mangoPayConfig.softPayProvider.withProviderType(providerType)
+  }
 
   override def hooksDirectives(implicit
     _system: ActorSystem[_],

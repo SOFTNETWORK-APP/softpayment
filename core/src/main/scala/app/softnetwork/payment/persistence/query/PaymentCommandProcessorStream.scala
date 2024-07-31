@@ -14,7 +14,7 @@ import scala.concurrent.Future
 trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWithCommand] {
   _: JournalProvider with OffsetProvider with PaymentHandler =>
 
-  override lazy val tag: String = PaymentSettings.ExternalToPaymentAccountTag
+  override lazy val tag: String = PaymentSettings.PaymentConfig.externalToPaymentAccountTag
 
   /** @return
     *   whether or not the events processed by this processor stream would be published to the main

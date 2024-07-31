@@ -26,6 +26,8 @@ service PaymentServiceApi {
     rpc CancelMandate (CancelMandateRequest) returns (CancelMandateResponse) {}
     rpc LoadBankAccountOwner (LoadBankAccountOwnerRequest) returns (LoadBankAccountOwnerResponse) {}
     rpc LoadLegalUser(LoadLegalUserRequest) returns (LoadLegalUserResponse) {}
+    rpc LoadPayInTransaction(LoadPayInTransactionRequest) returns (TransactionResponse) {}
+    rpc LoadPayOutTransaction (LoadPayOutTransactionRequest) returns (TransactionResponse) {}
 }
 
 message CreateOrUpdatePaymentAccountRequest {
@@ -49,6 +51,7 @@ enum TransactionStatus{
     TRANSACTION_FAILED = 2;
     TRANSACTION_NOT_SPECIFIED = 4;
     TRANSACTION_FAILED_FOR_TECHNICAL_REASON = 5;
+    TRANSACTION_CANCELED = 6;
 }
 
 message TransactionResponse {
@@ -85,6 +88,7 @@ message PayOutRequest {
     string currency = 5;
     google.protobuf.StringValue externalReference = 6;
     string clientId = 7;
+    google.protobuf.StringValue payInTransactionId = 8;
 }
 
 message TransferRequest {
@@ -194,4 +198,16 @@ message LoadLegalUserResponse {
     string siret = 3;
     app.softnetwork.payment.model.Address legalRepresentativeAddress = 4;
     app.softnetwork.payment.model.Address headQuartersAddress = 5;
+}
+
+message LoadPayInTransactionRequest {
+    string orderUuid = 1;
+    string payInTransactionId = 2;
+    string clientId = 3;
+}
+
+message LoadPayOutTransactionRequest {
+    string orderUuid = 1;
+    string payOutTransactionId = 2;
+    string clientId = 3;
 }

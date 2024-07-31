@@ -65,6 +65,10 @@ object PaymentMessages {
     *   - payment type
     * @param printReceipt
     *   - whether or not the client asks to print a receipt
+    * @param feesAmount
+    *   - optional fees amount
+    * @param user
+    *   - optional payment user
     */
   case class Payment(
     orderUuid: String,
@@ -80,7 +84,9 @@ object PaymentMessages {
     screenHeight: Option[Int] = None,
     statementDescriptor: Option[String] = None,
     paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
-    printReceipt: Boolean = false
+    printReceipt: Boolean = false,
+    feesAmount: Option[Int] = None,
+    user: Option[NaturalUser] = None
   )
 
   /** Flow [PreRegisterCard -> ] PreAuthorizeCard [ -> PreAuthorizeCardFor3DS]
@@ -105,6 +111,10 @@ object PaymentMessages {
     *   - browser info
     * @param printReceipt
     *   - whether or not the client asks to print a receipt
+    * @param creditedAccount
+    *   - account to credit
+    * @param feesAmount
+    *   - optional fees amount
     */
   case class PreAuthorizeCard(
     orderUuid: String,
@@ -116,12 +126,14 @@ object PaymentMessages {
     registerCard: Boolean = false,
     ipAddress: Option[String] = None,
     browserInfo: Option[BrowserInfo] = None,
-    printReceipt: Boolean = false
+    printReceipt: Boolean = false,
+    creditedAccount: Option[String] = None,
+    feesAmount: Option[Int] = None
   ) extends PaymentCommandWithKey {
     val key: String = debitedAccount
   }
 
-  /** 3ds command
+  /** card pre authorization return command
     *
     * @param orderUuid
     *   - order unique id
@@ -133,7 +145,7 @@ object PaymentMessages {
     *   - whether or not the client asks to print a receipt
     */
   @InternalApi
-  private[payment] case class PreAuthorizeCardFor3DS(
+  private[payment] case class PreAuthorizeCardCallback(
     orderUuid: String,
     preAuthorizationId: String,
     registerCard: Boolean = true,
@@ -217,6 +229,10 @@ object PaymentMessages {
     *   - payment type
     * @param printReceipt
     *   - whether or not the client asks to print a receipt
+    * @param feesAmount
+    *   - optional fees amount
+    * @param user
+    *   - optional payment user
     */
   case class PayIn(
     orderUuid: String,
@@ -231,12 +247,15 @@ object PaymentMessages {
     browserInfo: Option[BrowserInfo] = None,
     statementDescriptor: Option[String] = None,
     paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
-    printReceipt: Boolean = false
+    printReceipt: Boolean = false,
+    feesAmount: Option[Int] = None,
+    user: Option[NaturalUser] = None,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = debitedAccount
   }
 
-  /** 3ds command
+  /** pay in return command
     *
     * @param orderUuid
     *   - order unique id
@@ -248,28 +267,10 @@ object PaymentMessages {
     *   - whether or not the client asks to print a receipt
     */
   @InternalApi
-  private[payment] case class PayInFor3DS(
+  private[payment] case class PayInCallback(
     orderUuid: String,
     transactionId: String,
     registerCard: Boolean,
-    printReceipt: Boolean = false
-  ) extends PaymentCommandWithKey {
-    lazy val key: String = transactionId
-  }
-
-  /** PayPal return command
-    *
-    * @param orderUuid
-    *   - order unique id
-    * @param transactionId
-    *   - payIn transaction id
-    * @param printReceipt
-    *   - whether or not the client asks to print a receipt
-    */
-  @InternalApi
-  private[payment] case class PayInForPayPal(
-    orderUuid: String,
-    transactionId: String,
     printReceipt: Boolean = false
   ) extends PaymentCommandWithKey {
     lazy val key: String = transactionId
@@ -287,6 +288,8 @@ object PaymentMessages {
     *   - currency
     * @param externalReference
     *   - optional external reference
+    * @param payInTransactionId
+    *   - optional payIn transaction id
     * @param clientId
     *   - optional client id
     */
@@ -297,9 +300,26 @@ object PaymentMessages {
     feesAmount: Int = 0,
     currency: String = "EUR",
     externalReference: Option[String] = None,
+    payInTransactionId: Option[String] = None, //TODO should be required
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = creditedAccount
+  }
+
+  case class LoadPayOutTransaction(
+    orderUuid: String,
+    transactionId: String,
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey {
+    val key: String = transactionId
+  }
+
+  case class LoadPayInTransaction(
+    orderUuid: String,
+    transactionId: String,
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey {
+    val key: String = transactionId
   }
 
   /** @param orderUuid
@@ -500,7 +520,7 @@ object PaymentMessages {
     *   - transaction payIn id
     */
   @InternalApi
-  private[payment] case class PayInFirstRecurringFor3DS(
+  private[payment] case class FirstRecurringPaymentCallback(
     recurringPayInRegistrationId: String,
     transactionId: String
   ) extends PaymentCommandWithKey {
@@ -585,6 +605,10 @@ object PaymentMessages {
     *   - payment user
     * @param acceptedTermsOfPSP
     *   - whether or not the terms of the psp are accepted
+    * @param ipAddress
+    *   - ip address
+    * @param userAgent
+    *   - user agent
     * @param clientId
     *   - optional client id
     */
@@ -593,6 +617,8 @@ object PaymentMessages {
     bankAccount: BankAccount,
     user: Option[PaymentAccount.User] = None,
     acceptedTermsOfPSP: Option[Boolean] = None,
+    ipAddress: Option[String] = None,
+    userAgent: Option[String],
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey {
     val key: String = creditedAccount
@@ -652,6 +678,14 @@ object PaymentMessages {
     val key: String = creditedAccount
   }
 
+  @InternalApi
+  private[payment] case class CreateOrUpdateKycDocument(
+    creditedAccount: String,
+    kycDocument: KycDocument
+  ) extends PaymentCommandWithKey {
+    val key: String = creditedAccount
+  }
+
   /** hook command
     *
     * @param kycDocumentId
@@ -696,7 +730,8 @@ object PaymentMessages {
   /** @param creditedAccount
     *   - account which owns the UBO declaration that would be validated
     */
-  case class ValidateUboDeclaration(creditedAccount: String) extends PaymentCommandWithKey {
+  case class ValidateUboDeclaration(creditedAccount: String, ipAddress: String, userAgent: String)
+      extends PaymentCommandWithKey {
     val key: String = creditedAccount
   }
 
@@ -816,6 +851,13 @@ object PaymentMessages {
 
   case class PaymentRedirection(redirectUrl: String) extends PaidInResult
 
+  case class PaymentRequired(
+    transactionId: String,
+    paymentClientSecret: String,
+    paymentClientData: String,
+    paymentClientReturnUrl: String
+  ) extends PaidInResult
+
   case class RecurringPaymentRegistered(recurringPaymentRegistrationId: String)
       extends PaymentResult
 
@@ -866,6 +908,8 @@ object PaymentMessages {
 
   case class KycDocumentAdded(kycDocumentId: String) extends PaymentResult
 
+  case object KycDocumentCreatedOrUpdated extends PaymentResult
+
   case class KycDocumentStatusUpdated(report: KycDocumentValidationReport) extends PaymentResult
 
   case class KycDocumentStatusLoaded(report: KycDocumentValidationReport) extends PaymentResult
@@ -895,6 +939,18 @@ object PaymentMessages {
   case object PaymentAccountCreated extends PaymentResult
 
   case object PaymentAccountUpdated extends PaymentResult
+
+  case class PayInTransactionLoaded(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus,
+    error: Option[String]
+  ) extends PaymentResult
+
+  case class PayOutTransactionLoaded(
+    transactionId: String,
+    transactionStatus: Transaction.TransactionStatus,
+    error: Option[String]
+  ) extends PaymentResult
 
   class PaymentError(override val message: String) extends ErrorMessage(message) with PaymentResult
 

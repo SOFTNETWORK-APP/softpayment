@@ -3,7 +3,7 @@ package app.softnetwork.payment.scalatest
 import akka.actor.typed.ActorSystem
 import app.softnetwork.account.config.AccountSettings
 import app.softnetwork.account.persistence.query.AccountEventProcessorStreams.InternalAccountEvents2AccountProcessorStream
-import app.softnetwork.payment.config.PaymentSettings._
+import app.softnetwork.payment.config.PaymentSettings.PaymentConfig._
 import app.softnetwork.payment.handlers.MockSoftPayAccountHandler
 import app.softnetwork.payment.launch.SoftPayGuardian
 import app.softnetwork.payment.persistence.typed.MockSoftPayAccountBehavior
@@ -22,7 +22,7 @@ trait SoftPayTestKit extends PaymentTestKit with SoftPayGuardian {
   /** @return
     *   roles associated with this node
     */
-  override def roles: Seq[String] = super.roles :+ AkkaNodeRole :+ AccountSettings.AkkaNodeRole
+  override def roles: Seq[String] = super.roles :+ akkaNodeRole :+ AccountSettings.AkkaNodeRole
 
   override def internalAccountEvents2AccountProcessorStream
     : ActorSystem[_] => InternalAccountEvents2AccountProcessorStream = sys =>

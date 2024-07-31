@@ -1,7 +1,7 @@
 package app.softnetwork.payment.persistence.typed
 
 import app.softnetwork.kv.persistence.typed.KeyValueBehavior
-import app.softnetwork.payment.config.PaymentSettings.AkkaNodeRole
+import app.softnetwork.payment.config.PaymentSettings.PaymentConfig.akkaNodeRole
 
 trait PaymentKvBehavior extends KeyValueBehavior {
   override def persistenceId: String = "PaymentKeys"
@@ -9,7 +9,7 @@ trait PaymentKvBehavior extends KeyValueBehavior {
   /** @return
     *   node role required to start this actor
     */
-  override lazy val role: String = AkkaNodeRole
+  override lazy val role: String = akkaNodeRole
 
 }
 

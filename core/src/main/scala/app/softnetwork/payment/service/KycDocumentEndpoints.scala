@@ -21,7 +21,7 @@ trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val loadKycDocument: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
-      .in(PaymentSettings.KycRoute)
+      .in(PaymentSettings.PaymentConfig.kycRoute)
       .in(
         query[String]("documentType")
           .description(
@@ -53,7 +53,7 @@ trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val addKycDocument: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
-      .in(PaymentSettings.KycRoute)
+      .in(PaymentSettings.PaymentConfig.kycRoute)
       .in(
         query[String]("documentType")
           .description(

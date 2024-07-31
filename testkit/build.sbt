@@ -10,5 +10,7 @@ libraryDependencies ++= Seq(
   "app.softnetwork.session" %% "session-testkit" % Versions.genericPersistence,
   "app.softnetwork.persistence" %% "persistence-core-testkit" % Versions.genericPersistence,
   "app.softnetwork.account" %% "account-testkit" % Versions.account,
-  "org.scalatest" %% "scalatest" % Versions.scalatest
+  "org.scalatest" %% "scalatest" % Versions.scalatest,
+  "org.seleniumhq.selenium" % "selenium-java" % Versions.selenium,
+  "org.seleniumhq.selenium" % "htmlunit-driver" % Versions.selenium
 )

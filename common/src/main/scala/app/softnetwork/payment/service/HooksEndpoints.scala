@@ -14,6 +14,6 @@ trait HooksEndpoints extends Tapir with SchemaDerivation with BasicPaymentServic
 
   def hooks(
     rootEndpoint: Endpoint[Unit, Unit, Unit, Unit, Any]
-  ): Full[Unit, Unit, (String, String), Unit, Unit, Any, Future]
+  ): Full[Unit, Unit, _, Unit, Unit, Any, Future]
 
 }

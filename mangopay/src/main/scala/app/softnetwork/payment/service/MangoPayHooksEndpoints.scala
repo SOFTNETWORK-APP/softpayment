@@ -14,9 +14,9 @@ trait MangoPayHooksEndpoints extends HooksEndpoints with PaymentHandler {
   /** should be implemented by each payment provider
     */
   def hooks(
-    hooksEndpoint: Endpoint[Unit, Unit, Unit, Unit, Any]
-  ): Full[Unit, Unit, (String, String), Unit, Unit, Any, Future] =
-    hooksEndpoint
+    rootEndpoint: Endpoint[Unit, Unit, Unit, Unit, Any]
+  ): Full[Unit, Unit, _, Unit, Unit, Any, Future] =
+    rootEndpoint
       .description("MangoPay Payment Hooks")
       .in(query[String]("EventType").description("MangoPay Event Type"))
       .in(query[String]("RessourceId").description("MangoPay Resource Id related to this event"))

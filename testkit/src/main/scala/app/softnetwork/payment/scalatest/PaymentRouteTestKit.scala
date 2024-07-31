@@ -5,9 +5,10 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.{ContentTypes, Multipart, StatusCodes}
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.api.server.config.ServerSettings.RootPath
-import app.softnetwork.payment.api.PaymentGrpcServicesTestKit
-import app.softnetwork.payment.config.MangoPay
-import app.softnetwork.payment.config.PaymentSettings._
+import app.softnetwork.payment.api.{PaymentClient, PaymentGrpcServicesTestKit}
+import app.softnetwork.payment.config.PaymentSettings
+import app.softnetwork.payment.config.PaymentSettings.PaymentConfig._
+import app.softnetwork.payment.data.{customerUuid, sellerUuid}
 import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model._
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -23,6 +24,16 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     with PaymentGrpcServicesTestKit {
   _: Suite with ApiRoutes with SessionMaterials[SD] =>
 
+  lazy val paymentClient: PaymentClient = PaymentClient(ts)
+
+  lazy val customerSession: SD with SessionDataDecorator[SD] =
+    companion.newSession.withId(customerUuid).withProfile("customer").withClientId(clientId)
+
+  var externalUserId: String = "individual"
+
+  def sellerSession(id: String = sellerUuid): SD with SessionDataDecorator[SD] =
+    companion.newSession.withId(id).withProfile("seller").withClientId(clientId)
+
   import app.softnetwork.serialization._
 
   override lazy val additionalConfig: String = paymentGrpcConfig
@@ -37,7 +48,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   def loadPaymentAccount(): PaymentAccountView = {
     withHeaders(
-      Get(s"/$RootPath/$PaymentPath")
+      Get(s"/$RootPath/${PaymentSettings.PaymentConfig.path}")
     ) ~> routes ~> check {
       status shouldEqual StatusCodes.OK
       responseAs[PaymentAccountView]
@@ -46,7 +57,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   def loadCards(): Seq[Card] = {
     withHeaders(
-      Get(s"/$RootPath/$PaymentPath/$CardRoute")
+      Get(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute")
     ) ~> routes ~> check {
       status shouldEqual StatusCodes.OK
       responseAs[Seq[Card]]
@@ -55,7 +66,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   def loadBankAccount(): BankAccountView = {
     withHeaders(
-      Get(s"/$RootPath/$PaymentPath/$BankRoute")
+      Get(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute")
     ) ~> routes ~> check {
       status shouldEqual StatusCodes.OK
       responseAs[BankAccountView]
@@ -71,7 +82,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
       .foreach { documentType =>
         withHeaders(
           Post(
-            s"/$RootPath/$PaymentPath/$KycRoute?documentType=$documentType",
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$kycRoute?documentType=$documentType",
             entity = Multipart.FormData
               .fromPath(
                 "pages",
@@ -99,7 +110,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     documentType: KycDocument.KycDocumentType
   ): KycDocumentValidationReport = {
     withHeaders(
-      Get(s"/$RootPath/$PaymentPath/$KycRoute?documentType=$documentType")
+      Get(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$kycRoute?documentType=$documentType")
     ) ~> routes ~> check {
       status shouldEqual StatusCodes.OK
       responseAs[KycDocumentValidationReport]
@@ -112,13 +123,15 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
       .map(_.documentType)
       .foreach { documentType =>
         withHeaders(
-          Get(s"/$RootPath/$PaymentPath/$KycRoute?documentType=$documentType")
+          Get(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$kycRoute?documentType=$documentType"
+          )
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           val report = responseAs[KycDocumentValidationReport]
           assert(report.status == KycDocument.KycDocumentStatus.KYC_DOCUMENT_VALIDATION_ASKED)
           Get(
-            s"/$RootPath/$PaymentPath/$HooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=KYC_SUCCEEDED&RessourceId=${report.id}"
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$hooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=KYC_SUCCEEDED&RessourceId=${report.id}"
           ) ~> routes ~> check {
             status shouldEqual StatusCodes.OK
             assert(
@@ -133,7 +146,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   def loadDeclaration(): UboDeclarationView = {
     withHeaders(
-      Get(s"/$RootPath/$PaymentPath/$DeclarationRoute")
+      Get(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$declarationRoute")
     ) ~> routes ~> check {
       status shouldEqual StatusCodes.OK
       responseAs[UboDeclarationView]

@@ -3,6 +3,7 @@ package app.softnetwork.payment.spi
 import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.payment.service.{HooksDirectives, HooksEndpoints}
+import com.typesafe.config.Config
 import org.json4s.Formats
 
 import java.util.ServiceLoader
@@ -15,8 +16,8 @@ object PaymentProviders {
 
   private[this] var paymentProviders: Map[String, PaymentProvider] = Map.empty
 
-  def defaultPaymentProviders: Seq[SoftPayAccount.Client.Provider] =
-    paymentProviderFactories.iterator().asScala.map(_.softPaymentProvider).toSeq
+  def defaultPaymentProviders(config: Config): Seq[SoftPayAccount.Client.Provider] =
+    paymentProviderFactories.iterator().asScala.map(_.softPaymentProvider(config)).toSeq
 
   def hooksDirectives(implicit
     system: ActorSystem[_],

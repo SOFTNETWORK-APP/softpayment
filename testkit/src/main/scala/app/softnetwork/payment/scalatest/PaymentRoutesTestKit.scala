@@ -7,11 +7,19 @@ import app.softnetwork.payment.launch.PaymentRoutes
 import app.softnetwork.payment.service.{MockPaymentService, PaymentService}
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
-import app.softnetwork.session.scalatest.{SessionServiceRoutes, SessionTestKit}
-import app.softnetwork.session.service.SessionMaterials
+import app.softnetwork.session.scalatest.{
+  OneOffCookieSessionServiceTestKit,
+  OneOffHeaderSessionServiceTestKit,
+  RefreshableCookieSessionServiceTestKit,
+  RefreshableHeaderSessionServiceTestKit,
+  SessionServiceRoutes,
+  SessionTestKit
+}
+import app.softnetwork.session.service.{JwtClaimsSessionMaterials, SessionMaterials}
 import com.softwaremill.session.{RefreshTokenStorage, SessionConfig, SessionManager}
+import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
-import org.softnetwork.session.model.Session
+import org.softnetwork.session.model.{JwtClaims, Session}
 
 import scala.concurrent.ExecutionContext
 
@@ -42,4 +50,40 @@ trait PaymentRoutesTestKit[SD <: SessionData with SessionDataDecorator[SD]]
   override def apiRoutes: ActorSystem[_] => List[ApiRoute] =
     system => super.apiRoutes(system) :+ sessionServiceRoute(system)
 
+}
+
+trait PaymentRoutesWithOneOffCookieSessionSpecTestKit
+    extends AnyWordSpecLike
+    with PaymentRouteTestKit[JwtClaims]
+    with OneOffCookieSessionServiceTestKit[JwtClaims]
+    with PaymentRoutesTestKit[JwtClaims]
+    with JwtClaimsSessionMaterials {
+  override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
+}
+
+trait PaymentRoutesWithOneOffHeaderSessionSpecTestKit
+    extends AnyWordSpecLike
+    with PaymentRouteTestKit[JwtClaims]
+    with OneOffHeaderSessionServiceTestKit[JwtClaims]
+    with PaymentRoutesTestKit[JwtClaims]
+    with JwtClaimsSessionMaterials {
+  override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
+}
+
+trait PaymentRoutesWithRefreshableCookieSessionSpecTestKit
+    extends AnyWordSpecLike
+    with PaymentRouteTestKit[JwtClaims]
+    with RefreshableCookieSessionServiceTestKit[JwtClaims]
+    with PaymentRoutesTestKit[JwtClaims]
+    with JwtClaimsSessionMaterials {
+  override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
+}
+
+trait PaymentRoutesWithRefreshableHeaderSessionSpecTestKit
+    extends AnyWordSpecLike
+    with PaymentRouteTestKit[JwtClaims]
+    with RefreshableHeaderSessionServiceTestKit[JwtClaims]
+    with PaymentRoutesTestKit[JwtClaims]
+    with JwtClaimsSessionMaterials {
+  override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }

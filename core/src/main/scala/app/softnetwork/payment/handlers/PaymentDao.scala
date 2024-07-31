@@ -151,7 +151,9 @@ trait PaymentDao extends PaymentHandler {
     registerCard: Boolean = false,
     ipAddress: Option[String] = None,
     browserInfo: Option[BrowserInfo] = None,
-    printReceipt: Boolean = false
+    printReceipt: Boolean = false,
+    creditedAccount: Option[String] = None,
+    feesAmount: Option[Int] = None
   )(implicit
     system: ActorSystem[_]
   ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
@@ -167,7 +169,9 @@ trait PaymentDao extends PaymentHandler {
         registerCard,
         ipAddress,
         browserInfo,
-        printReceipt
+        printReceipt,
+        creditedAccount,
+        feesAmount
       )
     ) map {
       case result: PaymentRedirection        => Right(Left(result))
@@ -216,6 +220,21 @@ trait PaymentDao extends PaymentHandler {
   }
 
   @InternalApi
+  private[payment] def loadPayInTransaction(
+    orderUuid: String,
+    transactionId: String,
+    clientId: Option[String] = None
+  )(implicit
+    system: ActorSystem[_]
+  ): Future[Either[TransactionNotFound.type, PayInTransactionLoaded]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(LoadPayInTransaction(orderUuid, transactionId, clientId)) map {
+      case result: PayInTransactionLoaded => Right(result)
+      case _                              => Left(TransactionNotFound)
+    }
+  }
+
+  @InternalApi
   private[payment] def refund(
     orderUuid: String,
     payInTransactionId: String,
@@ -256,6 +275,7 @@ trait PaymentDao extends PaymentHandler {
     feesAmount: Int,
     currency: String = "EUR",
     externalReference: Option[String],
+    payInTransactionId: Option[String] = None,
     clientId: Option[String] = None
   )(implicit
     system: ActorSystem[_]
@@ -269,6 +289,7 @@ trait PaymentDao extends PaymentHandler {
         feesAmount,
         currency,
         externalReference,
+        payInTransactionId,
         clientId
       )
     ) map {
@@ -280,6 +301,21 @@ trait PaymentDao extends PaymentHandler {
         )
       case _ =>
         Left(PayOutFailed("", Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED, "unknown"))
+    }
+  }
+
+  @InternalApi
+  private[payment] def loadPayOutTransaction(
+    orderUuid: String,
+    transactionId: String,
+    clientId: Option[String] = None
+  )(implicit
+    system: ActorSystem[_]
+  ): Future[Either[TransactionNotFound.type, PayOutTransactionLoaded]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(LoadPayOutTransaction(orderUuid, transactionId, clientId)) map {
+      case result: PayOutTransactionLoaded => Right(result)
+      case _                               => Left(TransactionNotFound)
     }
   }
 

@@ -15,4 +15,6 @@ object Versions {
   val jinja = "2.7.1"
 
   val scalate = "1.9.8"
+
+  val selenium = "4.13.0"
 }

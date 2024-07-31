@@ -1,12 +1,12 @@
 package app.softnetwork.payment.service
 
 import akka.http.scaladsl.model.{RemoteAddress, StatusCodes}
-import akka.http.scaladsl.model.headers.`X-Forwarded-For`
+import akka.http.scaladsl.model.headers.{`User-Agent`, `X-Forwarded-For`}
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.api.server.config.ServerSettings.RootPath
-import app.softnetwork.payment.api.PaymentClient
 import app.softnetwork.payment.data._
-import app.softnetwork.payment.config.PaymentSettings._
+import app.softnetwork.payment.config.PaymentSettings
+import app.softnetwork.payment.config.PaymentSettings.PaymentConfig._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model._
@@ -32,25 +32,253 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
   import app.softnetwork.serialization._
 
-  lazy val paymentClient: PaymentClient = PaymentClient(ts)
-
-  lazy val customerSession: SD with SessionDataDecorator[SD] =
-    companion.newSession.withId(customerUuid).withProfile(Some("customer")).withClientId(clientId)
-
-  lazy val sellerSession: SD with SessionDataDecorator[SD] =
-    companion.newSession.withId(sellerUuid).withProfile(Some("seller")).withClientId(clientId)
-
   "Payment service" must {
+    "not create bank account with wrong iban" in {
+      createNewSession(sellerSession())
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            BankAccount(None, ownerName, ownerAddress, "", bic),
+            naturalUser,
+            None
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.BadRequest
+        assert(responseAs[PaymentError].message == WrongIban.message)
+      }
+    }
+
+    "not create bank account with wrong bic" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            BankAccount(None, ownerName, ownerAddress, iban, "WRONG"),
+            naturalUser,
+            None
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.BadRequest
+        assert(responseAs[PaymentError].message == WrongBic.message)
+      }
+    }
+
+    "create bank account with natural user" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            BankAccount(None, ownerName, ownerAddress, iban, bic),
+            naturalUser.withExternalUuid(externalUserId),
+            Some(true)
+          )
+        ).withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val bankAccount = loadBankAccount()
+        sellerBankAccountId = bankAccount.bankAccountId
+      }
+    }
+
+    "update bank account with natural user" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            BankAccount(Option(sellerBankAccountId), ownerName, ownerAddress, iban, bic),
+            naturalUser.withLastName("anotherLastName").withExternalUuid(externalUserId),
+            None
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val bankAccount = loadBankAccount()
+//        val previousBankAccountId = sellerBankAccountId
+        sellerBankAccountId = bankAccount.bankAccountId
+//        assert(sellerBankAccountId != previousBankAccountId)
+      }
+    }
+
+    "not update bank account with wrong siret" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            BankAccount(
+              Option(sellerBankAccountId),
+              ownerName,
+              ownerAddress,
+              iban,
+              bic
+            ),
+            legalUser.withSiret(""),
+            None
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.BadRequest
+        assert(responseAs[PaymentError].message == WrongSiret.message)
+      }
+    }
+
+    "not update bank account with empty legal name" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            BankAccount(
+              Option(sellerBankAccountId),
+              ownerName,
+              ownerAddress,
+              iban,
+              bic
+            ),
+            legalUser.withLegalName(""),
+            None
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.BadRequest
+        assert(responseAs[PaymentError].message == LegalNameRequired.message)
+      }
+    }
+
+    "not update bank account without accepted terms of PSP" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            BankAccount(
+              Option(sellerBankAccountId),
+              ownerName,
+              ownerAddress,
+              iban,
+              bic
+            ),
+            legalUser,
+            None
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.BadRequest
+        assert(responseAs[PaymentError].message == AcceptedTermsOfPSPRequired.message)
+      }
+    }
+
+    "update bank account with sole trader legal user" in {
+      externalUserId = "soleTrader"
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            BankAccount(
+              Option(sellerBankAccountId),
+              ownerName,
+              ownerAddress,
+              iban,
+              bic
+            ),
+            legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
+            Some(true)
+          )
+        ).withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val bankAccount = loadBankAccount()
+//        val previousBankAccountId = sellerBankAccountId
+        sellerBankAccountId = bankAccount.bankAccountId
+//        assert(sellerBankAccountId != previousBankAccountId)
+      }
+    }
+
+    "update bank account with business legal user" in {
+      externalUserId = "business"
+      val bank =
+        BankAccountCommand(
+          BankAccount(
+            Option(sellerBankAccountId),
+            ownerName,
+            ownerAddress,
+            iban,
+            bic
+          ),
+          legalUser
+            .withLegalUserType(LegalUser.LegalUserType.BUSINESS)
+            .withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
+          Some(true)
+        )
+      log.info(serialization.write(bank))
+      withHeaders(
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute", bank)
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val bankAccount = loadBankAccount()
+//        val previousBankAccountId = sellerBankAccountId
+        sellerBankAccountId = bankAccount.bankAccountId
+//        assert(sellerBankAccountId != previousBankAccountId)
+      }
+    }
+
+    "add document(s)" in {
+      addKycDocuments()
+    }
+
+    "update document(s) status" in {
+      validateKycDocuments()
+    }
+
+    "create or update ultimate beneficial owner" in {
+      withHeaders(
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$declarationRoute", ubo)
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val declaration = loadDeclaration()
+        assert(declaration.ubos.size == 1)
+        uboDeclarationId = declaration.uboDeclarationId
+      }
+    }
+
+    "ask for declaration validation" in {
+      withHeaders(
+        Put(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$declarationRoute")
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val declaration = loadDeclaration()
+        assert(
+          declaration.status == UboDeclaration.UboDeclarationStatus.UBO_DECLARATION_VALIDATION_ASKED
+        )
+      }
+    }
+
+    "update declaration status" in {
+      Get(
+        s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$hooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=UBO_DECLARATION_VALIDATED&RessourceId=$uboDeclarationId"
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val declaration = loadDeclaration()
+        assert(declaration.status == UboDeclaration.UboDeclarationStatus.UBO_DECLARATION_VALIDATED)
+      }
+    }
+
     "pre register card" in {
       createNewSession(customerSession)
       withHeaders(
-        Get(s"/$RootPath/$PaymentPath/$CardRoute")
+        Get(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute")
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.BadRequest
       }
       withHeaders(
         Post(
-          s"/$RootPath/$PaymentPath/$CardRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute",
           PreRegisterCard(
             orderUuid,
             naturalUser
@@ -67,7 +295,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "pre authorize card" in {
       withHeaders(
         Post(
-          s"/$RootPath/$PaymentPath/$PreAuthorizeCardRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute",
           Payment(
             orderUuid,
             5100,
@@ -93,9 +321,9 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    "pre authorize card for 3ds" in {
+    "pre authorize card callback" in {
       Get(
-        s"/$RootPath/$PaymentPath/$SecureModeRoute/$PreAuthorizeCardRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerCard=true&printReceipt=true"
+        s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$preAuthorizeCardRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerCard=true&printReceipt=true"
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val paymentAccount = loadPaymentAccount()
@@ -114,237 +342,12 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       cardId = card.id
     }
 
-    "not create bank account with wrong iban" in {
-      createNewSession(sellerSession)
-      withHeaders(
-        Post(
-          s"/$RootPath/$PaymentPath/$BankRoute",
-          BankAccountCommand(
-            BankAccount(None, ownerName, ownerAddress, "", bic),
-            naturalUser,
-            None
-          )
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.BadRequest
-        assert(responseAs[PaymentError].message == WrongIban.message)
-      }
-    }
-
-    "not create bank account with wrong bic" in {
-      withHeaders(
-        Post(
-          s"/$RootPath/$PaymentPath/$BankRoute",
-          BankAccountCommand(
-            BankAccount(None, ownerName, ownerAddress, iban, "WRONG"),
-            naturalUser,
-            None
-          )
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.BadRequest
-        assert(responseAs[PaymentError].message == WrongBic.message)
-      }
-    }
-
-    "create bank account with natural user" in {
-      withHeaders(
-        Post(
-          s"/$RootPath/$PaymentPath/$BankRoute",
-          BankAccountCommand(
-            BankAccount(None, ownerName, ownerAddress, iban, bic),
-            naturalUser,
-            None
-          )
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.OK
-        val bankAccount = loadBankAccount()
-        sellerBankAccountId = bankAccount.bankAccountId
-      }
-    }
-
-    "update bank account with natural user" in {
-      withHeaders(
-        Post(
-          s"/$RootPath/$PaymentPath/$BankRoute",
-          BankAccountCommand(
-            BankAccount(Some(sellerBankAccountId), ownerName, ownerAddress, iban, bic),
-            naturalUser.withLastName("anotherLastName"),
-            None
-          )
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.OK
-        val bankAccount = loadBankAccount()
-//        val previousBankAccountId = sellerBankAccountId
-        sellerBankAccountId = bankAccount.bankAccountId
-//        assert(sellerBankAccountId != previousBankAccountId)
-      }
-    }
-
-    "not update bank account with wrong siret" in {
-      withHeaders(
-        Post(
-          s"/$RootPath/$PaymentPath/$BankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Some(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
-            legalUser.withSiret(""),
-            None
-          )
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.BadRequest
-        assert(responseAs[PaymentError].message == WrongSiret.message)
-      }
-    }
-
-    "not update bank account with empty legal name" in {
-      withHeaders(
-        Post(
-          s"/$RootPath/$PaymentPath/$BankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Some(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
-            legalUser.withLegalName(""),
-            None
-          )
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.BadRequest
-        assert(responseAs[PaymentError].message == LegalNameRequired.message)
-      }
-    }
-
-    "not update bank account without accepted terms of PSP" in {
-      withHeaders(
-        Post(
-          s"/$RootPath/$PaymentPath/$BankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Some(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
-            legalUser,
-            None
-          )
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.BadRequest
-        assert(responseAs[PaymentError].message == AcceptedTermsOfPSPRequired.message)
-      }
-    }
-
-    "update bank account with sole trader legal user" in {
-      withHeaders(
-        Post(
-          s"/$RootPath/$PaymentPath/$BankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Some(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
-            legalUser,
-            Some(true)
-          )
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.OK
-        val bankAccount = loadBankAccount()
-//        val previousBankAccountId = sellerBankAccountId
-        sellerBankAccountId = bankAccount.bankAccountId
-//        assert(sellerBankAccountId != previousBankAccountId)
-      }
-    }
-
-    "update bank account with business legal user" in {
-      val bank =
-        BankAccountCommand(
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
-          legalUser.withLegalUserType(LegalUser.LegalUserType.BUSINESS),
-          Some(true)
-        )
-      log.info(serialization.write(bank))
-      withHeaders(
-        Post(s"/$RootPath/$PaymentPath/$BankRoute", bank)
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.OK
-        val bankAccount = loadBankAccount()
-//        val previousBankAccountId = sellerBankAccountId
-        sellerBankAccountId = bankAccount.bankAccountId
-//        assert(sellerBankAccountId != previousBankAccountId)
-      }
-    }
-
-    "add document(s)" in {
-      addKycDocuments()
-    }
-
-    "update document(s) status" in {
-      validateKycDocuments()
-    }
-
-    "create or update ultimate beneficial owner" in {
-      withHeaders(
-        Post(s"/$RootPath/$PaymentPath/$DeclarationRoute", ubo)
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.OK
-        val declaration = loadDeclaration()
-        assert(declaration.ubos.size == 1)
-        uboDeclarationId = declaration.uboDeclarationId
-      }
-    }
-
-    "ask for declaration validation" in {
-      withHeaders(
-        Put(s"/$RootPath/$PaymentPath/$DeclarationRoute")
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.OK
-        val declaration = loadDeclaration()
-        assert(
-          declaration.status == UboDeclaration.UboDeclarationStatus.UBO_DECLARATION_VALIDATION_ASKED
-        )
-      }
-    }
-
-    "update declaration status" in {
-      Get(
-        s"/$RootPath/$PaymentPath/$HooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=UBO_DECLARATION_VALIDATED&RessourceId=$uboDeclarationId"
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.OK
-        val declaration = loadDeclaration()
-        assert(declaration.status == UboDeclaration.UboDeclarationStatus.UBO_DECLARATION_VALIDATED)
-      }
-    }
-
     "pay in / out with pre authorized card" in {
       createNewSession(customerSession)
       withHeaders(
         Post(
-          s"/$RootPath/$PaymentPath/$PreAuthorizeCardRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute/${URLEncoder
+            .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
           Payment(
             orderUuid,
             100,
@@ -371,7 +374,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
               100,
               0,
               "EUR",
-              Some("reference")
+              Some("reference"),
+              result.transactionId
             ) complete () match {
               case Success(s) =>
                 assert(s.transactionId.isDefined)
@@ -387,7 +391,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       createNewSession(customerSession)
       withHeaders(
         Post(
-          s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$payInRoute/${URLEncoder
             .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
           Payment(
             orderUuid,
@@ -415,7 +419,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         val printReceipt = params.getOrElse("printReceipt", "")
         assert(printReceipt == "true")
         Get(
-          s"/$RootPath/$PaymentPath/$SecureModeRoute/$PayInRoute/$orderUuid?transactionId=$transactionId&registerCard=$registerCard&printReceipt=$printReceipt"
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$payInRoute/$orderUuid?transactionId=$transactionId&registerCard=$registerCard&printReceipt=$printReceipt"
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
@@ -425,7 +429,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             5100,
             0,
             "EUR",
-            None
+            None,
+            transactionId
           ) complete () match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
@@ -440,12 +445,11 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       createNewSession(customerSession)
       withHeaders(
         Post(
-          s"/$RootPath/$PaymentPath/$PayInRoute/${URLEncoder
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$payInRoute/${URLEncoder
             .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
           Payment(
             orderUuid,
             5100,
-            "EUR",
             paymentType = Transaction.PaymentType.PAYPAL,
             printReceipt = true
           )
@@ -464,7 +468,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         val printReceipt = params.getOrElse("printReceipt", "")
         assert(printReceipt == "true")
         Get(
-          s"/$RootPath/$PaymentPath/$PayPalRoute/$orderUuid?transactionId=$transactionId&printReceipt=$printReceipt"
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$payInRoute/$orderUuid?transactionId=$transactionId&registerCard=false&printReceipt=$printReceipt"
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
@@ -474,7 +478,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             5100,
             0,
             "EUR",
-            None
+            None,
+            transactionId
           ) complete () match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
@@ -486,9 +491,9 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "create mandate" in {
-      createNewSession(sellerSession)
+      createNewSession(sellerSession())
       withHeaders(
-        Post(s"/$RootPath/$PaymentPath/$MandateRoute")
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute")
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         assert(loadPaymentAccount().bankAccount.flatMap(_.mandateId).isDefined)
@@ -502,7 +507,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "register recurring direct debit payment" in {
       withHeaders(
         Post(
-          s"/$RootPath/$PaymentPath/$RecurringPaymentRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute",
           RegisterRecurringPayment(
             "",
             `type` = RecurringPayment.RecurringPaymentType.DIRECT_DEBIT,
@@ -518,7 +523,9 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         recurringPaymentRegistrationId =
           responseAs[RecurringPaymentRegistered].recurringPaymentRegistrationId
         withHeaders(
-          Get(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/$recurringPaymentRegistrationId")
+          Get(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+          )
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           val recurringPayment = responseAs[RecurringPaymentView]
@@ -541,13 +548,15 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "execute direct debit automatically for next recurring payment" in {
       withHeaders(
-        Delete(s"/$RootPath/$PaymentPath/$MandateRoute")
+        Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute")
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.BadRequest
       }
       probe.expectMessageType[Schedule4PaymentTriggered]
       withHeaders(
-        Get(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/$recurringPaymentRegistrationId")
+        Get(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val recurringPayment = responseAs[RecurringPaymentView]
@@ -568,7 +577,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       createNewSession(customerSession)
       withHeaders(
         Post(
-          s"/$RootPath/$PaymentPath/$RecurringPaymentRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute",
           RegisterRecurringPayment(
             "",
             `type` = RecurringPayment.RecurringPaymentType.CARD,
@@ -584,7 +593,9 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         recurringPaymentRegistrationId =
           responseAs[RecurringPaymentRegistered].recurringPaymentRegistrationId
         withHeaders(
-          Get(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/$recurringPaymentRegistrationId")
+          Get(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+          )
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           val recurringPayment = responseAs[RecurringPaymentView]
@@ -607,7 +618,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "execute first recurring card payment" in {
       withHeaders(
         Post(
-          s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/${URLEncoder
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/${URLEncoder
             .encode(recurringPaymentRegistrationId, "UTF-8")}",
           Payment(
             "",
@@ -617,7 +628,9 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         withHeaders(
-          Get(s"/$RootPath/$PaymentPath/$RecurringPaymentRoute/$recurringPaymentRegistrationId")
+          Get(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+          )
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           val recurringPayment = responseAs[RecurringPaymentView]
@@ -642,9 +655,9 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "cancel mandate" in {
-      createNewSession(sellerSession)
+      createNewSession(sellerSession())
       withHeaders(
-        Delete(s"/$RootPath/$PaymentPath/$MandateRoute")
+        Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute")
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         assert(loadPaymentAccount().bankAccount.flatMap(_.mandateId).isEmpty)
@@ -657,7 +670,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       assert(paymentAccount.paymentAccountStatus.isCompteOk)
       val userId = paymentAccount.legalUser.flatMap(_.legalRepresentative.userId).getOrElse("")
       Get(
-        s"/$RootPath/$PaymentPath/$HooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=USER_KYC_LIGHT&RessourceId=$userId"
+        s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$hooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=USER_KYC_LIGHT&RessourceId=$userId"
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         assert(loadPaymentAccount().paymentAccountStatus.isDocumentsKo)
@@ -666,7 +679,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "delete bank account" in {
       withHeaders(
-        Delete(s"/$RootPath/$PaymentPath/$BankRoute")
+        Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute")
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         assert(loadPaymentAccount().bankAccount.isEmpty)
@@ -676,13 +689,13 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "disable card" in {
       createNewSession(customerSession)
       withHeaders(
-        Delete(s"/$RootPath/$PaymentPath/$CardRoute?cardId=$cardId")
+        Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute?cardId=$cardId")
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.BadRequest
       }
       withHeaders(
         Put(
-          s"/$RootPath/$PaymentPath/$RecurringPaymentRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute",
           UpdateRecurringCardPaymentRegistration(
             "",
             recurringPaymentRegistrationId,
@@ -693,7 +706,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         status shouldEqual StatusCodes.OK
       }
       withHeaders(
-        Delete(s"/$RootPath/$PaymentPath/$CardRoute?cardId=$cardId")
+        Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute?cardId=$cardId")
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val cards = loadCards()

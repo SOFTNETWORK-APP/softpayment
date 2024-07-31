@@ -77,15 +77,17 @@ trait PaymentGuardian extends SessionGuardian { _: SchemaProvider with CsrfCheck
     )
 
   def registerProvidersAccount: ActorSystem[_] => Unit = system => {
-    PaymentProviders.defaultPaymentProviders.foreach(provider => {
-      implicit val ec: ExecutionContext = system.executionContext
-      softPayAccountDao.registerAccountWithProvider(provider)(system) map {
-        case Some(account) =>
-          system.log.info(s"Registered provider account for ${provider.providerId}: $account")
-        case _ =>
-          system.log.warn(s"Failed to register provider account for ${provider.providerId}")
-      }
-    })
+    PaymentProviders
+      .defaultPaymentProviders(config)
+      .foreach(provider => {
+        implicit val ec: ExecutionContext = system.executionContext
+        softPayAccountDao.registerAccountWithProvider(provider)(system) map {
+          case Some(account) =>
+            system.log.info(s"Registered provider account for ${provider.providerId}: $account")
+          case _ =>
+            system.log.warn(s"Failed to register provider account for ${provider.providerId}")
+        }
+      })
   }
 
   override def initSystem: ActorSystem[_] => Unit = system => {

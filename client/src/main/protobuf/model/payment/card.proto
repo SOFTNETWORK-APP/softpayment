@@ -24,6 +24,8 @@ message Card {
     required string alias = 5;
     required string expirationDate = 6;
     optional bool active = 7;
+    optional string holderName = 8;
+    optional string brand = 9;
 }
 
 message CardOwner {

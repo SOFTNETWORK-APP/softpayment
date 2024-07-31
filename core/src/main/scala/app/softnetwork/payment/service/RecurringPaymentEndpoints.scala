@@ -20,7 +20,7 @@ trait RecurringPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   val registerRecurringPayment: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
-      .in(PaymentSettings.RecurringPaymentRoute)
+      .in(PaymentSettings.PaymentConfig.recurringPaymentRoute)
       .in(jsonBody[RegisterRecurringPayment].description("Recurring payment to register"))
       .out(
         oneOf[PaymentResult](
@@ -57,7 +57,7 @@ trait RecurringPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   val loadRecurringPayment: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
-      .in(PaymentSettings.RecurringPaymentRoute)
+      .in(PaymentSettings.PaymentConfig.recurringPaymentRoute)
       .in(path[String])
       .out(
         statusCode(StatusCode.Ok).and(
@@ -81,7 +81,7 @@ trait RecurringPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   val updateRecurringCardPaymentRegistration: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.put
-      .in(PaymentSettings.RecurringPaymentRoute)
+      .in(PaymentSettings.PaymentConfig.recurringPaymentRoute)
       .in(
         jsonBody[UpdateRecurringCardPaymentRegistration].description(
           "Recurring card payment update"
@@ -107,7 +107,7 @@ trait RecurringPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   val deleteRecurringPayment: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.delete
-      .in(PaymentSettings.RecurringPaymentRoute)
+      .in(PaymentSettings.PaymentConfig.recurringPaymentRoute)
       .in(path[String])
       .out(
         statusCode(StatusCode.Ok)

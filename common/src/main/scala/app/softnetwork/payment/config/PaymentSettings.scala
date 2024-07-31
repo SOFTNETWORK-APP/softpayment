@@ -1,6 +1,7 @@
 package app.softnetwork.payment.config
 
 import com.typesafe.config.{Config, ConfigFactory}
+import configs.Configs
 
 /** Created by smanciot on 05/07/2018.
   */
@@ -8,31 +9,21 @@ trait PaymentSettings {
 
   lazy val config: Config = ConfigFactory.load()
 
-  val BaseUrl: String = config.getString("payment.baseUrl")
-
-  val PaymentPath: String = config.getString("payment.path")
-
-  val PayInRoute: String = config.getString("payment.payIn-route")
-  val PayInStatementDescriptor: String = config.getString("payment.payIn-statement-descriptor")
-  val PreAuthorizeCardRoute: String = config.getString("payment.pre-authorize-card-route")
-  val RecurringPaymentRoute: String = config.getString("payment.recurringPayment-route")
-  val SecureModeRoute: String = config.getString("payment.secure-mode-route")
-  val HooksRoute: String = config.getString("payment.hooks-route")
-  val MandateRoute: String = config.getString("payment.mandate-route")
-  val CardRoute: String = config.getString("payment.card-route")
-  val BankRoute: String = config.getString("payment.bank-route")
-  val DeclarationRoute: String = config.getString("payment.declaration-route")
-  val KycRoute: String = config.getString("payment.kyc-route")
-  val PayPalRoute: String = config.getString("payment.payPal-route")
-
-  val DisableBankAccountDeletion: Boolean =
-    config.getBoolean("payment.disable-bank-account-deletion")
-
-  val ExternalToPaymentAccountTag: String =
-    config.getString("payment.event-streams.external-to-payment-account-tag")
-
-  val AkkaNodeRole: String = config.getString("payment.akka-node-role")
+  lazy val PaymentConfig: Payment.Config = {
+    Configs[Payment.Config].get(config, "payment").toEither match {
+      case Left(configError) =>
+        Console.err.println(s"Something went wrong with the provided arguments $configError")
+        throw configError.configException
+      case Right(paymentConfig) => paymentConfig
+    }
+  }
 
 }
 
-object PaymentSettings extends PaymentSettings
+object PaymentSettings extends PaymentSettings {
+  def apply(conf: Config): PaymentSettings = new PaymentSettings {
+    override lazy val config: Config = conf
+  }
+
+  def apply(): PaymentSettings = new PaymentSettings {}
+}

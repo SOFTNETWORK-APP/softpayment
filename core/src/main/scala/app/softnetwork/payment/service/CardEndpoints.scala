@@ -20,7 +20,7 @@ trait CardEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val loadCards: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
-      .in(PaymentSettings.CardRoute)
+      .in(PaymentSettings.PaymentConfig.cardRoute)
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[Seq[CardView]].description("Authenticated user cards")
@@ -38,7 +38,7 @@ trait CardEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val preRegisterCard: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
-      .in(PaymentSettings.CardRoute)
+      .in(PaymentSettings.PaymentConfig.cardRoute)
       .in(jsonBody[PreRegisterCard])
       .out(
         statusCode(StatusCode.Ok).and(
@@ -74,7 +74,7 @@ trait CardEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val disableCard: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.delete
-      .in(PaymentSettings.CardRoute)
+      .in(PaymentSettings.PaymentConfig.cardRoute)
       .in(query[String]("cardId").description("Card id to disable"))
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[CardDisabled.type])

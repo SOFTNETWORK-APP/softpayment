@@ -51,7 +51,8 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         printReceipt = true
       )
     )
-      .in(PaymentSettings.PreAuthorizeCardRoute)
+      .in(PaymentSettings.PaymentConfig.preAuthorizeCardRoute)
+      .in(paths.description("optional credited account"))
       .post
       .out(
         oneOf[PaymentResult](
@@ -69,41 +70,48 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           )
         )
       )
-      .serverLogic(principal => { case (language, accept, userAgent, ipAddress, payment) =>
-        val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
-        import payment._
-        run(
-          PreAuthorizeCard(
-            orderUuid,
-            externalUuidWithProfile(principal._2),
-            debitedAmount,
-            currency,
-            registrationId,
-            registrationData,
-            registerCard,
-            if (browserInfo.isDefined) ipAddress else None,
-            browserInfo,
-            printReceipt
-          )
-        ).map {
-          case result: CardPreAuthorized  => Right(result)
-          case result: PaymentRedirection => Right(result)
-          case other                      => Left(error(other))
-        }
+      .serverLogic(principal => {
+        case (language, accept, userAgent, ipAddress, payment, creditedAccount) =>
+          val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
+          import payment._
+          run(
+            PreAuthorizeCard(
+              orderUuid,
+              externalUuidWithProfile(principal._2),
+              debitedAmount,
+              currency,
+              registrationId,
+              registrationData,
+              registerCard,
+              if (browserInfo.isDefined) ipAddress else None,
+              browserInfo,
+              printReceipt,
+              creditedAccount.headOption,
+              feesAmount
+            )
+          ).map {
+            case result: CardPreAuthorized  => Right(result)
+            case result: PaymentRedirection => Right(result)
+            case other                      => Left(error(other))
+          }
       })
       .description("Pre authorize card")
 
-  val preAuthorizeCardFor3DS: ServerEndpoint[Any with AkkaStreams, Future] =
+  val preAuthorizeCardCallback: ServerEndpoint[Any with AkkaStreams, Future] =
     rootEndpoint
-      .in(PaymentSettings.SecureModeRoute / PaymentSettings.PreAuthorizeCardRoute)
+      .in(
+        PaymentSettings.PaymentConfig.callbacksRoute / PaymentSettings.PaymentConfig.preAuthorizeCardRoute
+      )
       .in(path[String].description("Order uuid"))
-      .in(query[String]("preAuthorizationId").description("Pre authorization transaction id"))
+      .in(queryParams)
+      .description("Pre authorization query parameters")
+      /*.in(query[String]("preAuthorizationId").description("Pre authorization transaction id"))
       .in(
         query[Boolean]("registerCard").description(
           "Whether to register or not the card after successfully pre authorization"
         )
       )
-      .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))
+      .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))*/
       .out(
         oneOf[PaymentResult](
           oneOfVariant[CardPreAuthorized](
@@ -121,9 +129,14 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .description("Pre authorize card for 3D secure")
-      .serverLogic { case (orderUuid, preAuthorizationId, registerCard, printReceipt) =>
+      .serverLogic { case (orderUuid, params) =>
+        val preAuthorizationIdParameter =
+          params.get("preAuthorizationIdParameter").getOrElse("preAuthorizationId")
+        val preAuthorizationId = params.get(preAuthorizationIdParameter).getOrElse("")
+        val registerCard = params.get("registerCard").getOrElse("false").toBoolean
+        val printReceipt = params.get("printReceipt").getOrElse("false").toBoolean
         run(
-          PreAuthorizeCardFor3DS(orderUuid, preAuthorizationId, registerCard, printReceipt)
+          PreAuthorizeCardCallback(orderUuid, preAuthorizationId, registerCard, printReceipt)
         ).map {
           case result: CardPreAuthorized  => Right(result)
           case result: PaymentRedirection => Right(result)
@@ -142,7 +155,7 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         printReceipt = true
       )
     )
-      .in(PaymentSettings.PayInRoute)
+      .in(PaymentSettings.PaymentConfig.payInRoute)
       .in(path[String].description("credited account"))
       .post
       .out(
@@ -153,7 +166,11 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           ),
           oneOfVariant[PaymentRedirection](
             statusCode(StatusCode.Accepted)
-              .and(jsonBody[PaymentRedirection].description("Payment redirection to 3D secure"))
+              .and(jsonBody[PaymentRedirection].description("Payment redirection"))
+          ),
+          oneOfVariant[PaymentRequired](
+            statusCode(StatusCode.PaymentRequired)
+              .and(jsonBody[PaymentRequired].description("Payment required"))
           )
         )
       )
@@ -175,27 +192,28 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               browserInfo,
               statementDescriptor,
               paymentType,
-              printReceipt
+              printReceipt,
+              feesAmount,
+              user = user, // required for Pay in without registered card (eg PayPal)
+              clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
             )
           ).map {
             case result: PaidIn             => Right(result)
             case result: PaymentRedirection => Right(result)
+            case result: PaymentRequired    => Right(result)
             case other                      => Left(error(other))
           }
       })
       .description("Pay in")
 
-  val payInFor3DS: ServerEndpoint[Any with AkkaStreams, Future] =
+  val payInCallback: ServerEndpoint[Any with AkkaStreams, Future] =
     rootEndpoint
-      .in(PaymentSettings.SecureModeRoute / PaymentSettings.PayInRoute)
+      .in(PaymentSettings.PaymentConfig.callbacksRoute / PaymentSettings.PaymentConfig.payInRoute)
       .in(path[String].description("Order uuid"))
-      .in(query[String]("transactionId").description("Payment transaction id"))
-      .in(
-        query[Boolean]("registerCard").description(
-          "Whether to register or not the card after successfully pay in"
-        )
-      )
-      .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))
+      .in(queryParams)
+      .description("Pay in query parameters")
+      /*.in(query[String]("transactionId").description("Payment transaction id"))
+      .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))*/
       .out(
         oneOf[PaymentResult](
           oneOfVariant[PaidIn](
@@ -205,52 +223,33 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           oneOfVariant[PaymentRedirection](
             statusCode(StatusCode.Accepted)
               .and(jsonBody[PaymentRedirection].description("Payment redirection to 3D secure"))
-          )
-        )
-      )
-      .description("Pay in for 3D secure")
-      .serverLogic { case (orderUuid, transactionId, registerCard, printReceipt) =>
-        run(
-          PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt)
-        ).map {
-          case result: PaidIn             => Right(result)
-          case result: PaymentRedirection => Right(result)
-          case other                      => Left(error(other))
-        }
-      }
-
-  val payInForPayPal: ServerEndpoint[Any with AkkaStreams, Future] =
-    rootEndpoint
-      .in(PaymentSettings.PayPalRoute)
-      .in(path[String].description("Order uuid"))
-      .in(query[String]("transactionId").description("Payment transaction id"))
-      .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))
-      .out(
-        oneOf[PaymentResult](
-          oneOfVariant[PaidIn](
-            statusCode(StatusCode.Ok)
-              .and(jsonBody[PaidIn].description("Payment transaction result"))
           ),
-          oneOfVariant[PaymentRedirection](
-            statusCode(StatusCode.Accepted)
-              .and(jsonBody[PaymentRedirection].description("Payment redirection to 3D secure"))
+          oneOfVariant[PaymentRequired](
+            statusCode(StatusCode.PaymentRequired)
+              .and(jsonBody[PaymentRequired].description("Payment required"))
           )
         )
       )
-      .description("Pay in for PayPal")
-      .serverLogic { case (orderUuid, transactionId, printReceipt) =>
+      .description("Pay in with card")
+      .serverLogic { case (orderUuid, params) =>
+        val transactionIdParameter =
+          params.get("transactionIdParameter").getOrElse("transactionId")
+        val transactionId = params.get(transactionIdParameter).getOrElse("")
+        val registerCard = params.get("registerCard").getOrElse("false").toBoolean
+        val printReceipt = params.get("printReceipt").getOrElse("false").toBoolean
         run(
-          PayInForPayPal(orderUuid, transactionId, printReceipt)
+          PayInCallback(orderUuid, transactionId, registerCard, printReceipt)
         ).map {
           case result: PaidIn             => Right(result)
           case result: PaymentRedirection => Right(result)
+          case result: PaymentRequired    => Right(result)
           case other                      => Left(error(other))
         }
       }
 
   val executeFirstRecurringCardPayment: ServerEndpoint[Any with AkkaStreams, Future] =
     payment(Payment("", 0)).post
-      .in(PaymentSettings.RecurringPaymentRoute)
+      .in(PaymentSettings.PaymentConfig.recurringPaymentRoute)
       .in(path[String].description("Recurring payment registration Id"))
       .out(
         oneOf[PaymentResult](
@@ -290,9 +289,11 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       })
       .description("Execute first recurring payment")
 
-  val executeFirstRecurringCardPaymentFor3DS: ServerEndpoint[Any with AkkaStreams, Future] =
+  val executeFirstRecurringCardPaymentCallback: ServerEndpoint[Any with AkkaStreams, Future] =
     rootEndpoint
-      .in(PaymentSettings.SecureModeRoute / PaymentSettings.RecurringPaymentRoute)
+      .in(
+        PaymentSettings.PaymentConfig.callbacksRoute / PaymentSettings.PaymentConfig.recurringPaymentRoute
+      )
       .in(path[String].description("Recurring payment registration Id"))
       .in(query[String]("transactionId").description("First recurring payment transaction Id"))
       .out(
@@ -314,7 +315,7 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .description("Execute first recurring payment for 3D secure")
       .serverLogic { case (recurringPayInRegistrationId, transactionId) =>
         run(
-          PayInFirstRecurringFor3DS(recurringPayInRegistrationId, transactionId)
+          FirstRecurringPaymentCallback(recurringPayInRegistrationId, transactionId)
         ).map {
           case result: PaidIn             => Right(result)
           case result: PaymentRedirection => Right(result)
@@ -325,11 +326,10 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val cardPaymentEndpoints: List[ServerEndpoint[AkkaStreams with capabilities.WebSockets, Future]] =
     List(
       preAuthorizeCard,
-      preAuthorizeCardFor3DS,
+      preAuthorizeCardCallback,
       payIn,
-      payInFor3DS,
-      payInForPayPal,
+      payInCallback,
       executeFirstRecurringCardPayment,
-      executeFirstRecurringCardPaymentFor3DS
+      executeFirstRecurringCardPaymentCallback
     )
 }

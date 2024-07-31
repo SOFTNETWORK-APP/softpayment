@@ -75,7 +75,8 @@ class PaymentHandlerSpec
           "EUR",
           Some(cardPreRegistration.id),
           Some(cardPreRegistration.preregistrationData),
-          registerCard = true
+          registerCard = true,
+          creditedAccount = Some(computeExternalUuidWithProfile(sellerUuid, Some("seller")))
         )
       ) await {
         case result: PaymentRedirection =>
@@ -93,7 +94,7 @@ class PaymentHandlerSpec
 
     "update card pre authorization" in {
       !?(
-        PreAuthorizeCardFor3DS(
+        PreAuthorizeCardCallback(
           orderUuid,
           preAuthorizationId
         )
@@ -134,7 +135,9 @@ class PaymentHandlerSpec
       !?(
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(None, ownerName, ownerAddress, "", bic)
+          BankAccount(None, ownerName, ownerAddress, "", bic),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case WrongIban =>
@@ -146,7 +149,9 @@ class PaymentHandlerSpec
       !?(
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(None, ownerName, ownerAddress, iban, "WRONG")
+          BankAccount(None, ownerName, ownerAddress, iban, "WRONG"),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case WrongBic =>
@@ -160,7 +165,9 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           BankAccount(None, ownerName, ownerAddress, iban, ""),
           Some(User.NaturalUser(naturalUser.withExternalUuid(sellerUuid).withProfile("seller"))),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -207,7 +214,9 @@ class PaymentHandlerSpec
                 .withProfile("seller")
             )
           ),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -254,7 +263,9 @@ class PaymentHandlerSpec
                 .withProfile("seller")
             )
           ),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -282,7 +293,9 @@ class PaymentHandlerSpec
                 .withProfile("seller")
             )
           ),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -314,7 +327,9 @@ class PaymentHandlerSpec
                 .withProfile("seller")
             )
           ),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await { case r: BankAccountCreatedOrUpdated =>
         assert(!r.kycUpdated && !r.documentsUpdated && r.userUpdated)
@@ -342,7 +357,9 @@ class PaymentHandlerSpec
                 .withProfile("seller")
             )
           ),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await { case r: BankAccountCreatedOrUpdated =>
         assert(!r.kycUpdated && !r.documentsUpdated && r.userUpdated)
@@ -360,7 +377,9 @@ class PaymentHandlerSpec
             iban,
             bic
           ),
-          Some(User.LegalUser(legalUser.withSiret("")))
+          Some(User.LegalUser(legalUser.withSiret(""))),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case WrongSiret =>
@@ -379,7 +398,9 @@ class PaymentHandlerSpec
             iban,
             bic
           ),
-          Some(User.LegalUser(legalUser.withLegalName("")))
+          Some(User.LegalUser(legalUser.withLegalName(""))),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case LegalNameRequired =>
@@ -398,7 +419,9 @@ class PaymentHandlerSpec
             iban,
             bic
           ),
-          Some(User.LegalUser(legalUser))
+          Some(User.LegalUser(legalUser)),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case AcceptedTermsOfPSPRequired =>
@@ -423,7 +446,9 @@ class PaymentHandlerSpec
             )
           ),
           Some(true),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -474,7 +499,9 @@ class PaymentHandlerSpec
             )
           ),
           Some(true),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -551,7 +578,9 @@ class PaymentHandlerSpec
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
           Some(true),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -568,7 +597,9 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -584,7 +615,9 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
-          Some(true)
+          Some(true),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -601,7 +634,9 @@ class PaymentHandlerSpec
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
           Some(true),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -617,7 +652,9 @@ class PaymentHandlerSpec
           updatedBankAccount.withBic(""),
           Some(User.LegalUser(updatedLegalUser)),
           Some(true),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -637,7 +674,9 @@ class PaymentHandlerSpec
           updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
           Some(true),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
@@ -726,7 +765,13 @@ class PaymentHandlerSpec
     }
 
     "ask for declaration validation" in {
-      !?(ValidateUboDeclaration(computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
+      !?(
+        ValidateUboDeclaration(
+          computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+          "127.0.0.1",
+          Some("UserAgent")
+        )
+      ) await {
         case UboDeclarationAskedForValidation =>
           !?(GetUboDeclaration(computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
             case result: UboDeclarationLoaded =>
@@ -777,7 +822,8 @@ class PaymentHandlerSpec
           "EUR",
           Some(cardPreRegistration.id),
           Some(cardPreRegistration.preregistrationData),
-          registerCard = true
+          registerCard = true,
+          creditedAccount = Some(computeExternalUuidWithProfile(sellerUuid, Some("seller")))
         )
       ) await {
         case result: CardPreAuthorized =>
@@ -801,7 +847,8 @@ class PaymentHandlerSpec
           "EUR",
           Some(cardPreRegistration.id),
           Some(cardPreRegistration.preregistrationData),
-          registerCard = true
+          registerCard = true,
+          creditedAccount = Some(computeExternalUuidWithProfile(sellerUuid, Some("seller")))
         )
       ) await {
         case result: CardPreAuthorized =>
@@ -844,7 +891,8 @@ class PaymentHandlerSpec
                 100,
                 0,
                 "EUR",
-                None
+                None,
+                result.transactionId
               ) complete () match {
                 case Success(s) =>
                   assert(s.transactionId.isDefined)
@@ -867,14 +915,15 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(sellerUuid, Some("seller"))
         )
       ) await {
-        case _: PaidIn =>
+        case result: PaidIn =>
           paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             100,
             0,
             "EUR",
-            None
+            None,
+            Option(result.transactionId)
           ) complete () match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
@@ -909,20 +958,21 @@ class PaymentHandlerSpec
           val printReceipt = params.getOrElse("printReceipt", "")
           assert(printReceipt == "true")
           !?(
-            PayInForPayPal(
+            PayInCallback(
               orderUuid,
               transactionId,
               printReceipt.toBoolean
             )
           ) await {
-            case _: PaidIn =>
+            case result: PaidIn =>
               paymentClient.payOut(
                 orderUuid,
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
                 0,
                 "EUR",
-                None
+                None,
+                Option(result.transactionId)
               ) complete () match {
                 case Success(s) =>
                   assert(s.transactionId.isDefined)
@@ -983,7 +1033,9 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
           BankAccount(None, ownerName, ownerAddress, iban, bic),
           Some(User.NaturalUser(naturalUser.withExternalUuid(vendorUuid).withProfile("vendor"))),
-          clientId = Some(clientId)
+          clientId = Some(clientId),
+          ipAddress = Some("127.0.0.1"),
+          userAgent = Some("UserAgent")
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>

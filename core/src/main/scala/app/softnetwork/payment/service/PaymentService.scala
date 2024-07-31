@@ -22,7 +22,7 @@ import de.heikoseeberger.akkahttpjson4s.Json4sSupport
 import org.json4s.{jackson, Formats}
 import org.json4s.jackson.Serialization
 import app.softnetwork.api.server._
-import app.softnetwork.payment.config.PaymentSettings._
+import app.softnetwork.payment.config.PaymentSettings.PaymentConfig._
 import app.softnetwork.payment.model._
 import app.softnetwork.payment.spi.PaymentProviders
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -50,13 +50,12 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
   override implicit def ts: ActorSystem[_] = system
 
   val route: Route = {
-    pathPrefix(PaymentSettings.PaymentPath) {
+    pathPrefix(PaymentSettings.PaymentConfig.path) {
       hooks ~
       card ~
-      payInFor3ds ~
-      payInForPayPal ~
-      preAuthorizeCardFor3ds ~
-      payInFirstRecurringFor3ds ~
+      payInCallback ~
+      preAuthorizeCardCallback ~
+      firstRecurringPaymentCallback ~
       bank ~
       declaration ~
       kyc ~
@@ -66,7 +65,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     }
   }
 
-  lazy val card: Route = pathPrefix(CardRoute) {
+  lazy val card: Route = pathPrefix(cardRoute) {
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
@@ -160,57 +159,58 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                         userAgent.map(_.value()),
                         payment
                       )
-                    pathPrefix(PreAuthorizeCardRoute) {
-                      run(
-                        PreAuthorizeCard(
-                          orderUuid,
-                          externalUuidWithProfile(session),
-                          debitedAmount,
-                          currency,
-                          registrationId,
-                          registrationData,
-                          registerCard,
-                          if (browserInfo.isDefined) Some(ipAddress) else None,
-                          browserInfo,
-                          printReceipt
-                        )
-                      ) completeWith {
-                        case r: CardPreAuthorized =>
-                          complete(
-                            HttpResponse(
-                              StatusCodes.OK,
-                              entity = r
-                            )
-                          )
-                        case r: PaymentRedirection =>
-                          complete(
-                            HttpResponse(
-                              StatusCodes.Accepted,
-                              entity = r
-                            )
-                          )
-                        case other => error(other)
-                      }
-                    } ~ pathPrefix(PayInRoute) {
-                      pathPrefix(Segment) { creditedAccount =>
+                    pathPrefix(preAuthorizeCardRoute) {
+                      pathEnd {
                         run(
-                          PayIn(
+                          PreAuthorizeCard(
                             orderUuid,
                             externalUuidWithProfile(session),
                             debitedAmount,
                             currency,
-                            creditedAccount,
                             registrationId,
                             registrationData,
                             registerCard,
                             if (browserInfo.isDefined) Some(ipAddress) else None,
                             browserInfo,
-                            statementDescriptor,
-                            paymentType,
-                            printReceipt
+                            printReceipt,
+                            None,
+                            feesAmount
                           )
                         ) completeWith {
-                          case r: PaidIn =>
+                          case r: CardPreAuthorized =>
+                            complete(
+                              HttpResponse(
+                                StatusCodes.OK,
+                                entity = r
+                              )
+                            )
+                          case r: PaymentRedirection =>
+                            complete(
+                              HttpResponse(
+                                StatusCodes.Accepted,
+                                entity = r
+                              )
+                            )
+                          case other => error(other)
+                        }
+                      } ~ pathSuffix(Segment) { creditedAccount =>
+                        run(
+                          PreAuthorizeCard(
+                            orderUuid,
+                            externalUuidWithProfile(session),
+                            debitedAmount,
+                            currency,
+                            registrationId,
+                            registrationData,
+                            registerCard,
+                            if (browserInfo.isDefined) Some(ipAddress) else None,
+                            browserInfo,
+                            printReceipt,
+                            Some(creditedAccount),
+                            feesAmount
+                          )
+                        ) completeWith {
+                          case r: CardPreAuthorized =>
                             complete(
                               HttpResponse(
                                 StatusCodes.OK,
@@ -227,7 +227,52 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                           case other => error(other)
                         }
                       }
-                    } ~ pathPrefix(RecurringPaymentRoute) {
+                    } ~ pathPrefix(payInRoute) {
+                      pathPrefix(Segment) { creditedAccount =>
+                        run(
+                          PayIn(
+                            orderUuid,
+                            externalUuidWithProfile(session),
+                            debitedAmount,
+                            currency,
+                            creditedAccount,
+                            registrationId,
+                            registrationData,
+                            registerCard,
+                            if (browserInfo.isDefined) Some(ipAddress) else None,
+                            browserInfo,
+                            statementDescriptor,
+                            paymentType,
+                            printReceipt,
+                            user = user, // required for Pay in without registered card (eg PayPal)
+                            clientId = client.map(_.clientId).orElse(session.clientId)
+                          )
+                        ) completeWith {
+                          case r: PaidIn =>
+                            complete(
+                              HttpResponse(
+                                StatusCodes.OK,
+                                entity = r
+                              )
+                            )
+                          case r: PaymentRedirection =>
+                            complete(
+                              HttpResponse(
+                                StatusCodes.Accepted,
+                                entity = r
+                              )
+                            )
+                          case r: PaymentRequired =>
+                            complete(
+                              HttpResponse(
+                                StatusCodes.PaymentRequired,
+                                entity = r
+                              )
+                            )
+                          case other => error(other)
+                        }
+                      }
+                    } ~ pathPrefix(recurringPaymentRoute) {
                       pathPrefix(Segment) { recurringPaymentRegistrationId =>
                         run(
                           PayInFirstRecurring(
@@ -266,61 +311,54 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     }
   }
 
-  lazy val payInFor3ds: Route = pathPrefix(SecureModeRoute / PayInRoute) {
+  lazy val payInCallback: Route = pathPrefix(callbacksRoute / payInRoute) {
     pathPrefix(Segment) { orderUuid =>
-      parameters("transactionId", "registerCard".as[Boolean], "printReceipt".as[Boolean]) {
-        (transactionId, registerCard, printReceipt) =>
-          run(PayInFor3DS(orderUuid, transactionId, registerCard, printReceipt)) completeWith {
-            case r: PaidIn =>
-              complete(
-                HttpResponse(
-                  StatusCodes.OK,
-                  entity = r
+      parameterMap { params =>
+        val transactionIdParameter =
+          params.getOrElse("transactionIdParameter", "transactionId")
+        parameters(transactionIdParameter, "registerCard".as[Boolean], "printReceipt".as[Boolean]) {
+          (transactionId, registerCard, printReceipt) =>
+            run(PayInCallback(orderUuid, transactionId, registerCard, printReceipt)) completeWith {
+              case r: PaidIn =>
+                complete(
+                  HttpResponse(
+                    StatusCodes.OK,
+                    entity = r
+                  )
                 )
-              )
-            case r: PaymentRedirection =>
-              complete(
-                HttpResponse(
-                  StatusCodes.Accepted,
-                  entity = r
+              case r: PaymentRedirection =>
+                complete(
+                  HttpResponse(
+                    StatusCodes.Accepted,
+                    entity = r
+                  )
                 )
-              )
-            case other => error(other)
-          }
-      }
-    }
-  }
-
-  lazy val payInForPayPal: Route = pathPrefix(PayPalRoute) {
-    pathPrefix(Segment) { orderUuid =>
-      parameters("transactionId", "printReceipt".as[Boolean]) { (transactionId, printReceipt) =>
-        run(PayInForPayPal(orderUuid, transactionId, printReceipt)) completeWith {
-          case r: PaidIn =>
-            complete(
-              HttpResponse(
-                StatusCodes.OK,
-                entity = r
-              )
-            )
-          case r: PaymentRedirection =>
-            complete(
-              HttpResponse(
-                StatusCodes.Accepted,
-                entity = r
-              )
-            )
-          case other => error(other)
+              case r: PaymentRequired =>
+                complete(
+                  HttpResponse(
+                    StatusCodes.PaymentRequired,
+                    entity = r
+                  )
+                )
+              case other => error(other)
+            }
         }
       }
     }
   }
 
-  lazy val preAuthorizeCardFor3ds: Route = pathPrefix(SecureModeRoute / PreAuthorizeCardRoute) {
+  lazy val preAuthorizeCardCallback: Route = pathPrefix(callbacksRoute / preAuthorizeCardRoute) {
     pathPrefix(Segment) { orderUuid =>
-      parameters("preAuthorizationId", "registerCard".as[Boolean], "printReceipt".as[Boolean]) {
-        (preAuthorizationId, registerCard, printReceipt) =>
+      parameterMap { params =>
+        val preAuthorizationIdParameter =
+          params.getOrElse("preAuthorizationIdParameter", "preAuthorizationId")
+        parameters(
+          preAuthorizationIdParameter,
+          "registerCard".as[Boolean],
+          "printReceipt".as[Boolean]
+        ) { (preAuthorizationId, registerCard, printReceipt) =>
           run(
-            PreAuthorizeCardFor3DS(orderUuid, preAuthorizationId, registerCard, printReceipt)
+            PreAuthorizeCardCallback(orderUuid, preAuthorizationId, registerCard, printReceipt)
           ) completeWith {
             case _: CardPreAuthorized =>
               complete(
@@ -337,45 +375,50 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
               )
             case other => error(other)
           }
-      }
-    }
-  }
-
-  lazy val payInFirstRecurringFor3ds: Route = pathPrefix(SecureModeRoute / RecurringPaymentRoute) {
-    pathPrefix(Segment) { recurringPayInRegistrationId =>
-      parameter("transactionId") { transactionId =>
-        run(PayInFirstRecurringFor3DS(recurringPayInRegistrationId, transactionId)) completeWith {
-          case r: PaidIn =>
-            complete(
-              HttpResponse(
-                StatusCodes.OK,
-                entity = r
-              )
-            )
-          case r: PaymentRedirection =>
-            complete(
-              HttpResponse(
-                StatusCodes.Accepted,
-                entity = r
-              )
-            )
-          case other => error(other)
         }
       }
     }
   }
 
+  lazy val firstRecurringPaymentCallback: Route =
+    pathPrefix(callbacksRoute / recurringPaymentRoute) {
+      pathPrefix(Segment) { recurringPayInRegistrationId =>
+        parameter("transactionId") { transactionId =>
+          run(
+            FirstRecurringPaymentCallback(recurringPayInRegistrationId, transactionId)
+          ) completeWith {
+            case r: PaidIn =>
+              complete(
+                HttpResponse(
+                  StatusCodes.OK,
+                  entity = r
+                )
+              )
+            case r: PaymentRedirection =>
+              complete(
+                HttpResponse(
+                  StatusCodes.Accepted,
+                  entity = r
+                )
+              )
+            case other => error(other)
+          }
+        }
+      }
+    }
+
   private lazy val hooksRoutes: List[Route] = PaymentProviders.hooksDirectives.map { case (k, v) =>
+    log.info("registering hooks for provider: {}", k)
     pathPrefix(k) {
       v.hooks
     }
   }.toList
 
-  lazy val hooks: Route = pathPrefix(HooksRoute) {
+  lazy val hooks: Route = pathPrefix(hooksRoute) {
     concat(hooksRoutes: _*)
   }
 
-  lazy val bank: Route = pathPrefix(BankRoute) {
+  lazy val bank: Route = pathPrefix(bankRoute) {
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
@@ -399,56 +442,62 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
             }
           } ~
           post {
-            entity(as[BankAccountCommand]) { bank =>
-              import bank._
-              var externalUuid: String = ""
-              val updatedUser: Option[PaymentAccount.User] =
-                user match {
-                  case Left(naturalUser) =>
-                    var updatedNaturalUser = {
-                      if (naturalUser.externalUuid.trim.isEmpty) {
-                        naturalUser.withExternalUuid(session.id)
-                      } else {
-                        naturalUser
-                      }
+            optionalHeaderValueByType[UserAgent]((): Unit) { userAgent =>
+              extractClientIP { ipAddress =>
+                entity(as[BankAccountCommand]) { bank =>
+                  import bank._
+                  var externalUuid: String = ""
+                  val updatedUser: Option[PaymentAccount.User] =
+                    user match {
+                      case Left(naturalUser) =>
+                        var updatedNaturalUser = {
+                          if (naturalUser.externalUuid.trim.isEmpty) {
+                            naturalUser.withExternalUuid(session.id)
+                          } else {
+                            naturalUser
+                          }
+                        }
+                        session.profile match {
+                          case Some(profile) if updatedNaturalUser.profile.isEmpty =>
+                            updatedNaturalUser = updatedNaturalUser.withProfile(profile)
+                          case _ =>
+                        }
+                        externalUuid = updatedNaturalUser.externalUuid
+                        Some(PaymentAccount.User.NaturalUser(updatedNaturalUser))
+                      case Right(legalUser) =>
+                        var updatedLegalRepresentative = legalUser.legalRepresentative
+                        if (updatedLegalRepresentative.externalUuid.trim.isEmpty) {
+                          updatedLegalRepresentative =
+                            updatedLegalRepresentative.withExternalUuid(session.id)
+                        }
+                        session.profile match {
+                          case Some(profile) if updatedLegalRepresentative.profile.isEmpty =>
+                            updatedLegalRepresentative =
+                              updatedLegalRepresentative.withProfile(profile)
+                          case _ =>
+                        }
+                        externalUuid = updatedLegalRepresentative.externalUuid
+                        Some(
+                          PaymentAccount.User.LegalUser(
+                            legalUser.withLegalRepresentative(updatedLegalRepresentative)
+                          )
+                        )
                     }
-                    session.profile match {
-                      case Some(profile) if updatedNaturalUser.profile.isEmpty =>
-                        updatedNaturalUser = updatedNaturalUser.withProfile(profile)
-                      case _ =>
-                    }
-                    externalUuid = updatedNaturalUser.externalUuid
-                    Some(PaymentAccount.User.NaturalUser(updatedNaturalUser))
-                  case Right(legalUser) =>
-                    var updatedLegalRepresentative = legalUser.legalRepresentative
-                    if (updatedLegalRepresentative.externalUuid.trim.isEmpty) {
-                      updatedLegalRepresentative =
-                        updatedLegalRepresentative.withExternalUuid(session.id)
-                    }
-                    session.profile match {
-                      case Some(profile) if updatedLegalRepresentative.profile.isEmpty =>
-                        updatedLegalRepresentative = updatedLegalRepresentative.withProfile(profile)
-                      case _ =>
-                    }
-                    externalUuid = updatedLegalRepresentative.externalUuid
-                    Some(
-                      PaymentAccount.User.LegalUser(
-                        legalUser.withLegalRepresentative(updatedLegalRepresentative)
-                      )
+                  run(
+                    CreateOrUpdateBankAccount(
+                      externalUuidWithProfile(session),
+                      bankAccount.withExternalUuid(externalUuid),
+                      updatedUser,
+                      acceptedTermsOfPSP,
+                      Some(ipAddress.value),
+                      userAgent.map(_.name())
                     )
+                  ) completeWith {
+                    case r: BankAccountCreatedOrUpdated =>
+                      complete(HttpResponse(StatusCodes.OK, entity = r))
+                    case other => error(other)
+                  }
                 }
-              run(
-                CreateOrUpdateBankAccount(
-                  externalUuidWithProfile(session),
-                  bankAccount.withExternalUuid(externalUuid),
-                  updatedUser,
-                  acceptedTermsOfPSP,
-                  client.map(_.clientId).orElse(session.clientId)
-                )
-              ) completeWith {
-                case r: BankAccountCreatedOrUpdated =>
-                  complete(HttpResponse(StatusCodes.OK, entity = r))
-                case other => error(other)
               }
             }
           } ~
@@ -463,7 +512,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     }
   }
 
-  lazy val declaration: Route = pathPrefix(DeclarationRoute) {
+  lazy val declaration: Route = pathPrefix(declarationRoute) {
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
@@ -484,10 +533,20 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
               }
             }
           } ~ put {
-            run(ValidateUboDeclaration(externalUuidWithProfile(session))) completeWith {
-              case _: UboDeclarationAskedForValidation.type =>
-                complete(HttpResponse(StatusCodes.OK))
-              case other => error(other)
+            optionalHeaderValueByType[UserAgent]((): Unit) { userAgent =>
+              extractClientIP { ipAddress =>
+                run(
+                  ValidateUboDeclaration(
+                    externalUuidWithProfile(session),
+                    ipAddress.value,
+                    userAgent.map(_.name())
+                  )
+                ) completeWith {
+                  case _: UboDeclarationAskedForValidation.type =>
+                    complete(HttpResponse(StatusCodes.OK))
+                  case other => error(other)
+                }
+              }
             }
           }
         }
@@ -496,7 +555,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
   }
 
   lazy val kyc: Route = {
-    pathPrefix(KycRoute) {
+    pathPrefix(kycRoute) {
       parameter("documentType") { documentType =>
         val maybeKycDocumentType: Option[KycDocument.KycDocumentType] =
           KycDocument.KycDocumentType.enumCompanion.fromName(documentType)
@@ -555,7 +614,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
   }
 
   lazy val mandate: Route =
-    pathPrefix(MandateRoute) {
+    pathPrefix(mandateRoute) {
       parameter("MandateId") { mandateId =>
         run(UpdateMandateStatus(mandateId)) completeWith {
           case r: MandateStatusUpdated => complete(HttpResponse(StatusCodes.OK, entity = r.result))
@@ -594,7 +653,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-  lazy val recurringPayment: Route = pathPrefix(RecurringPaymentRoute) {
+  lazy val recurringPayment: Route = pathPrefix(recurringPaymentRoute) {
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists

@@ -68,6 +68,20 @@ trait PaymentClient extends GrpcClient {
       )
   }
 
+  def loadPayInTransaction(
+    orderUuid: String,
+    payInTransactionId: String,
+    token: Option[String] = None
+  ): Future[TransactionResponse] = {
+    withAuthorization(
+      grpcClient.loadPayInTransaction(),
+      token
+    )
+      .invoke(
+        LoadPayInTransactionRequest(orderUuid, payInTransactionId, settings.clientId)
+      )
+  }
+
   def cancelPreAuthorization(
     orderUuid: String,
     cardPreAuthorizedTransactionId: String,
@@ -115,6 +129,7 @@ trait PaymentClient extends GrpcClient {
     feesAmount: Int,
     currency: String,
     externalReference: Option[String],
+    payInTransactionId: Option[String],
     token: Option[String] = None
   ): Future[TransactionResponse] = {
     withAuthorization(
@@ -129,8 +144,23 @@ trait PaymentClient extends GrpcClient {
           feesAmount,
           currency,
           externalReference,
-          settings.clientId
+          settings.clientId,
+          payInTransactionId
         )
+      )
+  }
+
+  def loadPayOutTransaction(
+    orderUuid: String,
+    payOutTransactionId: String,
+    token: Option[String] = None
+  ): Future[TransactionResponse] = {
+    withAuthorization(
+      grpcClient.loadPayOutTransaction(),
+      token
+    )
+      .invoke(
+        LoadPayOutTransactionRequest(orderUuid, payOutTransactionId, settings.clientId)
       )
   }
 

@@ -6,7 +6,7 @@ import app.softnetwork.validation.RegexValidator
 import scala.util.matching.Regex
 
 trait LegalUserDecorator { self: LegalUser =>
-  lazy val wrongSiret: Boolean = !SiretValidator.check(siret)
+  lazy val wrongSiret: Boolean = !SiretValidator.check(siret.split(" ").mkString)
 
   lazy val wrongLegalRepresentativeAddress: Boolean = legalRepresentativeAddress.wrongAddress
 
@@ -18,6 +18,8 @@ trait LegalUserDecorator { self: LegalUser =>
     uboDeclaration.exists(_.status.isUboDeclarationValidated)
 
   lazy val view: LegalUserView = model.LegalUserView(self)
+
+  lazy val siren: String = siret.split(" ").mkString.take(9)
 }
 
 object SiretValidator extends RegexValidator {
@@ -28,6 +30,7 @@ case class LegalUserView(
   legalUserType: LegalUser.LegalUserType,
   legalName: String,
   siret: String,
+  siren: String,
   legalRepresentative: NaturalUserView,
   legalRepresentativeAddress: AddressView,
   headQuartersAddress: AddressView,
@@ -42,6 +45,7 @@ object LegalUserView {
       legalUserType,
       legalName,
       siret,
+      siren,
       legalRepresentative.view,
       legalRepresentativeAddress.view,
       headQuartersAddress.view,

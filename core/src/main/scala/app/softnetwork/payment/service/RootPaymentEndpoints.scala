@@ -32,7 +32,7 @@ trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
 
   lazy val rootEndpoint: Endpoint[Unit, Unit, Unit, Unit, Any] =
     endpoint
-      .in(PaymentSettings.PaymentPath)
+      .in(PaymentSettings.PaymentConfig.path)
 
   lazy val requiredSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
@@ -50,7 +50,7 @@ trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
           requiredClientSession
         }
       )
-      .in(PaymentSettings.PaymentPath)
+      .in(PaymentSettings.PaymentConfig.path)
 
   lazy val optionalSessionEndpoint: PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
@@ -68,6 +68,6 @@ trait RootPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
           optionalClientSession
         }
       )
-      .in(PaymentSettings.PaymentPath)
+      .in(PaymentSettings.PaymentConfig.path)
 
 }

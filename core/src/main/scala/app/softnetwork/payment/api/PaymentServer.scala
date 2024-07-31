@@ -19,7 +19,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
   TransferFailed,
   Transferred
 }
-import app.softnetwork.payment.model.{BankAccount, PaymentAccount, RecurringPayment}
+import app.softnetwork.payment.model.{BankAccount, PaymentAccount, RecurringPayment, Transaction}
 import app.softnetwork.payment.serialization._
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -114,6 +114,7 @@ trait PaymentServer extends PaymentServiceApi with PaymentDao {
       feesAmount,
       currency,
       externalReference,
+      payInTransactionId,
       Some(clientId)
     ) map {
       case Right(r: PaidOut) =>
@@ -279,6 +280,43 @@ trait PaymentServer extends PaymentServiceApi with PaymentDao {
     }
   }
 
+  override def loadPayInTransaction(
+    in: LoadPayInTransactionRequest
+  ): Future[TransactionResponse] = {
+    import in._
+    loadPayInTransaction(orderUuid, payInTransactionId, Some(clientId)) map {
+      case Right(r) =>
+        TransactionResponse(
+          transactionId = Some(r.transactionId),
+          transactionStatus = r.transactionStatus
+        )
+      case Left(_) =>
+        TransactionResponse(
+          transactionId = None,
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some("transaction not found")
+        )
+    }
+  }
+
+  override def loadPayOutTransaction(
+    in: LoadPayOutTransactionRequest
+  ): Future[TransactionResponse] = {
+    import in._
+    loadPayOutTransaction(orderUuid, payOutTransactionId, Some(clientId)) map {
+      case Right(r) =>
+        TransactionResponse(
+          transactionId = Some(r.transactionId),
+          transactionStatus = r.transactionStatus
+        )
+      case _ =>
+        TransactionResponse(
+          transactionId = None,
+          transactionStatus = TransactionStatus.TRANSACTION_NOT_SPECIFIED,
+          error = Some("transaction nont found")
+        )
+    }
+  }
 }
 
 object PaymentServer {

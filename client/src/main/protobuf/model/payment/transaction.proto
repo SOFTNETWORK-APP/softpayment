@@ -35,6 +35,8 @@ message Transaction {
         TRANSACTION_FAILED = 2;
         TRANSACTION_NOT_SPECIFIED = 4;
         TRANSACTION_FAILED_FOR_TECHNICAL_REASON = 5;
+        TRANSACTION_CANCELED = 6;
+        TRANSACTION_PENDING_PAYMENT = 7;
     }
     
     enum PaymentType {
@@ -85,6 +87,11 @@ message Transaction {
     optional string payPalBuyerAccountEmail = 31;
     optional string idempotencyKey = 32;
     optional string clientId = 33;
+    optional string paymentClientSecret = 34;
+    optional string paymentClientData = 35;
+    optional string paymentClientReturnUrl = 36;
+    optional string sourceTransactionId = 37;
+    optional int32 transferAmount = 38;
 }
 
 message BrowserInfo {
@@ -101,6 +108,26 @@ message BrowserInfo {
 }
 
 message PayInTransaction {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    option (scalapb.message).extends = "PayInTransactionDecorator";
+    required string orderUuid = 1;
+    required int32 debitedAmount = 2;
+    required int32 feesAmount = 3 [default = 0];
+    required string currency = 4 [default = "EUR"];
+    required string creditedWalletId = 5;
+    required string authorId = 6;
+    required string statementDescriptor = 7;
+    required Transaction.PaymentType paymentType = 8 [default = CARD];
+    optional string cardId = 9;
+    optional string ipAddress = 10;
+    optional BrowserInfo browserInfo = 11;
+    optional bool registerCard = 12;
+    optional bool printReceipt = 13;
+    optional string cardPreAuthorizedTransactionId = 14;
+    optional int32 preAuthorizationDebitedAmount = 15;
+}
+
+message PayInWithCardTransaction {
     option (scalapb.message).extends = "ProtobufDomainObject";
     required string orderUuid = 1;
     required int32 debitedAmount = 2;
@@ -127,6 +154,9 @@ message PayInWithPayPalTransaction {
     optional string language = 7;
     optional string statementDescriptor = 8;
     optional bool printReceipt = 9;
+    optional string payPalWalletId = 10;
+    optional string ipAddress = 11;
+    optional BrowserInfo browserInfo = 12;
 }
 
 message RefundTransaction {
@@ -151,6 +181,8 @@ message TransferTransaction {
     required string debitedWalletId = 7;
     optional string orderUuid = 8;
     optional string externalReference = 9;
+    optional string statementDescriptor = 10;
+    optional string payInTransactionId = 11;
 }
 
 message PayOutTransaction {
@@ -164,6 +196,8 @@ message PayOutTransaction {
     required string authorId = 7;
     required string debitedWalletId = 8;
     optional string externalReference = 9;
+    optional string payInTransactionId = 10;
+    optional string statementDescriptor = 11;
 }
 
 message DirectDebitTransaction {
@@ -190,6 +224,9 @@ message PreAuthorizationTransaction {
     optional BrowserInfo browserInfo = 7;
     optional bool registerCard = 8;
     optional bool printReceipt = 9;
+    optional string creditedUserId = 10;
+    optional int32 feesAmount = 11;
+    optional string statementDescriptor = 12;
 }
 
 message PayInWithCardPreAuthorizedTransaction {
@@ -201,6 +238,8 @@ message PayInWithCardPreAuthorizedTransaction {
     required string authorId = 5;
     required string cardPreAuthorizedTransactionId = 6;
     required int32 preAuthorizationDebitedAmount = 7;
+    optional int32 feesAmount = 8;
+    optional string statementDescriptor = 9;
 }
 
 message CardPreRegistration{
