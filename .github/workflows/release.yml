@@ -36,7 +36,7 @@ jobs:
         distribution: 'temurin'
         cache: 'sbt'
     - name: Run tests & Coverage Report
-      run: sbt coverage test coverageReport
+      run: STRIPE_CLIENT_ID=${{secrets.STRIPE_CLIENT_ID}} STRIPE_API_KEY=${{secrets.STRIPE_API_KEY}} sbt coverage test coverageReport
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
