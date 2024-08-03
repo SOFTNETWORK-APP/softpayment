@@ -62,6 +62,7 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
                 preAuthorizationId,
                 creditedAccount,
                 debitedAmount,
+                feesAmount,
                 clientId
               )
             !?(command) map {
@@ -80,6 +81,7 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
               orderUuid,
               payInTransactionId,
               refundAmount,
+              feesRefundAmount,
               currency,
               reasonMessage,
               initializedByClient,

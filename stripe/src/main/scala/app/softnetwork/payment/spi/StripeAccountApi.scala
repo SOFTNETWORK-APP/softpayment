@@ -239,6 +239,24 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             )
                             .build()
                         )
+                        .setSettings(
+                          AccountUpdateParams.Settings
+                            .builder()
+                            .setPayouts(
+                              AccountUpdateParams.Settings.Payouts
+                                .builder()
+                                .setSchedule(
+                                  AccountUpdateParams.Settings.Payouts.Schedule
+                                    .builder()
+                                    .setInterval(
+                                      AccountUpdateParams.Settings.Payouts.Schedule.Interval.MANUAL
+                                    )
+                                    .build()
+                                )
+                                .build()
+                            )
+                            .build()
+                        )
                         .putMetadata("external_uuid", naturalUser.externalUuid)
                     naturalUser.business match {
                       case Some(business) =>
@@ -392,6 +410,24 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             .build()
                         )
                         .setCountry(naturalUser.countryOfResidence)
+                        .setSettings(
+                          AccountCreateParams.Settings
+                            .builder()
+                            .setPayouts(
+                              AccountCreateParams.Settings.Payouts
+                                .builder()
+                                .setSchedule(
+                                  AccountCreateParams.Settings.Payouts.Schedule
+                                    .builder()
+                                    .setInterval(
+                                      AccountCreateParams.Settings.Payouts.Schedule.Interval.MANUAL
+                                    )
+                                    .build()
+                                )
+                                .build()
+                            )
+                            .build()
+                        )
                         .setMetadata(Map("external_uuid" -> naturalUser.externalUuid).asJava)
 
                     naturalUser.business match {
@@ -762,6 +798,24 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                           .build()
                       )
                       .setEmail(legalUser.legalRepresentative.email)
+                      .setSettings(
+                        AccountUpdateParams.Settings
+                          .builder()
+                          .setPayouts(
+                            AccountUpdateParams.Settings.Payouts
+                              .builder()
+                              .setSchedule(
+                                AccountUpdateParams.Settings.Payouts.Schedule
+                                  .builder()
+                                  .setInterval(
+                                    AccountUpdateParams.Settings.Payouts.Schedule.Interval.MANUAL
+                                  )
+                                  .build()
+                              )
+                              .build()
+                          )
+                          .build()
+                      )
                       .putMetadata("external_uuid", legalUser.legalRepresentative.externalUuid)
 
                   /*if (tos_shown_and_accepted) {
@@ -996,6 +1050,24 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                       )
                       .setCountry(legalUser.legalRepresentative.countryOfResidence)
                       .setEmail(legalUser.legalRepresentative.email)
+                      .setSettings(
+                        AccountCreateParams.Settings
+                          .builder()
+                          .setPayouts(
+                            AccountCreateParams.Settings.Payouts
+                              .builder()
+                              .setSchedule(
+                                AccountCreateParams.Settings.Payouts.Schedule
+                                  .builder()
+                                  .setInterval(
+                                    AccountCreateParams.Settings.Payouts.Schedule.Interval.MANUAL
+                                  )
+                                  .build()
+                              )
+                              .build()
+                          )
+                          .build()
+                      )
                       .putMetadata("external_uuid", legalUser.legalRepresentative.externalUuid)
 
                   /*if (tos_shown_and_accepted) {
@@ -1342,7 +1414,8 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
       case Some(userId) if userId.startsWith("acct") => // account
         Try {
           val account = Account.retrieve(userId, StripeApi().requestOptions)
-          val walletId = maybeWalletId.getOrElse(java.util.UUID.randomUUID().toString)
+          // the wallet id is the connected account id if not provided
+          val walletId = maybeWalletId.getOrElse(userId)
           account
             .update(
               AccountUpdateParams

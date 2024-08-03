@@ -55,21 +55,27 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                   case Some(feesAmount)
                       if feesAmount != Option(resource.getApplicationFeeAmount)
                         .map(_.intValue())
-                        .getOrElse(0) =>
-                    resource.update(
+                        .getOrElse(0) && resource.getStatus == "requires_capture" =>
+                    val params =
                       PaymentIntentUpdateParams
                         .builder()
                         .setApplicationFeeAmount(feesAmount)
-                        .build(),
-                      requestOptions
-                    )
+
+                    payInWithCardPreAuthorizedTransaction.statementDescriptor match {
+                      case Some(statementDescriptor) =>
+                        params.setStatementDescriptor(statementDescriptor)
+                      case _ =>
+                    }
+
+                    resource.update(params.build(), requestOptions)
                   case _ => resource
                 }
-              case _ => resource
+              case _ => // we set the fees amount only if the transfer destination has been set
+                resource
             }
 
           resource.getStatus match {
-            case "requires_capture" =>
+            case "requires_capture" => // we capture the funds now
               val params =
                 PaymentIntentCaptureParams
                   .builder()
@@ -86,12 +92,6 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                     payInWithCardPreAuthorizedTransaction.cardPreAuthorizedTransactionId
                   )
                   .putMetadata("order_uuid", payInWithCardPreAuthorizedTransaction.orderUuid)
-              /*.setTransferData( // transfer destination has to be set in the payment intent creation
-                PaymentIntentCaptureParams.TransferData
-                  .builder()
-                  .setAmount(payInWithCardPreAuthorizedTransaction.debitedAmount)
-                  .build()
-              )*/
 
               payInWithCardPreAuthorizedTransaction.statementDescriptor match {
                 case Some(statementDescriptor) =>
@@ -114,7 +114,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 .withOrderUuid(payInWithCardPreAuthorizedTransaction.orderUuid)
                 .withNature(Transaction.TransactionNature.REGULAR)
                 .withType(Transaction.TransactionType.PAYIN)
-                .withAmount(payment.getAmountReceived.intValue())
+                .withAmount(payment.getAmount.intValue())
                 .withFees(Option(payment.getApplicationFeeAmount).map(_.intValue()).getOrElse(0))
                 .withResultCode(status)
                 .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
@@ -127,16 +127,14 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 )
                 .withCardId(payment.getPaymentMethod)
                 .withAuthorId(payment.getCustomer)
-                //            .withCreditedUserId(
-                //              payInWithCardPreAuthorizedTransaction.creditedWalletId
-                //            ) // the credited wallet id is not the user id
                 .withCreditedWalletId(payInWithCardPreAuthorizedTransaction.creditedWalletId)
                 .withSourceTransactionId(
                   payInWithCardPreAuthorizedTransaction.cardPreAuthorizedTransactionId
                 )
                 .copy(
                   creditedUserId =
-                    Option(payment.getTransferData).flatMap(td => Option(td.getDestination))
+                    Option(payment.getTransferData).flatMap(td => Option(td.getDestination)),
+                  cardId = Option(payment.getPaymentMethod)
                 )
             if (status == "succeeded") {
               transaction =
@@ -178,21 +176,29 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             PaymentIntentCreateParams
               .builder()
               .setAmount(payInTransaction.debitedAmount)
+              .setApplicationFeeAmount(payInTransaction.feesAmount)
+              .setCaptureMethod(PaymentIntentCreateParams.CaptureMethod.AUTOMATIC)
               .setCurrency(payInTransaction.currency)
               .setCustomer(payInTransaction.authorId)
-
-              /*.setTransferData(
-                PaymentIntentCreateParams.TransferData.builder().setDestination(payInTransaction.creditedWalletId).build()
-              )*/
-              .setCaptureMethod(PaymentIntentCreateParams.CaptureMethod.MANUAL)
               //.setOffSession(true) // For off-session payments
-              .setStatementDescriptorSuffix(payInTransaction.statementDescriptor)
+              .setTransferData(
+                PaymentIntentCreateParams.TransferData
+                  .builder()
+                  .setDestination(payInTransaction.creditedWalletId)
+                  .build()
+              )
               .setTransferGroup(payInTransaction.orderUuid)
               .putMetadata("order_uuid", payInTransaction.orderUuid)
               .putMetadata("transaction_type", "pay_in")
               .putMetadata("payment_type", "card")
               .putMetadata("print_receipt", payInTransaction.printReceipt.getOrElse(false).toString)
               .putMetadata("register_card", payInTransaction.registerCard.getOrElse(false).toString)
+
+          payInTransaction.statementDescriptor match {
+            case Some(statementDescriptor) =>
+              params.setStatementDescriptorSuffix(statementDescriptor)
+            case _ =>
+          }
 
           Option(payInTransaction.cardId) match {
             case Some(cardId) =>
@@ -291,14 +297,17 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 .withNature(Transaction.TransactionNature.REGULAR)
                 .withType(Transaction.TransactionType.PAYIN)
                 .withPaymentType(Transaction.PaymentType.CARD)
-                .withAmount(payment.getAmountReceived.intValue())
-                .withFees(0)
+                .withAmount(payment.getAmount.intValue())
+                .withFees(Option(payment.getApplicationFeeAmount).map(_.intValue()).getOrElse(0))
                 .withCurrency(payment.getCurrency)
                 .withResultCode(status)
                 .withAuthorId(payment.getCustomer)
+                .withCreditedUserId(
+                  payment.getTransferData.getDestination
+                )
+                .withCreditedWalletId(payInTransaction.creditedWalletId)
                 .copy(
-                  cardId = Option(payment.getPaymentMethod),
-                  creditedWalletId = Some(payInTransaction.creditedWalletId)
+                  cardId = Option(payment.getPaymentMethod)
                 )
 
             if (status == "requires_action" && payment.getNextAction.getType == "redirect_to_url") {
@@ -358,32 +367,17 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             PaymentIntentCreateParams
               .builder()
               .setAmount(payInTransaction.debitedAmount)
+              .setApplicationFeeAmount(payInTransaction.feesAmount)
+              .setCaptureMethod(PaymentIntentCreateParams.CaptureMethod.AUTOMATIC)
               .setCurrency(payInTransaction.currency)
-              .addPaymentMethodType("paypal")
-              .setPaymentMethodOptions(
-                PaymentIntentCreateParams.PaymentMethodOptions
-                  .builder()
-                  .setPaypal(
-                    PaymentIntentCreateParams.PaymentMethodOptions.Paypal
-                      .builder()
-                      .setCaptureMethod(
-                        PaymentIntentCreateParams.PaymentMethodOptions.Paypal.CaptureMethod.MANUAL
-                      )
-                      .build()
-                  )
-                  .build()
-              )
-              .setPaymentMethodData(
-                PaymentIntentCreateParams.PaymentMethodData
-                  .builder()
-                  .setType(PaymentIntentCreateParams.PaymentMethodData.Type.PAYPAL)
-                  .setPaypal(
-                    PaymentIntentCreateParams.PaymentMethodData.Paypal.builder().build()
-                  )
-                  .build()
-              )
               .setCustomer(payInTransaction.authorId)
-              .setCaptureMethod(PaymentIntentCreateParams.CaptureMethod.MANUAL)
+              .addPaymentMethodType("paypal")
+              .setTransferData(
+                PaymentIntentCreateParams.TransferData
+                  .builder()
+                  .setDestination(payInTransaction.creditedWalletId)
+                  .build()
+              )
               .setTransferGroup(payInTransaction.orderUuid)
               .putMetadata("order_uuid", payInTransaction.orderUuid)
               .putMetadata("transaction_type", "pay_in")
@@ -475,14 +469,15 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 .withNature(Transaction.TransactionNature.REGULAR)
                 .withType(Transaction.TransactionType.PAYIN)
                 .withPaymentType(Transaction.PaymentType.PAYPAL)
-                .withAmount(payment.getAmountReceived.intValue())
-                .withFees(0)
+                .withAmount(payment.getAmount.intValue())
+                .withFees(Option(payment.getApplicationFeeAmount).map(_.intValue()).getOrElse(0))
                 .withCurrency(payment.getCurrency)
                 .withResultCode(status)
                 .withAuthorId(payment.getCustomer)
-                .copy(
-                  creditedWalletId = Some(payInTransaction.creditedWalletId)
+                .withCreditedUserId(
+                  payment.getTransferData.getDestination
                 )
+                .withCreditedWalletId(payInTransaction.creditedWalletId)
 
             if (status == "requires_action" && payment.getNextAction.getType == "redirect_to_url") {
               transaction = transaction.copy(

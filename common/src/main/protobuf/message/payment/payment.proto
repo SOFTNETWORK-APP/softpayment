@@ -186,7 +186,8 @@ message PayInWithCardPreAuthorizedCommandEvent{
     required string preAuthorizationId = 1;
     required string creditedAccount = 2;
     optional int32 debitedAmount = 3;
-    optional string clientId = 4;
+    optional int32 feesAmount = 4;
+    optional string clientId = 5;
 }
 
 message RefundCommandEvent{
@@ -199,6 +200,7 @@ message RefundCommandEvent{
     required string reasonMessage = 5;
     required bool initializedByClient = 6;
     optional string clientId = 7;
+    optional int32 feesRefundAmount = 8;
 }
 
 message PayOutCommandEvent{

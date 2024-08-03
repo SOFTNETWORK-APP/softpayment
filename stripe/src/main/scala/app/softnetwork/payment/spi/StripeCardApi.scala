@@ -183,7 +183,7 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
           .setPaymentMethod(preAuthorizationTransaction.cardId)
           .setCaptureMethod(
             PaymentIntentCreateParams.CaptureMethod.MANUAL
-          ) // To capture funds later
+          ) // To capture funds later (https://stripe.com/docs/payments/capture-later)
           .setConfirm(true) // Confirm the PaymentIntent immediately
           //.setOffSession(true) // For off-session payments
           .setReturnUrl(
@@ -194,6 +194,38 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
           .putMetadata("order_uuid", preAuthorizationTransaction.orderUuid)
           .putMetadata("transaction_type", "pre_authorization")
           .putMetadata("payment_type", "card")
+
+      preAuthorizationTransaction.ipAddress match {
+        case Some(ipAddress) =>
+          var onlineParams =
+            PaymentIntentCreateParams.MandateData.CustomerAcceptance.Online
+              .builder()
+              .setIpAddress(ipAddress)
+
+          preAuthorizationTransaction.browserInfo.map(_.userAgent) match {
+            case Some(userAgent) =>
+              onlineParams = onlineParams.setUserAgent(userAgent)
+            case _ =>
+          }
+
+          params
+            .setMandateData(
+              PaymentIntentCreateParams.MandateData
+                .builder()
+                .setCustomerAcceptance(
+                  PaymentIntentCreateParams.MandateData.CustomerAcceptance
+                    .builder()
+                    .setAcceptedAt((System.currentTimeMillis() / 1000).toInt)
+                    .setOnline(onlineParams.build())
+                    .build()
+                )
+                .build()
+            )
+
+        case _ =>
+
+      }
+
       preAuthorizationTransaction.creditedUserId match {
         case Some(creditedUserId) =>
           params.setTransferData(

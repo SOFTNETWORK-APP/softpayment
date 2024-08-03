@@ -131,16 +131,16 @@ message PayInWithCardTransaction {
     option (scalapb.message).extends = "ProtobufDomainObject";
     required string orderUuid = 1;
     required int32 debitedAmount = 2;
-    required string currency = 3 [default = "EUR"];
-    required string creditedWalletId = 4;
-    required string authorId = 5;
-    required string cardId = 6;
-    optional string ipAddress = 7;
-    optional BrowserInfo browserInfo = 8;
-    optional bool registerCard = 9;
-    required string statementDescriptor = 10;
-    required Transaction.PaymentType paymentType = 11 [default = CARD];
-    optional bool printReceipt = 12;
+    required int32 feesAmount = 3;
+    required string currency = 4 [default = "EUR"];
+    required string creditedWalletId = 5;
+    required string authorId = 6;
+    required string cardId = 7;
+    optional string ipAddress = 8;
+    optional BrowserInfo browserInfo = 9;
+    optional bool registerCard = 10;
+    optional bool printReceipt = 11;
+    optional string statementDescriptor = 12;
 }
 
 message PayInWithPayPalTransaction {
@@ -168,6 +168,7 @@ message RefundTransaction {
     required string authorId = 5;
     required string reasonMessage = 6;
     required bool initializedByClient = 7;
+    optional int32 feesRefundAmount = 8;
 }
 
 message TransferTransaction {

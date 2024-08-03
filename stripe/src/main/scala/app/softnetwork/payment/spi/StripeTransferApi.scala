@@ -3,8 +3,13 @@ package app.softnetwork.payment.spi
 import app.softnetwork.payment.config.StripeApi
 import app.softnetwork.payment.model.{Transaction, TransferTransaction}
 import app.softnetwork.serialization.asJson
-import com.stripe.model.{Balance, Transfer}
-import com.stripe.param.TransferCreateParams
+import com.google.gson.Gson
+import com.stripe.model.{Balance, PaymentIntent, Transfer}
+import com.stripe.param.{
+  PaymentIntentCaptureParams,
+  PaymentIntentUpdateParams,
+  TransferCreateParams
+}
 
 import collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -24,45 +29,196 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
         mlog.info(
           s"Processing transfer transaction for order: ${transferTransaction.orderUuid} -> ${asJson(transferTransaction)}"
         )
+
+        var debitedAmount = transferTransaction.debitedAmount
+
+        var feesAmount = transferTransaction.feesAmount
+
         Try {
           val requestOptions = StripeApi().requestOptions
 
-          val amountToTransfer =
-            transferTransaction.debitedAmount - transferTransaction.feesAmount
+          transferTransaction.payInTransactionId match {
+            // case of a payment intent
+            case Some(transactionId) if transactionId.startsWith("pi_") =>
+              var resource =
+                PaymentIntent.retrieve(transactionId, requestOptions)
 
-          val availableAmount =
-            Balance
-              .retrieve(requestOptions)
-              .getAvailable
-              .asScala
-              .find(_.getCurrency == transferTransaction.currency) match {
-              case Some(balance) =>
-                balance.getAmount.intValue()
-              case None =>
-                0
-            }
+              // optionally update fees amount if different from the one in the payment intent and
+              // the payment intent has not been captured yet
+              resource =
+                Option(resource.getTransferData).flatMap(td => Option(td.getDestination)) match {
+                  case Some(_)
+                      if feesAmount != Option(resource.getApplicationFeeAmount)
+                        .map(_.intValue())
+                        .getOrElse(0) && resource.getStatus == "requires_capture" =>
+                    resource.update(
+                      PaymentIntentUpdateParams
+                        .builder()
+                        .setApplicationFeeAmount(feesAmount)
+                        .build(),
+                      requestOptions
+                    )
+                  case _ => resource
+                }
 
-          val params =
-            TransferCreateParams
-              .builder()
-              .setAmount(Math.min(amountToTransfer, availableAmount))
-              .setDestination(transferTransaction.creditedUserId)
-              .setCurrency(transferTransaction.currency)
-              .putMetadata("available_amount", availableAmount.toString)
-              .putMetadata("debited_amount", transferTransaction.debitedAmount.toString)
-              .putMetadata("fees_amount", transferTransaction.feesAmount.toString)
-              .putMetadata("amount_to_transfer", amountToTransfer.toString)
+              val payment =
+                resource.getStatus match {
+                  case "requires_capture" => // we capture the funds
+                    val params =
+                      PaymentIntentCaptureParams
+                        .builder()
+                        .setAmountToCapture(resource.getAmountCapturable)
+                    resource.capture(
+                      params.build(),
+                      requestOptions
+                    )
+                  case _ => resource
+                }
 
-          transferTransaction.orderUuid match {
-            case Some(orderUuid) =>
-              params.setTransferGroup(orderUuid)
-              params.putMetadata("order_uuid", orderUuid)
+              Option(payment.getTransferData).flatMap(td => Option(td.getDestination)) match {
+
+                case Some(destination) if destination != transferTransaction.creditedUserId =>
+                  throw new Exception(
+                    s"Destination account does not match the credited user id: $destination != ${transferTransaction.creditedUserId}"
+                  )
+
+                case Some(_) => // no need for transfer
+                  debitedAmount = payment.getAmountReceived.intValue()
+                  feesAmount =
+                    Option(payment.getApplicationFeeAmount).map(_.intValue()).getOrElse(0)
+                  payment
+
+                case None =>
+                  debitedAmount = payment.getAmountReceived.intValue()
+
+                  val amountToTransfer = debitedAmount - feesAmount
+
+                  val params =
+                    TransferCreateParams
+                      .builder()
+                      .setAmount(amountToTransfer)
+                      .setCurrency(transferTransaction.currency)
+                      .setDestination(transferTransaction.creditedUserId)
+                      .setSourceTransaction(payment.getLatestCharge)
+                      .putMetadata("debited_amount", debitedAmount.toString)
+                      .putMetadata("fees_amount", feesAmount.toString)
+                      .putMetadata("amount_to_transfer", amountToTransfer.toString)
+
+                  transferTransaction.orderUuid match {
+                    case Some(orderUuid) =>
+                      params.setTransferGroup(orderUuid)
+                      params.putMetadata("order_uuid", orderUuid)
+                    case _ =>
+                      Option(payment.getTransferGroup).foreach { transferGroup =>
+                        params.setTransferGroup(transferGroup)
+                        params.putMetadata("order_uuid", transferGroup)
+                      }
+                  }
+
+                  transferTransaction.externalReference match {
+                    case Some(externalReference) =>
+                      params.putMetadata("external_reference", externalReference)
+                    case _ =>
+                  }
+
+                  mlog.info(
+                    s"Creating transfer for order ${transferTransaction.orderUuid} -> ${new Gson()
+                      .toJson(params.build())}"
+                  )
+
+                  Transfer.create(params.build(), requestOptions)
+              }
+
             case _ =>
+              val amountToTransfer = debitedAmount - feesAmount
+
+              val availableAmount =
+                Balance
+                  .retrieve(requestOptions)
+                  .getAvailable
+                  .asScala
+                  .find(_.getCurrency == transferTransaction.currency) match {
+                  case Some(balance) =>
+                    balance.getAmount.intValue()
+                  case None =>
+                    0
+                }
+
+              val params =
+                TransferCreateParams
+                  .builder()
+                  .setAmount(Math.min(amountToTransfer, availableAmount))
+                  .setDestination(transferTransaction.creditedUserId)
+                  .setCurrency(transferTransaction.currency)
+                  .putMetadata("available_amount", availableAmount.toString)
+                  .putMetadata("debited_amount", transferTransaction.debitedAmount.toString)
+                  .putMetadata("fees_amount", transferTransaction.feesAmount.toString)
+                  .putMetadata("amount_to_transfer", amountToTransfer.toString)
+
+              transferTransaction.orderUuid match {
+                case Some(orderUuid) =>
+                  params.setTransferGroup(orderUuid)
+                  params.putMetadata("order_uuid", orderUuid)
+                case _ =>
+              }
+
+              Transfer.create(params.build(), requestOptions)
+
           }
 
-          Transfer.create(params.build(), requestOptions)
-
         } match {
+          case Success(payment: PaymentIntent) =>
+            val status = payment.getStatus
+
+            val creditedUserId = Option(transferTransaction.creditedUserId)
+            // Option(payment.getTransferData).map(_.getDestination)
+
+            var transaction =
+              Transaction()
+                .withId(payment.getId)
+                .withOrderUuid(
+                  Option(payment.getTransferGroup)
+                    .orElse(transferTransaction.orderUuid)
+                    .getOrElse("")
+                )
+                .withNature(Transaction.TransactionNature.REGULAR)
+                .withType(Transaction.TransactionType.PAYOUT)
+                .withPaymentType(Transaction.PaymentType.BANK_WIRE)
+                .withAmount(debitedAmount)
+                .withFees(feesAmount)
+                .withCurrency(payment.getCurrency)
+                .withAuthorId(
+                  Option(payment.getCustomer).getOrElse(transferTransaction.authorId)
+                )
+                .withDebitedWalletId(transferTransaction.debitedWalletId)
+                .copy(
+                  creditedUserId = creditedUserId,
+                  sourceTransactionId = transferTransaction.payInTransactionId,
+                  externalReference = transferTransaction.externalReference
+                )
+
+            status match {
+              case "succeeded" =>
+                transaction = transaction.copy(
+                  status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED
+                )
+              case "processing" =>
+                transaction =
+                  transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
+              case "cancelled" =>
+                transaction =
+                  transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CANCELED)
+              case _ => //requires_action, requires_confirmation, requires_payment_method
+                transaction =
+                  transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_FAILED)
+            }
+
+            mlog.info(
+              s"Transfer executed for order ${transaction.orderUuid} -> ${asJson(transaction)}"
+            )
+
+            Some(transaction)
+
           case Success(transfer: Transfer) =>
             val transaction =
               Transaction()
@@ -80,7 +236,8 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
                 .withStatus(Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
                 .copy(
                   orderUuid = transferTransaction.orderUuid.getOrElse(""),
-                  sourceTransactionId = transferTransaction.payInTransactionId
+                  sourceTransactionId = transferTransaction.payInTransactionId,
+                  externalReference = transferTransaction.externalReference
                 )
 
             mlog.info(
@@ -107,8 +264,55 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
     */
   override def loadTransfer(transactionId: String): Option[Transaction] = {
     Try {
-      Transfer.retrieve(transactionId, StripeApi().requestOptions)
+      if (transactionId.startsWith("pi_")) {
+        PaymentIntent.retrieve(transactionId, StripeApi().requestOptions)
+      } else {
+        Transfer.retrieve(transactionId, StripeApi().requestOptions)
+      }
     } match {
+      case Success(payment: PaymentIntent) =>
+        val status = payment.getStatus
+
+        val creditedUserId = Option(payment.getTransferData).map(_.getDestination)
+        val amountToTransfer = payment.getAmountReceived.intValue()
+        val feesAmount = Option(payment.getApplicationFeeAmount).map(_.intValue()).getOrElse(0)
+
+        var transaction =
+          Transaction()
+            .withId(payment.getId)
+            .withOrderUuid(Option(payment.getTransferGroup).getOrElse(""))
+            .withNature(Transaction.TransactionNature.REGULAR)
+            .withType(Transaction.TransactionType.TRANSFER)
+            .withPaymentType(Transaction.PaymentType.BANK_WIRE)
+            .withAmount(amountToTransfer + feesAmount)
+            .withFees(feesAmount)
+            .withCurrency(payment.getCurrency)
+            .withAuthorId(Option(payment.getCustomer).getOrElse(""))
+            .withCreditedUserId(creditedUserId.getOrElse(""))
+            .withTransferAmount(amountToTransfer)
+
+        status match {
+          case "succeeded" =>
+            transaction = transaction.copy(
+              status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED
+            )
+          case "processing" =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
+          case "cancelled" =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CANCELED)
+          case _ => //requires_action, requires_confirmation, requires_payment_method
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_FAILED)
+        }
+
+        mlog.info(
+          s"Transfer transaction retrieved for $transactionId -> ${asJson(transaction)}"
+        )
+
+        Some(transaction)
+
       case Success(transfer: Transfer) =>
         val metadata = transfer.getMetadata.asScala
         val orderUuid =
@@ -131,10 +335,17 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
             .withTransferAmount(transfer.getAmount.intValue())
 
         mlog.info(
-          s"Pay out transaction retrieved for order ${transaction.orderUuid} -> ${asJson(transaction)}"
+          s"Transfer transaction retrieved for $transactionId -> ${asJson(transaction)}"
         )
 
         Some(transaction)
+
+      case Failure(f) =>
+        mlog.error(
+          s"Error retrieving transfer transaction for $transactionId",
+          f
+        )
+        None
     }
   }
 }

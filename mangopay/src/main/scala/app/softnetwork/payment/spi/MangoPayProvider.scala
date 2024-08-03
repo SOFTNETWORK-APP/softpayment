@@ -1009,7 +1009,11 @@ trait MangoPayProvider extends PaymentProvider {
             val paymentDetails = new PayInPaymentDetailsCard
             paymentDetails.setCardId(cardId)
             paymentDetails.setCardType(CardType.CB_VISA_MASTERCARD)
-            paymentDetails.setStatementDescriptor(statementDescriptor)
+            statementDescriptor match {
+              case Some(s) =>
+                paymentDetails.setStatementDescriptor(s)
+              case _ =>
+            }
             if (ipAddress.isDefined) {
               paymentDetails.setIpAddress(ipAddress.get)
             }

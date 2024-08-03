@@ -1001,6 +1001,7 @@ class PaymentHandlerSpec
             orderUuid,
             payInTransactionId,
             101,
+            None,
             "EUR",
             "change my mind",
             initializedByClient = true
@@ -1012,6 +1013,7 @@ class PaymentHandlerSpec
                 orderUuid,
                 payInTransactionId,
                 50,
+                None,
                 "EUR",
                 "change my mind",
                 initializedByClient = true

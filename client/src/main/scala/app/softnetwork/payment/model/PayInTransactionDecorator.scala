@@ -10,9 +10,9 @@ trait PayInTransactionDecorator { _: PayInTransaction =>
             .withOrderUuid(orderUuid)
             .withAuthorId(authorId)
             .withDebitedAmount(debitedAmount)
+            .withFeesAmount(feesAmount)
             .withCurrency(currency)
             .withCreditedWalletId(creditedWalletId)
-            .withPaymentType(paymentType)
             .withStatementDescriptor(statementDescriptor)
             .withCardId(cardId.orNull)
             .copy(

@@ -309,6 +309,9 @@ trait PaymentBehavior
                         .withReasonMessage(reasonMessage)
                         .withPayInTransactionId(payInTransactionId)
                         .withInitializedByClient(initializedByClient)
+                        .copy(
+                          feesRefundAmount = feesRefundAmount
+                        )
                     )
                   ) match {
                     case None => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)

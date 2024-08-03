@@ -42,7 +42,8 @@ message PayInWithCardPreAuthorizedRequest {
     string preAuthorizationId = 1;
     string creditedAccount = 2;
     google.protobuf.Int32Value debitedAmount = 3;
-    string clientId = 4;
+    google.protobuf.Int32Value feesAmount = 4;
+    string clientId = 5;
 }
 
 enum TransactionStatus{
@@ -74,10 +75,11 @@ message RefundRequest {
     string orderUuid = 1;
     string payInTransactionId = 2;
     int32 refundAmount = 3;
-    string currency = 4;
-    string reasonMessage = 5;
-    bool initializedByClient = 6;
-    string clientId = 7;
+    google.protobuf.Int32Value feesRefundAmount = 4;
+    string currency = 5;
+    string reasonMessage = 6;
+    bool initializedByClient = 7;
+    string clientId = 8;
 }
 
 message PayOutRequest {

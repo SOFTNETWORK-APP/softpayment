@@ -200,13 +200,20 @@ trait PaymentDao extends PaymentHandler {
     preAuthorizationId: String,
     creditedAccount: String,
     debitedAmount: Option[Int],
+    feesAmount: Option[Int] = None,
     clientId: Option[String] = None
   )(implicit
     system: ActorSystem[_]
   ): Future[Either[PayInFailed, PaidIn]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
     !?(
-      PayInWithCardPreAuthorized(preAuthorizationId, creditedAccount, debitedAmount, clientId)
+      PayInWithCardPreAuthorized(
+        preAuthorizationId,
+        creditedAccount,
+        debitedAmount,
+        feesAmount,
+        clientId
+      )
     ) map {
       case result: PaidIn     => Right(result)
       case error: PayInFailed => Left(error)
@@ -239,6 +246,7 @@ trait PaymentDao extends PaymentHandler {
     orderUuid: String,
     payInTransactionId: String,
     refundAmount: Int,
+    feesRefundAmount: Option[Int] = None,
     currency: String = "EUR",
     reasonMessage: String,
     initializedByClient: Boolean,
@@ -250,6 +258,7 @@ trait PaymentDao extends PaymentHandler {
         orderUuid,
         payInTransactionId,
         refundAmount,
+        feesRefundAmount,
         currency,
         reasonMessage,
         initializedByClient,

@@ -169,6 +169,7 @@ trait PayInCommandHandler
                                     PayInTransaction.defaultInstance
                                       .withAuthorId(userId)
                                       .withDebitedAmount(debitedAmount)
+                                      .withFeesAmount(feesAmount.getOrElse(0))
                                       .withCurrency(currency)
                                       .withOrderUuid(orderUuid)
                                       .withCreditedWalletId(creditedWalletId)
@@ -222,7 +223,7 @@ trait PayInCommandHandler
                   case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
                 }
 
-              case Transaction.PaymentType.PAYPAL =>
+              case Transaction.PaymentType.PAYPAL => // TODO should be the default behavior
                 paymentAccount.userId match {
                   case Some(userId) =>
                     // load credited payment account

@@ -244,6 +244,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                             statementDescriptor,
                             paymentType,
                             printReceipt,
+                            feesAmount = feesAmount,
                             user = user, // required for Pay in without registered card (eg PayPal)
                             clientId = client.map(_.clientId).orElse(session.clientId)
                           )

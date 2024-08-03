@@ -52,6 +52,7 @@ trait PaymentClient extends GrpcClient {
     preAuthorizationId: String,
     creditedAccount: String,
     debitedAmount: Option[Int],
+    feesAmount: Option[Int] = None,
     token: Option[String] = None
   ): Future[TransactionResponse] = {
     withAuthorization(
@@ -63,6 +64,7 @@ trait PaymentClient extends GrpcClient {
           preAuthorizationId,
           creditedAccount,
           debitedAmount,
+          feesAmount,
           settings.clientId
         )
       )
@@ -100,6 +102,7 @@ trait PaymentClient extends GrpcClient {
     orderUuid: String,
     payInTransactionId: String,
     refundAmount: Int,
+    feesRefundAmount: Option[Int] = None,
     currency: String,
     reasonMessage: String,
     initializedByClient: Boolean,
@@ -114,6 +117,7 @@ trait PaymentClient extends GrpcClient {
           orderUuid,
           payInTransactionId,
           refundAmount,
+          feesRefundAmount,
           currency,
           reasonMessage,
           initializedByClient,

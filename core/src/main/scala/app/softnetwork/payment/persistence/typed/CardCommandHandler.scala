@@ -234,7 +234,7 @@ trait CardCommandHandler
             )
             val paymentProvider = loadPaymentProvider(clientId)
             import paymentProvider._
-            paymentAccount.getNaturalUser.userId match {
+            paymentAccount.userId match {
               case Some(userId) =>
                 (registrationId match {
                   case Some(id) =>
@@ -450,6 +450,9 @@ trait CardCommandHandler
                                   .withCreditedWalletId(creditedWalletId)
                                   .withPreAuthorizationDebitedAmount(
                                     preAuthorizationTransaction.amount
+                                  )
+                                  .copy(
+                                    feesAmount = feesAmount.getOrElse(0)
                                   )
                               )
                             ) match {

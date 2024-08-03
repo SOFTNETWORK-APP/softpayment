@@ -447,7 +447,10 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             printReceipt = true,
             feesAmount = Some(feesAmount)
           )
-        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
+        ).withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val result = responseAs[CardPreAuthorized]
@@ -469,7 +472,8 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       paymentClient.payInWithCardPreAuthorized(
         preAuthorizationId,
         computeExternalUuidWithProfile(externalUserId, Some("seller")),
-        None
+        None,
+        Some(feesAmount)
       ) complete () match {
         case Success(result) =>
           log.info(serialization.write(result))
@@ -532,9 +536,13 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             Some(cardPreRegistration.id),
             None,
             registerCard = true,
-            printReceipt = true
+            printReceipt = true,
+            feesAmount = Some(feesAmount)
           )
-        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
+        ).withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val result = responseAs[PaidIn]
@@ -617,6 +625,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             debitedAmount,
             paymentType = Transaction.PaymentType.PAYPAL,
             printReceipt = true,
+            feesAmount = Some(feesAmount),
             user = Some(naturalUser)
           )
         ).withHeaders(
@@ -745,6 +754,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             debitedAmount,
             paymentType = Transaction.PaymentType.CARD,
             printReceipt = true,
+            feesAmount = Some(feesAmount),
             user = Some(naturalUser)
           )
         ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
@@ -826,6 +836,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         orderUuid,
         payOutTransactionId,
         debitedAmount,
+        Some(feesAmount),
         currency,
         "reason message",
         initializedByClient = false
@@ -838,5 +849,6 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         case Failure(f) => fail(f)
       }
     }
+
   }
 }

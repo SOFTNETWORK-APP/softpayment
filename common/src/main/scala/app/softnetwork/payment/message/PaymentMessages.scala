@@ -202,6 +202,8 @@ object PaymentMessages {
     * @param debitedAmount
     *   - amount to be debited from the account that made the pre-authorization (if not specified it
     *     will be the amount specified during the pre-authorization)
+    * @param feesAmount
+    *   - optional fees amount
     * @param clientId
     *   - optional client id
     */
@@ -209,6 +211,7 @@ object PaymentMessages {
     preAuthorizationId: String,
     creditedAccount: String,
     debitedAmount: Option[Int],
+    feesAmount: Option[Int] = None,
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
       with PayInCommand
@@ -317,7 +320,7 @@ object PaymentMessages {
     feesAmount: Int = 0,
     currency: String = "EUR",
     externalReference: Option[String] = None,
-    payInTransactionId: Option[String] = None, //TODO should be required
+    payInTransactionId: Option[String] = None,
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
       with PayOutCommand {
@@ -348,6 +351,8 @@ object PaymentMessages {
     *   - payIn transaction id
     * @param refundAmount
     *   - refund amount
+    * @param feesRefundAmount
+    *   - fees refund amount
     * @param currency
     *   - currency
     * @param reasonMessage
@@ -361,6 +366,7 @@ object PaymentMessages {
     orderUuid: String,
     payInTransactionId: String,
     refundAmount: Int,
+    feesRefundAmount: Option[Int] = None,
     currency: String = "EUR",
     reasonMessage: String,
     initializedByClient: Boolean,

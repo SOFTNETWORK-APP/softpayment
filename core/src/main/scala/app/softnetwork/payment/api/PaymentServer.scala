@@ -19,7 +19,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
   TransferFailed,
   Transferred
 }
-import app.softnetwork.payment.model.{BankAccount, PaymentAccount, RecurringPayment, Transaction}
+import app.softnetwork.payment.model.{BankAccount, PaymentAccount, RecurringPayment}
 import app.softnetwork.payment.serialization._
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -53,6 +53,7 @@ trait PaymentServer extends PaymentServiceApi with PaymentDao {
       preAuthorizationId,
       creditedAccount,
       debitedAmount,
+      feesAmount,
       Some(clientId)
     ) map {
       case Right(r: PaidIn) =>
@@ -86,6 +87,7 @@ trait PaymentServer extends PaymentServiceApi with PaymentDao {
       orderUuid,
       payInTransactionId,
       refundAmount,
+      feesRefundAmount,
       currency,
       reasonMessage,
       initializedByClient,
