@@ -1199,7 +1199,7 @@ trait MangoPayProvider extends PaymentProvider {
           refund.getRefundReason.setRefundReasonType(RefundReasonType.OTHER)
         }
         refund.setDebitedFunds(new Money)
-        refund.getDebitedFunds.setAmount(refundAmount + feesRefundAmount.getOrElse(0))
+        refund.getDebitedFunds.setAmount(refundAmount)
         refund.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
         refund.setFees(new Money)
         refund.getFees.setAmount(0) // fees are only set during transfer or payOut
