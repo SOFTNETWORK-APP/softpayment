@@ -67,14 +67,17 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "create bank account with natural user" in {
+      val command =
+        BankAccountCommand(
+          BankAccount(None, ownerName, ownerAddress, iban, bic),
+          naturalUser.withExternalUuid(externalUserId),
+          Some(true)
+        )
+      log.info(s"create bank account with natural user command: ${serialization.write(command)}")
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
-          BankAccountCommand(
-            BankAccount(None, ownerName, ownerAddress, iban, bic),
-            naturalUser.withExternalUuid(externalUserId),
-            Some(true)
-          )
+          command
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
           `User-Agent`("test")
@@ -173,20 +176,25 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "update bank account with sole trader legal user" in {
       externalUserId = "soleTrader"
+      val command =
+        BankAccountCommand(
+          BankAccount(
+            Option(sellerBankAccountId),
+            ownerName,
+            ownerAddress,
+            iban,
+            bic
+          ),
+          legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
+          Some(true)
+        )
+      log.info(
+        s"update bank account with sole trader legal user command: ${serialization.write(command)}"
+      )
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Option(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
-            legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
-            Some(true)
-          )
+          command
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
           `User-Agent`("test")
@@ -202,7 +210,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "update bank account with business legal user" in {
       externalUserId = "business"
-      val bank =
+      val command =
         BankAccountCommand(
           BankAccount(
             Option(sellerBankAccountId),
@@ -216,9 +224,11 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             .withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
           Some(true)
         )
-      log.info(serialization.write(bank))
+      log.info(
+        s"update bank account with business legal user command: ${serialization.write(command)}"
+      )
       withHeaders(
-        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute", bank)
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute", command)
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val bankAccount = loadBankAccount()
@@ -237,6 +247,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "create or update ultimate beneficial owner" in {
+      log.info(s"create or update ultimate beneficial owner command: ${serialization.write(ubo)}")
       withHeaders(
         Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$declarationRoute", ubo)
       ) ~> routes ~> check {
@@ -276,36 +287,39 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.BadRequest
       }
-      withHeaders(
-        Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute",
-          PreRegisterCard(
-            orderUuid,
-            naturalUser
-          )
+      val command =
+        PreRegisterCard(
+          orderUuid,
+          naturalUser
         )
+      log.info(s"pre register card command: ${serialization.write(command)}")
+      withHeaders(
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute", command)
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         cardPreRegistration = responseAs[CardPreRegistration]
+        log.info(s"card pre registration: ${serialization.write(cardPreRegistration)}")
       }
       val paymentAccount = loadPaymentAccount()
       assert(paymentAccount.naturalUser.isDefined)
     }
 
     "pre authorize card" in {
+      val payment =
+        Payment(
+          orderUuid,
+          debitedAmount,
+          "EUR",
+          Some(cardPreRegistration.id),
+          Some(cardPreRegistration.preregistrationData),
+          registerCard = true,
+          printReceipt = true,
+          feesAmount = Some(feesAmount)
+        )
+      log.info(s"pre authorize card payment: ${serialization.write(payment)}")
       withHeaders(
-        Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute",
-          Payment(
-            orderUuid,
-            5100,
-            "EUR",
-            Some(cardPreRegistration.id),
-            Some(cardPreRegistration.preregistrationData),
-            registerCard = true,
-            printReceipt = true
-          )
-        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute", payment)
+          .withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.Accepted
         val redirection = responseAs[PaymentRedirection]
@@ -344,18 +358,22 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "pay in / out with pre authorized card" in {
       createNewSession(customerSession)
+      val payment =
+        Payment(
+          orderUuid,
+          100,
+          "EUR",
+          Some(cardPreRegistration.id),
+          Some(cardPreRegistration.preregistrationData),
+          registerCard = true,
+          printReceipt = true
+        )
+      log.info(s"pay in / out with pre authorized card payment: ${serialization.write(payment)}")
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute/${URLEncoder
             .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
-          Payment(
-            orderUuid,
-            100,
-            "EUR",
-            Some(cardPreRegistration.id),
-            Some(cardPreRegistration.preregistrationData),
-            registerCard = true
-          )
+          payment
         ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
@@ -389,19 +407,23 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "pay in / out with 3ds" in {
       createNewSession(customerSession)
+      val payment =
+        Payment(
+          orderUuid,
+          debitedAmount,
+          "EUR",
+          Some(cardPreRegistration.id),
+          Some(cardPreRegistration.preregistrationData),
+          registerCard = true,
+          printReceipt = true,
+          feesAmount = Some(feesAmount)
+        )
+      log.info(s"pay in / out with 3ds payment: ${serialization.write(payment)}")
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$payInRoute/${URLEncoder
             .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
-          Payment(
-            orderUuid,
-            5100,
-            "EUR",
-            Some(cardPreRegistration.id),
-            Some(cardPreRegistration.preregistrationData),
-            registerCard = true,
-            printReceipt = true
-          )
+          payment
         ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.Accepted
@@ -426,8 +448,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-            5100,
-            0,
+            debitedAmount,
+            feesAmount,
             "EUR",
             None,
             transactionId
@@ -443,16 +465,20 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "pay in / out with PayPal" in {
       createNewSession(customerSession)
+      val payment =
+        Payment(
+          orderUuid,
+          debitedAmount,
+          paymentType = Transaction.PaymentType.PAYPAL,
+          printReceipt = true,
+          feesAmount = Some(feesAmount)
+        )
+      log.info(s"pay in / out with PayPal payment: ${serialization.write(payment)}")
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$payInRoute/${URLEncoder
             .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
-          Payment(
-            orderUuid,
-            5100,
-            paymentType = Transaction.PaymentType.PAYPAL,
-            printReceipt = true
-          )
+          payment
         ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.Accepted
@@ -475,8 +501,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           paymentClient.payOut(
             orderUuid,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-            5100,
-            0,
+            debitedAmount,
+            feesAmount,
             "EUR",
             None,
             transactionId

@@ -157,7 +157,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                           TokenCreateParams.Account.Individual.Dob
                             .builder()
                             .setDay(c.get(Calendar.DAY_OF_MONTH))
-                            .setMonth(c.get(Calendar.MONTH))
+                            .setMonth(c.get(Calendar.MONTH) + 1)
                             .setYear(c.get(Calendar.YEAR))
                             .build()
                         )
@@ -299,7 +299,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                           TokenCreateParams.Account.Individual.Dob
                             .builder()
                             .setDay(c.get(Calendar.DAY_OF_MONTH))
-                            .setMonth(c.get(Calendar.MONTH))
+                            .setMonth(c.get(Calendar.MONTH) + 1)
                             .setYear(c.get(Calendar.YEAR))
                             .build()
                         )
@@ -591,7 +591,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             PersonUpdateParams.Dob
                               .builder()
                               .setDay(c.get(Calendar.DAY_OF_MONTH))
-                              .setMonth(c.get(Calendar.MONTH))
+                              .setMonth(c.get(Calendar.MONTH) + 1)
                               .setYear(c.get(Calendar.YEAR))
                               .build()
                           )
@@ -654,7 +654,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             PersonCollectionCreateParams.Dob
                               .builder()
                               .setDay(c.get(Calendar.DAY_OF_MONTH))
-                              .setMonth(c.get(Calendar.MONTH))
+                              .setMonth(c.get(Calendar.MONTH) + 1)
                               .setYear(c.get(Calendar.YEAR))
                               .build()
                           )
@@ -871,7 +871,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                         TokenCreateParams.Person.Dob
                           .builder()
                           .setDay(c.get(Calendar.DAY_OF_MONTH))
-                          .setMonth(c.get(Calendar.MONTH))
+                          .setMonth(c.get(Calendar.MONTH) + 1)
                           .setYear(c.get(Calendar.YEAR))
                           .build()
                       )
@@ -1149,7 +1149,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                               PersonCollectionCreateParams.Dob
                                 .builder()
                                 .setDay(c.get(Calendar.DAY_OF_MONTH))
-                                .setMonth(c.get(Calendar.MONTH))
+                                .setMonth(c.get(Calendar.MONTH) + 1)
                                 .setYear(c.get(Calendar.YEAR))
                                 .build()
                             )
@@ -1820,7 +1820,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                   .builder()
                   .setAccountNumber(bankAccount.iban)
                   .setRoutingNumber(bankAccount.bic)
-                  .setCountry(bankAccount.countryCode.getOrElse("FR"))
+                  .setCountry(bankAccount.countryCode.getOrElse(bankAccount.ownerAddress.country))
                   .setCurrency(bankAccount.currency.getOrElse("EUR"))
                   .setAccountHolderName(bankAccount.ownerName)
                   .setAccountHolderType(account.getBusinessType match {
@@ -2047,7 +2047,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     PersonUpdateParams.Dob
                       .builder()
                       .setDay(c.get(Calendar.DAY_OF_MONTH))
-                      .setMonth(c.get(Calendar.MONTH))
+                      .setMonth(c.get(Calendar.MONTH) + 1)
                       .setYear(c.get(Calendar.YEAR))
                       .build()
                   )
@@ -2102,7 +2102,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     PersonCollectionCreateParams.Dob
                       .builder()
                       .setDay(c.get(Calendar.DAY_OF_MONTH))
-                      .setMonth(c.get(Calendar.MONTH))
+                      .setMonth(c.get(Calendar.MONTH) + 1)
                       .setYear(c.get(Calendar.YEAR))
                       .build()
                   )

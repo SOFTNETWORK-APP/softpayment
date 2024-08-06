@@ -41,9 +41,9 @@ package object data {
 
   val ownerName = s"$firstName $lastName"
   val ownerAddress: Address = Address.defaultInstance
-    .withAddressLine("addressLine")
+    .withAddressLine("17 rue Bouilloux Lafont")
     .withCity("Paris")
-    .withPostalCode("75002")
+    .withPostalCode("75015")
     .withCountry("FR")
 
   val naturalUser: NaturalUser =
@@ -97,5 +97,9 @@ package object data {
   var mandateId: String = _
 
   var directDebitTransactionId: String = _
+
+  val debitedAmount: Int = 5100
+
+  val feesAmount: Int = debitedAmount * 10 / 100
 
 }

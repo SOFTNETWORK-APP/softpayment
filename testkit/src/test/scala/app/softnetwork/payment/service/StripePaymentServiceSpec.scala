@@ -11,6 +11,8 @@ import app.softnetwork.payment.data.{
   birthday,
   cardId,
   cardPreRegistration,
+  debitedAmount,
+  feesAmount,
   firstName,
   iban,
   lastName,
@@ -75,10 +77,6 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
   var payInTransactionId: Option[String] = None
 
   var payOutTransactionId: Option[String] = None
-
-  val debitedAmount: Int = 5100
-
-  val feesAmount: Int = debitedAmount * 10 / 100
 
   val currency = "EUR"
 
@@ -635,6 +633,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       ) ~> routes ~> check {
         if (status == StatusCodes.PaymentRequired) {
           val payment = responseAs[PaymentRequired]
+          log.info(s"Payment required -> ${serialization.write(payment)}")
 
           val paymentClientReturnUrl = payment.paymentClientReturnUrl
           log.info(paymentClientReturnUrl)
