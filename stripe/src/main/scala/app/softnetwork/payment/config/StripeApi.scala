@@ -162,6 +162,7 @@ object StripeApi {
                   )
                   .setUrl(url)
                   .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)
+                  .setConnect(true)
                   .build(),
                 requestOptions.build()
               )
