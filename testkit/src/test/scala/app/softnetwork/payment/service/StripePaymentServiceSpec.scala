@@ -104,6 +104,19 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         sellerBankAccountId = bankAccount.bankAccountId
       }
     }
+    "accept mandate" in {
+      validateKycDocuments()
+      withHeaders(
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute").withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        assert(loadPaymentAccount().bankAccount.flatMap(_.mandateId).isDefined)
+        assert(loadPaymentAccount().bankAccount.flatMap(_.mandateStatus).isDefined)
+      }
+    }
   }
 
   "sole trader account" should {
@@ -174,6 +187,9 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$declarationRoute",
           ubo
+            .withFirstName(legalUser.legalRepresentative.firstName)
+            .withLastName(legalUser.legalRepresentative.lastName)
+            .withPercentOwnership(50)
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
           `User-Agent`("test")
@@ -182,6 +198,20 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         status shouldEqual StatusCodes.OK
         val declaration = loadDeclaration()
         assert(declaration.ubos.size == 1)
+        uboDeclarationId = declaration.uboDeclarationId
+      }
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$declarationRoute",
+          ubo.withPercentOwnership(50)
+        ).withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val declaration = loadDeclaration()
+        assert(declaration.ubos.size == 2)
         uboDeclarationId = declaration.uboDeclarationId
       }
     }

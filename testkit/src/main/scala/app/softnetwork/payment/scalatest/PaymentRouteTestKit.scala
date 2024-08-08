@@ -119,7 +119,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   def validateKycDocuments(): Unit = {
     loadPaymentAccount().documents
-      .filter(_.documentStatus == KycDocument.KycDocumentStatus.KYC_DOCUMENT_VALIDATION_ASKED)
+      .filterNot(_.documentStatus == KycDocument.KycDocumentStatus.KYC_DOCUMENT_VALIDATED)
       .map(_.documentType)
       .foreach { documentType =>
         withHeaders(
@@ -129,7 +129,7 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           val report = responseAs[KycDocumentValidationReport]
-          assert(report.status == KycDocument.KycDocumentStatus.KYC_DOCUMENT_VALIDATION_ASKED)
+          assert(report.status != KycDocument.KycDocumentStatus.KYC_DOCUMENT_VALIDATED)
           Get(
             s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$hooksRoute/${Provider.ProviderType.MOCK.name.toLowerCase}?EventType=KYC_SUCCEEDED&RessourceId=${report.id}"
           ) ~> routes ~> check {

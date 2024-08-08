@@ -19,7 +19,7 @@ case class NaturalUserView(
   externalUuid: String,
   profile: Option[String] = None,
   naturalUserType: Option[NaturalUser.NaturalUserType] = None
-)
+) extends User
 
 object NaturalUserView {
   def apply(paymentUser: NaturalUser): NaturalUserView = {

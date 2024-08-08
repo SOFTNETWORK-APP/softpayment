@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
   CreateOrUpdateKycDocument,
@@ -19,7 +20,7 @@ import collection.JavaConverters._
 
 /** Created by smanciot on 27/04/2021.
   */
-trait StripeEventHandler { _: BasicPaymentService with PaymentHandler =>
+trait StripeEventHandler extends Completion { _: BasicPaymentService with PaymentHandler =>
 
   def toStripeEvent(payload: String, sigHeader: String, secret: String): Option[Event] = {
     Try {
@@ -28,7 +29,8 @@ trait StripeEventHandler { _: BasicPaymentService with PaymentHandler =>
       case Success(event) =>
         Some(event)
       case Failure(f) =>
-        log.error(s"[Payment Hooks] Stripe Webhook verification failed: ${f.getMessage}")
+        log.error(s"[Payment Hooks] Stripe Webhook verification failed: ${f.getMessage}", f)
+        log.error(payload)
         None
     }
   }
@@ -57,8 +59,8 @@ trait StripeEventHandler { _: BasicPaymentService with PaymentHandler =>
                   )
               }
               //disable account
-              run(InvalidateRegularUser(accountId)).map {
-                case RegularUserInvalidated =>
+              run(InvalidateRegularUser(accountId)) complete () match {
+                case Success(RegularUserInvalidated) =>
                   log.info(
                     s"[Payment Hooks] Stripe Webhook received: Account Updated -> Account disabled for $accountId"
                   )
@@ -145,13 +147,13 @@ trait StripeEventHandler { _: BasicPaymentService with PaymentHandler =>
                     s"[Payment Hooks] Stripe Webhook received: Account Updated -> Account not disabled for $accountId"
                   )
               }
-            } else if (account.getChargesEnabled && account.getPayoutsEnabled) {
+            } else {
               log.info(
                 s"[Payment Hooks] Stripe Webhook received: Account Updated -> Charges and Payouts are enabled for $accountId"
               )
               //enable account
-              run(ValidateRegularUser(account.getId)).map {
-                case RegularUserValidated =>
+              run(ValidateRegularUser(account.getId)) complete () match {
+                case Success(RegularUserValidated) =>
                   log.info(
                     s"[Payment Hooks] Stripe Webhook received: Account Updated -> Account enabled for $accountId"
                   )
@@ -276,10 +278,10 @@ trait StripeEventHandler { _: BasicPaymentService with PaymentHandler =>
         accountId,
         document
       )
-    ).map {
-      case KycDocumentCreatedOrUpdated =>
+    ) complete () match {
+      case Success(KycDocumentCreatedOrUpdated) =>
         log.info(
-          s"[Payment Hooks] Stripe Webhook received: Document ID: $documentId updated"
+          s"[Payment Hooks] Stripe Webhook received: Document ID: $documentId refused"
         )
       case _ =>
         log.warn(

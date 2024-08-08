@@ -1815,6 +1815,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
         Try(Account.retrieve(bankAccount.userId, StripeApi().requestOptions)) match {
           case Success(account) =>
             Try {
+              val requestOptions = StripeApi().requestOptions
               val bank_account =
                 TokenCreateParams.BankAccount
                   .builder()
@@ -1830,7 +1831,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                   .build()
               val token = Token.create(
                 TokenCreateParams.builder().setBankAccount(bank_account).build(),
-                StripeApi().requestOptions
+                requestOptions
               )
               val params =
                 ExternalAccountCollectionCreateParams
@@ -1843,7 +1844,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                   .build()
               account.getExternalAccounts.create(
                 params,
-                StripeApi().requestOptions
+                requestOptions
               )
             } match {
               case Success(externalAccount) =>
@@ -2015,7 +2016,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     .setRelationship(
                       PersonCollectionListParams.Relationship
                         .builder()
-                        .setOwner(true)
+//                        .setOwner(true)
                         .build()
                     )
                     .build(),
@@ -2024,7 +2025,8 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                 .getData
                 .asScala
                 .find { person =>
-                  person.getFirstName == owner.firstName && person.getLastName == owner.lastName
+                  person.getFirstName.toLowerCase == owner.firstName.toLowerCase &&
+                  person.getLastName.toLowerCase == owner.lastName.toLowerCase
                 }
           }) match {
             case Some(person) =>

@@ -123,7 +123,9 @@ case class PaymentAccountView(
   documents: Seq[KycDocumentView] = Seq.empty,
   paymentAccountStatus: PaymentAccount.PaymentAccountStatus,
   transactions: Seq[TransactionView] = Seq.empty
-)
+) extends User {
+  override lazy val userId: Option[String] = legalUser.orElse(naturalUser).flatMap(_.userId)
+}
 
 object PaymentAccountView {
   def apply(paymentAccount: PaymentAccount): PaymentAccountView = {

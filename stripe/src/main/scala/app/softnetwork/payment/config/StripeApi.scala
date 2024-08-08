@@ -18,9 +18,12 @@ import java.nio.file.Paths
 import scala.util.{Failure, Success, Try}
 
 case class StripeApi(
-  requestOptionsBuilder: RequestOptionsBuilder
+  requestOptionsBuilder: RequestOptionsBuilder,
+  hash: String
 ) {
   lazy val requestOptions: RequestOptions = requestOptionsBuilder.clearStripeAccount().build()
+
+  lazy val secret: Option[String] = StripeApi.loadSecret(hash)
 }
 
 object StripeApi {
@@ -70,7 +73,7 @@ object StripeApi {
     stripeWebHooks = stripeWebHooks.updated(hash, secret)
   }
 
-  private[this] def loadSecret(hash: String): Option[String] = {
+  private[StripeApi] def loadSecret(hash: String): Option[String] = {
     val dir = s"$STRIPE_SECRETS_DIR/$hash"
     val file = Paths.get(dir, "webhook-secret").toFile
     Console.println(s"Loading secret from: ${file.getAbsolutePath}")
@@ -100,6 +103,8 @@ object StripeApi {
         // create / update stripe webhook endpoint
 
         val hash = sha256(provider.clientId)
+
+        val url = s"${config.hooksBaseUrl}?hash=$hash"
 
         import collection.JavaConverters._
 
@@ -149,8 +154,13 @@ object StripeApi {
               .create(
                 WebhookEndpointCreateParams
                   .builder()
-                  .addAllEnabledEvent(List(WebhookEndpointCreateParams.EnabledEvent.ALL).asJava)
-                  .setUrl(s"${config.hooksBaseUrl}?hash=$hash")
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.ACCOUNT__UPDATED
+                  )
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.PERSON__UPDATED
+                  )
+                  .setUrl(url)
                   .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)
                   .build(),
                 requestOptions.build()
@@ -160,7 +170,7 @@ object StripeApi {
 
         } match {
           case Success(secret) =>
-            val ret = StripeApi(requestOptions)
+            val ret = StripeApi(requestOptions, hash)
             stripeApis = stripeApis.updated(provider.providerId, ret)
             addSecret(hash, secret)
             ret

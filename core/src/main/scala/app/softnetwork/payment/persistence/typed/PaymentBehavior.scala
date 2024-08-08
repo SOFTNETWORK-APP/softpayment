@@ -4,33 +4,24 @@ import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.persistence.typed.scaladsl.Effect
-import app.softnetwork.kv.handlers.GenericKeyValueDao
-import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.payment.config.PaymentSettings.PaymentConfig.{
-  akkaNodeRole,
-  payInStatementDescriptor
-}
-import app.softnetwork.payment.handlers.{PaymentDao, PaymentKvDao, SoftPayAccountDao}
+import app.softnetwork.payment.config.PaymentSettings.PaymentConfig.akkaNodeRole
+import app.softnetwork.payment.handlers.{PaymentDao, SoftPayAccountDao}
 import app.softnetwork.payment.message.PaymentEvents._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.message.TransactionEvents._
 import app.softnetwork.payment.model.LegalUser.LegalUserType
 import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model._
-import app.softnetwork.payment.spi._
 import app.softnetwork.persistence._
 import app.softnetwork.persistence.message.{BroadcastEvent, CrudEvent}
 import app.softnetwork.persistence.typed._
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.scheduler.message.SchedulerEvents.{
-  ExternalEntityToSchedulerEvent,
   ExternalSchedulerEvent,
   SchedulerEventWithCommand
 }
-import app.softnetwork.scheduler.message.{AddSchedule, RemoveSchedule}
-import app.softnetwork.scheduler.model.Schedule
 import app.softnetwork.serialization.asJson
 import app.softnetwork.time._
 import org.slf4j.Logger

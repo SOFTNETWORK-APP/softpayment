@@ -36,7 +36,9 @@ case class LegalUserView(
   headQuartersAddress: AddressView,
   uboDeclaration: Option[UboDeclarationView] = None,
   lastAcceptedTermsOfPSP: Option[java.util.Date] = None
-)
+) extends User {
+  override lazy val userId: Option[String] = legalRepresentative.userId
+}
 
 object LegalUserView {
   def apply(legalUser: LegalUser): LegalUserView = {
