@@ -2,13 +2,27 @@ package app.softnetwork.payment.scalatest
 
 import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.config.PaymentSettings
-import app.softnetwork.payment.handlers.{MockPaymentHandler, MockSoftPayAccountDao, SoftPayAccountDao}
+import app.softnetwork.payment.handlers.{
+  MockPaymentHandler,
+  MockSoftPayAccountDao,
+  SoftPayAccountDao
+}
 import app.softnetwork.payment.model.SoftPayAccount.Client.Provider.ProviderType
-import app.softnetwork.payment.service.{MockPaymentServiceEndpoints, PaymentServiceEndpoints, StripeHooksEndpoints}
+import app.softnetwork.payment.service.{
+  MockPaymentServiceEndpoints,
+  PaymentServiceEndpoints,
+  StripeHooksEndpoints
+}
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.{CsrfCheck, CsrfCheckHeader}
 import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
-import app.softnetwork.session.scalatest.{OneOffCookieSessionEndpointsTestKit, OneOffHeaderSessionEndpointsTestKit, RefreshableCookieSessionEndpointsTestKit, RefreshableHeaderSessionEndpointsTestKit, SessionTestKit}
+import app.softnetwork.session.scalatest.{
+  OneOffCookieSessionEndpointsTestKit,
+  OneOffHeaderSessionEndpointsTestKit,
+  RefreshableCookieSessionEndpointsTestKit,
+  RefreshableHeaderSessionEndpointsTestKit,
+  SessionTestKit
+}
 import app.softnetwork.session.service.{JwtClaimsSessionMaterials, SessionMaterials}
 import com.softwaremill.session.{RefreshTokenStorage, SessionConfig, SessionManager}
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -46,7 +60,11 @@ trait StripePaymentEndpointsTestKit[SD <: SessionData with SessionDataDecorator[
           override def log: Logger = org.slf4j.LoggerFactory.getLogger(getClass)
 
           override implicit def system: ActorSystem[_] = sys
-        }.hooks(rootEndpoint.in(PaymentSettings.PaymentConfig.hooksRoute).in(ProviderType.STRIPE.name.toLowerCase))
+        }.hooks(
+          rootEndpoint
+            .in(PaymentSettings.PaymentConfig.hooksRoute)
+            .in(ProviderType.STRIPE.name.toLowerCase)
+        )
       )
     }
 

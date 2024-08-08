@@ -1031,32 +1031,14 @@ trait PaymentBehavior
               val shouldUpdateIban =
                 !paymentAccount.bankAccount.exists(_.checkIfSameIban(bankAccount.iban))
 
-              val iban = {
-                if (!shouldUpdateIban) {
-                  paymentAccount.bankAccount match {
-                    case Some(previous) => previous.iban
-                    case _              => bankAccount.iban
-                  }
-                } else {
-                  bankAccount.iban
-                }
-              }
+              val iban = bankAccount.iban
 
               val shouldUpdateBic =
                 shouldUpdateIban || !paymentAccount.bankAccount.exists(
                   _.checkIfSameBic(bankAccount.bic)
                 )
 
-              val bic = {
-                if (!shouldUpdateBic) {
-                  paymentAccount.bankAccount match {
-                    case Some(previous) => previous.bic
-                    case _              => bankAccount.bic
-                  }
-                } else {
-                  bankAccount.bic
-                }
-              }
+              val bic = bankAccount.bic
 
               var updatedPaymentAccount =
                 paymentAccount
