@@ -21,6 +21,7 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val createMandate: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
       .in(PaymentSettings.PaymentConfig.mandateRoute)
+      .in(jsonBody[Option[IbanMandate]])
       .out(
         oneOf[PaymentResult](
           oneOfVariant[MandateCreated.type](
@@ -35,10 +36,11 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic(principal =>
-        _ =>
+        maybeIban =>
           run(
             CreateMandate(
               externalUuidWithProfile(principal._2),
+              iban = maybeIban.map(_.iban),
               clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
             )
           ).map {

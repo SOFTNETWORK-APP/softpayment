@@ -627,16 +627,21 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
         // check if a session exists
         requiredClientSession { (client, session) =>
           post {
-            run(
-              CreateMandate(
-                externalUuidWithProfile(session),
-                clientId = client.map(_.clientId).orElse(session.clientId)
-              )
-            ) completeWith {
-              case r: MandateConfirmationRequired =>
-                complete(HttpResponse(StatusCodes.OK, entity = r))
-              case MandateCreated => complete(HttpResponse(StatusCodes.OK))
-              case other          => error(other)
+            entity(as[Option[IbanMandate]]) { maybeIban =>
+              run(
+                CreateMandate(
+                  externalUuidWithProfile(session),
+                  iban = maybeIban.map(_.iban),
+                  clientId = client.map(_.clientId).orElse(session.clientId)
+                )
+              ) completeWith {
+                case r: MandateConfirmationRequired =>
+                  complete(HttpResponse(StatusCodes.OK, entity = r))
+                case r: MandateRequired =>
+                  complete(HttpResponse(StatusCodes.PaymentRequired, entity = r))
+                case MandateCreated => complete(HttpResponse(StatusCodes.OK))
+                case other          => error(other)
+              }
             }
           } ~
           delete {

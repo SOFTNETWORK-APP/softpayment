@@ -18,10 +18,12 @@ import java.nio.file.Paths
 import scala.util.{Failure, Success, Try}
 
 case class StripeApi(
-  requestOptionsBuilder: RequestOptionsBuilder,
+  private val request: RequestOptionsBuilder,
   hash: String
 ) {
-  lazy val requestOptions: RequestOptions = requestOptionsBuilder.clearStripeAccount().build()
+  lazy val requestOptionsBuilder: RequestOptionsBuilder = request.clearStripeAccount()
+
+  lazy val requestOptions: RequestOptions = requestOptionsBuilder.build()
 
   lazy val secret: Option[String] = StripeApi.loadSecret(hash)
 }

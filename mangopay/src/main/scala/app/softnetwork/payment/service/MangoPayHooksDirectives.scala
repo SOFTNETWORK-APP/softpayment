@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.model.{BankAccount, KycDocument, UboDeclaration}
+import app.softnetwork.payment.model.{KycDocument, Mandate, UboDeclaration}
 import com.mangopay.core.enumerations.EventType
 
 trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
@@ -159,7 +159,7 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
                 }
               case EventType.MANDATE_FAILED =>
                 run(
-                  UpdateMandateStatus(resourceId, Some(BankAccount.MandateStatus.MANDATE_FAILED))
+                  UpdateMandateStatus(resourceId, Some(Mandate.MandateStatus.MANDATE_FAILED))
                 ) completeWith {
                   completeWithMandateStatusUpdatedResult(eventType, resourceId)
                 }
@@ -167,20 +167,20 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
                 run(
                   UpdateMandateStatus(
                     resourceId,
-                    Some(BankAccount.MandateStatus.MANDATE_SUBMITTED)
+                    Some(Mandate.MandateStatus.MANDATE_SUBMITTED)
                   )
                 ) completeWith {
                   completeWithMandateStatusUpdatedResult(eventType, resourceId)
                 }
               case EventType.MANDATE_CREATED =>
                 run(
-                  UpdateMandateStatus(resourceId, Some(BankAccount.MandateStatus.MANDATE_CREATED))
+                  UpdateMandateStatus(resourceId, Some(Mandate.MandateStatus.MANDATE_CREATED))
                 ) completeWith {
                   completeWithMandateStatusUpdatedResult(eventType, resourceId)
                 }
               case EventType.MANDATE_EXPIRED =>
                 run(
-                  UpdateMandateStatus(resourceId, Some(BankAccount.MandateStatus.MANDATE_EXPIRED))
+                  UpdateMandateStatus(resourceId, Some(Mandate.MandateStatus.MANDATE_EXPIRED))
                 ) completeWith {
                   completeWithMandateStatusUpdatedResult(eventType, resourceId)
                 }
@@ -188,7 +188,7 @@ trait MangoPayHooksDirectives extends HooksDirectives with PaymentHandler {
                 run(
                   UpdateMandateStatus(
                     resourceId,
-                    Some(BankAccount.MandateStatus.MANDATE_ACTIVATED)
+                    Some(Mandate.MandateStatus.MANDATE_ACTIVATED)
                   )
                 ) completeWith {
                   completeWithMandateStatusUpdatedResult(eventType, resourceId)

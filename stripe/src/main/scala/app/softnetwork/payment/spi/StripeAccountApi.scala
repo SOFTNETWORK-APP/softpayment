@@ -129,7 +129,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
               c.setTime(date)
               Try(
                 (naturalUser.userId match {
-                  case Some(userId) =>
+                  case Some(userId) if userId.startsWith("acct_") =>
                     Option(Account.retrieve(userId, StripeApi().requestOptions))
                   case _ =>
                     Account
@@ -428,6 +428,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             )
                             .build()
                         )
+                        .setType(AccountCreateParams.Type.CUSTOM)
                         .setMetadata(Map("external_uuid" -> naturalUser.externalUuid).asJava)
 
                     naturalUser.business match {
@@ -525,7 +526,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
             c.setTime(date)
             Try(
               (legalUser.legalRepresentative.userId match {
-                case Some(userId) =>
+                case Some(userId) if userId.startsWith("acct_") =>
                   Option(Account.retrieve(userId, StripeApi().requestOptions))
                 case _ =>
                   Account
@@ -922,7 +923,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     )*/
 
                   account
-                case _ => //TODO if tos_shown_and_accepted is true
+                case _ =>
                   // create company account
 
                   val company =
@@ -1068,6 +1069,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                           )
                           .build()
                       )
+                      .setType(AccountCreateParams.Type.CUSTOM)
                       .putMetadata("external_uuid", legalUser.legalRepresentative.externalUuid)
 
                   /*if (tos_shown_and_accepted) {
@@ -1196,6 +1198,27 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
               }
             ) match {
               case Success(account) =>
+                if (tos_shown_and_accepted) {
+                  mlog.info(s"****** tos_shown_and_accepted -> $tos_shown_and_accepted")
+                  val params =
+                    AccountUpdateParams
+                      .builder()
+                      .setTosAcceptance(
+                        AccountUpdateParams.TosAcceptance
+                          .builder()
+                          .setIp(ipAddress.get)
+                          .setUserAgent(userAgent.get)
+                          .setDate(persistence.now().getEpochSecond)
+                          .build()
+                      )
+                      .build()
+                  Try(
+                    account.update(
+                      params,
+                      StripeApi().requestOptions
+                    )
+                  )
+                }
                 Some(account.getId)
               case Failure(f) =>
                 mlog.error(f.getMessage, f)
@@ -2158,7 +2181,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
   private[this] def createOrUpdateCustomer(naturalUser: NaturalUser): Option[String] = {
     Try {
       (naturalUser.userId match {
-        case Some(userId) =>
+        case Some(userId) if userId.startsWith("cus_") =>
           Option(Customer.retrieve(userId, StripeApi().requestOptions))
         case _ =>
           Customer

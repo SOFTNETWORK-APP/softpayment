@@ -18,7 +18,11 @@ case class NaturalUserView(
   countryOfResidence: String,
   externalUuid: String,
   profile: Option[String] = None,
-  naturalUserType: Option[NaturalUser.NaturalUserType] = None
+  naturalUserType: Option[NaturalUser.NaturalUserType] = None,
+  address: Option[Address] = None,
+  phone: Option[String] = None,
+  business: Option[Business] = None,
+  title: Option[String] = None
 ) extends User
 
 object NaturalUserView {
@@ -34,7 +38,11 @@ object NaturalUserView {
       countryOfResidence,
       externalUuid,
       profile,
-      naturalUserType
+      naturalUserType,
+      address,
+      phone,
+      business,
+      title
     )
   }
 }

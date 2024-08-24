@@ -80,7 +80,7 @@ case class BankAccountView(
   encoded: Boolean,
   active: Boolean,
   mandateId: Option[String] = None,
-  mandateStatus: Option[BankAccount.MandateStatus] = None,
+  mandateStatus: Option[Mandate.MandateStatus] = None,
   externalUuid: String
 )
 

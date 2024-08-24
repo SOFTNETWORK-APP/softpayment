@@ -809,26 +809,33 @@ object PaymentMessages {
 
   /** Commands related to the mandate */
 
-  /** @param creditedAccount
+  /** @param debitedAccount
     *   - account to whom the mandate would be added
+    * @param iban
+    *   - optional IBAN
     * @param clientId
     *   - optional client id
     */
-  case class CreateMandate(creditedAccount: String, clientId: Option[String] = None)
-      extends PaymentCommandWithKey
+  case class CreateMandate(
+    debitedAccount: String,
+    iban: Option[String] = None,
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey
       with PaymentAccountCommand {
-    val key: String = creditedAccount
+    val key: String = debitedAccount
   }
 
-  /** @param creditedAccount
+  case class IbanMandate(iban: String)
+
+  /** @param debitedAccount
     *   - account which owns the mandate that would be canceled
     * @param clientId
     *   - optional client id
     */
-  case class CancelMandate(creditedAccount: String, clientId: Option[String] = None)
+  case class CancelMandate(debitedAccount: String, clientId: Option[String] = None)
       extends PaymentCommandWithKey
       with PaymentAccountCommand {
-    val key: String = creditedAccount
+    val key: String = debitedAccount
   }
 
   /** hook command
@@ -841,7 +848,7 @@ object PaymentMessages {
   @InternalApi
   private[payment] case class UpdateMandateStatus(
     mandateId: String,
-    status: Option[BankAccount.MandateStatus] = None
+    status: Option[Mandate.MandateStatus] = None
   ) extends PaymentCommandWithKey
       with PaymentAccountCommand {
     lazy val key: String = mandateId
@@ -915,6 +922,13 @@ object PaymentMessages {
     paymentClientData: String,
     paymentClientReturnUrl: String
   ) extends PaidInResult
+
+  case class MandateRequired(
+    mandateId: String,
+    mandateClientSecret: String,
+    mandateClientData: String,
+    mandateClientReturnUrl: String
+  )
 
   case class RecurringPaymentRegistered(recurringPaymentRegistrationId: String)
       extends PaymentResult

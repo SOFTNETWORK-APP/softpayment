@@ -35,7 +35,10 @@ case class LegalUserView(
   legalRepresentativeAddress: AddressView,
   headQuartersAddress: AddressView,
   uboDeclaration: Option[UboDeclarationView] = None,
-  lastAcceptedTermsOfPSP: Option[java.util.Date] = None
+  lastAcceptedTermsOfPSP: Option[java.util.Date] = None,
+  vatNumber: Option[String] = None,
+  phone: Option[String] = None,
+  business: Option[Business] = None
 ) extends User {
   override lazy val userId: Option[String] = legalRepresentative.userId
 }
@@ -52,7 +55,10 @@ object LegalUserView {
       legalRepresentativeAddress.view,
       headQuartersAddress.view,
       uboDeclaration.map(_.view),
-      lastAcceptedTermsOfPSP
+      lastAcceptedTermsOfPSP,
+      vatNumber,
+      phone,
+      business
     )
   }
 }

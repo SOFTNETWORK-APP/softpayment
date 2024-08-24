@@ -179,7 +179,7 @@ trait PaymentTestKit
 
   def updateMandateStatus(
     mandateId: String,
-    status: Option[BankAccount.MandateStatus] = None
+    status: Option[Mandate.MandateStatus] = None
   )(implicit ec: ExecutionContext): Future[Either[PaymentError, MandateStatusUpdated]] = {
     MockPaymentHandler !? UpdateMandateStatus(mandateId, status) map {
       case result: MandateStatusUpdated => Right(result)

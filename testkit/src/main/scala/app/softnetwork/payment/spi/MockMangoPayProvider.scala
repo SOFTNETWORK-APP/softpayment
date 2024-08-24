@@ -25,6 +25,7 @@ import com.mangopay.entities.{
   BankAccount => MangoPayBankAccount,
   Card => _,
   KycDocument => _,
+  Mandate => MangoPayMandate,
   Transaction => _,
   UboDeclaration => _,
   _
@@ -1089,7 +1090,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
     * @param userId
     *   - Provider user id
     * @param bankAccountId
-    *   - Bank account id
+    *   - optional Bank account id to associate with this mandate (required by some providers
+    *     including MangoPay)
+    * @param iban
+    *   - optional IBAN to associate with this mandate (required by some providers including Stripe)
     * @param idempotencyKey
     *   - whether to use an idempotency key for this request or not
     * @return
@@ -1098,25 +1102,32 @@ trait MockMangoPayProvider extends MangoPayProvider {
   override def mandate(
     externalUuid: String,
     userId: String,
-    bankAccountId: String,
+    bankAccountId: Option[String],
+    iban: Option[String],
     idempotencyKey: Option[String] = None
   ): Option[MandateResult] = {
-    val mandate = new Mandate()
-    mandate.setId(generateUUID())
-    mandate.setBankAccountId(bankAccountId)
-    mandate.setCulture(CultureCode.FR)
-    mandate.setExecutionType(MandateExecutionType.WEB)
-    mandate.setMandateType(MandateType.DIRECT_DEBIT)
-    mandate.setReturnUrl(
-      s"${config.mandateReturnUrl}?externalUuid=$externalUuid&idempotencyKey=${idempotencyKey.getOrElse("")}"
-    )
-    mandate.setScheme(MandateScheme.SEPA)
-    mandate.setStatus(MandateStatus.SUBMITTED)
-    mandate.setUserId(userId)
-    Mandates = Mandates.updated(mandate.getId, mandate)
-    Some(
-      MandateResult.defaultInstance.withId(mandate.getId).withStatus(mandate.getStatus)
-    )
+    bankAccountId match {
+      case Some(bankAccountId) =>
+        val mandate = new MangoPayMandate()
+        mandate.setId(generateUUID())
+        mandate.setBankAccountId(bankAccountId)
+        mandate.setCulture(CultureCode.FR)
+        mandate.setExecutionType(MandateExecutionType.WEB)
+        mandate.setMandateType(MandateType.DIRECT_DEBIT)
+        mandate.setReturnUrl(
+          s"${config.mandateReturnUrl}?externalUuid=$externalUuid&idempotencyKey=${idempotencyKey.getOrElse("")}"
+        )
+        mandate.setScheme(MandateScheme.SEPA)
+        mandate.setStatus(MandateStatus.SUBMITTED)
+        mandate.setUserId(userId)
+        Mandates = Mandates.updated(mandate.getId, mandate)
+        Some(
+          MandateResult.defaultInstance.withId(mandate.getId).withStatus(mandate.getStatus)
+        )
+      case None =>
+        mlog.error("No bank account id provided")
+        None
+    }
   }
 
   /** @param maybeMandateId
@@ -1131,12 +1142,15 @@ trait MockMangoPayProvider extends MangoPayProvider {
   override def loadMandate(
     maybeMandateId: Option[String],
     userId: String,
-    bankAccountId: String
+    bankAccountId: Option[String]
   ): Option[MandateResult] = {
     maybeMandateId match {
       case Some(mandateId) =>
         Mandates.get(mandateId) match {
-          case Some(s) if s.getBankAccountId == bankAccountId && s.getUserId == userId =>
+          case Some(s)
+              if (bankAccountId.isEmpty || s.getBankAccountId == bankAccountId.getOrElse(
+                ""
+              )) && s.getUserId == userId =>
             Some(
               MandateResult.defaultInstance.withId(s.getId).withStatus(s.getStatus)
             )
@@ -1144,7 +1158,11 @@ trait MockMangoPayProvider extends MangoPayProvider {
         }
       case _ =>
         Mandates.values
-          .filter(m => m.getBankAccountId == bankAccountId && m.getUserId == userId)
+          .filter(m =>
+            (bankAccountId.isEmpty || m.getBankAccountId == bankAccountId.getOrElse(
+              ""
+            )) && m.getUserId == userId
+          )
           .map(m => MandateResult.defaultInstance.withId(m.getId).withStatus(m.getStatus))
           .headOption
     }
@@ -1734,7 +1752,7 @@ object MockMangoPayProvider {
 
   var Transfers: Map[String, Transfer] = Map.empty
 
-  var Mandates: Map[String, Mandate] = Map.empty
+  var Mandates: Map[String, MangoPayMandate] = Map.empty
 
   var Documents: Map[String, KycDocumentValidationReport] = Map.empty
 

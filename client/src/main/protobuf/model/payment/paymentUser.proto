@@ -20,7 +20,7 @@ option (scalapb.options) = {
     preserve_unknown_fields: false
 };
 
-message BankAccount {
+message Mandate {
     enum MandateStatus {
         // the mandate has been created
         MANDATE_CREATED = 0;
@@ -32,11 +32,27 @@ message BankAccount {
         MANDATE_FAILED = 3;
         // the mandate is expired and is not longer available for payments
         MANDATE_EXPIRED = 4;
+        // the mandate has been cancelled by the user
+        MANDATE_CANCELLED = 5;
+        // the mandate is pending for validation
+        MANDATE_PENDING = 6;
     }
     enum MandateScheme {
         MANDATE_BACS = 1;
         MANDATE_SEPA = 2;
     }
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    option (scalapb.message).extends = "MandateDecorator";
+    required string id = 1;
+    required google.protobuf.Timestamp createdDate = 2 [(scalapb.field).type = "java.util.Date"];
+    required google.protobuf.Timestamp lastUpdated = 3 [(scalapb.field).type = "java.util.Date"];
+    required MandateStatus mandateStatus = 4;
+    required MandateScheme mandateScheme = 5 [default = MANDATE_SEPA];
+    optional string resultCode = 6;
+    optional string resultMessage = 7;
+}
+
+message BankAccount {
     option (scalapb.message).extends = "ProtobufDomainObject";
     option (scalapb.message).extends = "BankAccountDecorator";
     option (scalapb.message).companion_extends = "BankAccountCompanion";
@@ -52,8 +68,8 @@ message BankAccount {
     required bool active = 10 [default = true];
     required string externalUuid = 11;
     optional string mandateId = 12;
-    optional MandateStatus mandateStatus = 13;
-    optional MandateScheme mandateScheme = 14 [default = MANDATE_SEPA];
+    optional Mandate.MandateStatus mandateStatus = 13;
+    optional Mandate.MandateScheme mandateScheme = 14 [default = MANDATE_SEPA];
     optional string countryCode = 15;
     optional string currency = 16;
 }
@@ -132,6 +148,7 @@ message PaymentAccount {
     repeated Transaction transactions = 10;
     repeated RecurringPayment recurryingPayments = 11;
     optional string clientId = 12;
+    repeated Mandate mandates = 13;
 }
 
 message Business {
@@ -148,10 +165,13 @@ message BusinessSupport {
 
 message MandateResult{
     required string id = 1;
-    required BankAccount.MandateStatus status = 2;
+    required Mandate.MandateStatus status = 2;
     required string redirectUrl = 3;
     optional string resultCode = 4;
     optional string resultMessage = 5;
+    optional string mandateClientSecret = 6;
+    optional string mandateClientData = 7;
+    optional string mandateClientReturnUrl = 8;
 }
 
 message RecurringPayment {

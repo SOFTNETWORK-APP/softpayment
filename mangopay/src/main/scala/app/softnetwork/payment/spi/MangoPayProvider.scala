@@ -19,6 +19,7 @@ import com.mangopay.entities.{
   Birthplace => MangoPayBirthplace,
   Card => _,
   KycDocument => _,
+  Mandate => MangoPayMandate,
   Transaction => _,
   UboDeclaration => _,
   _
@@ -91,14 +92,14 @@ trait MangoPayProvider extends PaymentProvider {
 
   implicit def mangoPayMandateStatusToMandateStatus(
     status: MandateStatus
-  ): BankAccount.MandateStatus =
+  ): Mandate.MandateStatus =
     status match {
-      case MandateStatus.ACTIVE    => BankAccount.MandateStatus.MANDATE_ACTIVATED
-      case MandateStatus.CREATED   => BankAccount.MandateStatus.MANDATE_CREATED
-      case MandateStatus.EXPIRED   => BankAccount.MandateStatus.MANDATE_EXPIRED
-      case MandateStatus.FAILED    => BankAccount.MandateStatus.MANDATE_FAILED
-      case MandateStatus.SUBMITTED => BankAccount.MandateStatus.MANDATE_SUBMITTED
-      case _                       => BankAccount.MandateStatus.Unrecognized(-1)
+      case MandateStatus.ACTIVE    => Mandate.MandateStatus.MANDATE_ACTIVATED
+      case MandateStatus.CREATED   => Mandate.MandateStatus.MANDATE_CREATED
+      case MandateStatus.EXPIRED   => Mandate.MandateStatus.MANDATE_EXPIRED
+      case MandateStatus.FAILED    => Mandate.MandateStatus.MANDATE_FAILED
+      case MandateStatus.SUBMITTED => Mandate.MandateStatus.MANDATE_SUBMITTED
+      case _                       => Mandate.MandateStatus.Unrecognized(-1)
     }
 
   implicit def legalUserTypeToLegalPersonType(
@@ -1789,7 +1790,10 @@ trait MangoPayProvider extends PaymentProvider {
     * @param userId
     *   - Provider user id
     * @param bankAccountId
-    *   - Bank account id
+    *   - optional Bank account id to associate with the mandate (required by some providers
+    *     including MangoPay)
+    * @param iban
+    *   - optional IBAN to associate with the mandate (required by some providers including Stripe)
     * @param idempotencyKey
     *   - whether to use an idempotency key for this request or not
     * @return
@@ -1798,43 +1802,50 @@ trait MangoPayProvider extends PaymentProvider {
   override def mandate(
     externalUuid: String,
     userId: String,
-    bankAccountId: String,
+    bankAccountId: Option[String],
+    iban: Option[String],
     idempotencyKey: Option[String] = None
   ): Option[MandateResult] = {
-    val mandate = new Mandate()
-    mandate.setBankAccountId(bankAccountId)
-    mandate.setCulture(CultureCode.FR)
-    mandate.setExecutionType(MandateExecutionType.WEB)
-    mandate.setMandateType(MandateType.DIRECT_DEBIT)
-    mandate.setReturnUrl(
-      s"${config.mandateReturnUrl}?externalUuid=$externalUuid&idempotencyKey=${idempotencyKey.getOrElse("")}"
-    )
-    mandate.setScheme(MandateScheme.SEPA)
-    mandate.setUserId(userId)
-    Try(
-      idempotencyKey match {
-        case Some(key) => MangoPay().getMandateApi.create(key, mandate)
-        case _         => MangoPay().getMandateApi.create(mandate)
-      }
-    ) match {
-      case Success(s) =>
-        if (s.getStatus.isMandateFailed) {
-          mlog.error(
-            s"mandate creation failed for $externalUuid -> (${s.getResultCode}, ${s.getResultMessage}"
-          )
-        }
-        Some(
-          MandateResult.defaultInstance
-            .withId(s.getId)
-            .withStatus(s.getStatus)
-            .withRedirectUrl(s.getRedirectUrl)
-            .copy(
-              resultCode = Option(s.getResultCode),
-              resultMessage = Option(s.getResultMessage)
-            )
+    bankAccountId match {
+      case Some(bankAccountId) =>
+        val mandate = new MangoPayMandate()
+        mandate.setBankAccountId(bankAccountId)
+        mandate.setCulture(CultureCode.FR)
+        mandate.setExecutionType(MandateExecutionType.WEB)
+        mandate.setMandateType(MandateType.DIRECT_DEBIT)
+        mandate.setReturnUrl(
+          s"${config.mandateReturnUrl}?externalUuid=$externalUuid&idempotencyKey=${idempotencyKey.getOrElse("")}"
         )
-      case Failure(f) =>
-        mlog.error(f.getMessage, f)
+        mandate.setScheme(MandateScheme.SEPA)
+        mandate.setUserId(userId)
+        Try(
+          idempotencyKey match {
+            case Some(key) => MangoPay().getMandateApi.create(key, mandate)
+            case _         => MangoPay().getMandateApi.create(mandate)
+          }
+        ) match {
+          case Success(s) =>
+            if (s.getStatus.isMandateFailed) {
+              mlog.error(
+                s"mandate creation failed for $externalUuid -> (${s.getResultCode}, ${s.getResultMessage}"
+              )
+            }
+            Some(
+              MandateResult.defaultInstance
+                .withId(s.getId)
+                .withStatus(s.getStatus)
+                .withRedirectUrl(s.getRedirectUrl)
+                .copy(
+                  resultCode = Option(s.getResultCode),
+                  resultMessage = Option(s.getResultMessage)
+                )
+            )
+          case Failure(f) =>
+            mlog.error(f.getMessage, f)
+            None
+        }
+      case None =>
+        mlog.error("bankAccountId is required")
         None
     }
   }
@@ -1851,33 +1862,39 @@ trait MangoPayProvider extends PaymentProvider {
   override def loadMandate(
     maybeMandateId: Option[String],
     userId: String,
-    bankAccountId: String
+    bankAccountId: Option[String]
   ): Option[MandateResult] = {
     Try(
       maybeMandateId match {
         case Some(mandateId) => Option(MangoPay().getMandateApi.get(mandateId))
         case None =>
-          val sorting = new Sorting()
-          sorting.addField("creationDate", SortDirection.desc)
-          MangoPay().getMandateApi
-            .getForBankAccount(
-              userId,
-              bankAccountId,
-              new FilterMandates(),
-              new Pagination(1, 100),
-              sorting
-            )
-            .asScala
-            .toList
-            .find(mandate =>
-              mandate.getStatus.isMandateActivated || mandate.getStatus.isMandateSubmitted
-            )
+          bankAccountId match {
+            case Some(bankAccountId) =>
+              val sorting = new Sorting()
+              sorting.addField("creationDate", SortDirection.desc)
+              MangoPay().getMandateApi
+                .getForBankAccount(
+                  userId,
+                  bankAccountId,
+                  new FilterMandates(),
+                  new Pagination(1, 100),
+                  sorting
+                )
+                .asScala
+                .toList
+                .find(mandate =>
+                  mandate.getStatus.isMandateActivated || mandate.getStatus.isMandateSubmitted
+                )
+            case _ => None
+          }
       }
     ) match {
       case Success(s) =>
         s match {
           case Some(mandate)
-              if mandate.getBankAccountId == bankAccountId && mandate.getUserId == userId =>
+              if (bankAccountId.isEmpty || mandate.getBankAccountId == bankAccountId.getOrElse(
+                ""
+              )) && mandate.getUserId == userId =>
             Some(
               MandateResult.defaultInstance
                 .withId(mandate.getId)

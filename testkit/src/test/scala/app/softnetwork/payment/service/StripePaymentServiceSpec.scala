@@ -22,6 +22,7 @@ import app.softnetwork.payment.data.{
   ownerAddress,
   ownerName,
   preAuthorizationId,
+  recurringPaymentRegistrationId,
   sellerBankAccountId,
   ubo,
   uboDeclarationId
@@ -30,24 +31,33 @@ import app.softnetwork.payment.handlers.MockPaymentDao
 import app.softnetwork.payment.message.PaymentMessages.{
   BankAccountCommand,
   CardPreAuthorized,
+  IbanMandate,
   PaidIn,
   Payment,
   PaymentRedirection,
   PaymentRequired,
-  PreRegisterCard
+  PaymentResult,
+  PreRegisterCard,
+  RecurringPaymentRegistered,
+  RegisterRecurringPayment,
+  Schedule4PaymentTriggered
 }
 import app.softnetwork.payment.model.{
   computeExternalUuidWithProfile,
   BankAccount,
   CardPreRegistration,
   LegalUser,
+  RecurringPayment,
+  RecurringPaymentView,
   Transaction,
   UboDeclaration
 }
 import app.softnetwork.payment.scalatest.StripePaymentRouteTestKit
 import app.softnetwork.payment.serialization.paymentFormats
+import app.softnetwork.persistence.now
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
+import app.softnetwork.time._
 import com.stripe.model.PaymentIntent
 import com.stripe.param.PaymentIntentConfirmParams
 import org.scalatest.wordspec.AnyWordSpecLike
@@ -59,6 +69,7 @@ import org.openqa.selenium.{By, WebDriver, WebElement}
 import org.openqa.selenium.htmlunit.HtmlUnitDriver
 
 import java.net.{InetAddress, URLEncoder}
+import java.time.LocalDate
 import scala.util.{Failure, Success, Try}
 import collection.JavaConverters._
 
@@ -107,14 +118,88 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "accept mandate" in {
       validateKycDocuments()
       withHeaders(
-        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute").withHeaders(
-          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
-          `User-Agent`("test")
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute", IbanMandate(iban))
+          .withHeaders(
+            `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+            `User-Agent`("test")
+          )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val paymentAccount = loadPaymentAccount()
+        assert(paymentAccount.mandate.map(_.id).isDefined)
+        assert(paymentAccount.mandate.map(_.status).isDefined)
+      }
+    }
+
+    val probe = createTestProbe[PaymentResult]()
+    subscribeProbe(probe)
+
+    "register recurring direct debit payment" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute",
+          RegisterRecurringPayment(
+            "",
+            `type` = RecurringPayment.RecurringPaymentType.DIRECT_DEBIT,
+            frequency = Some(RecurringPayment.RecurringPaymentFrequency.DAILY),
+            endDate = Some(now()),
+            fixedNextAmount = Some(true),
+            nextDebitedAmount = Some(1000),
+            nextFeesAmount = Some(100)
+          )
         )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        assert(loadPaymentAccount().bankAccount.flatMap(_.mandateId).isDefined)
-        assert(loadPaymentAccount().bankAccount.flatMap(_.mandateStatus).isDefined)
+        recurringPaymentRegistrationId =
+          responseAs[RecurringPaymentRegistered].recurringPaymentRegistrationId
+        withHeaders(
+          Get(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+          )
+        ) ~> routes ~> check {
+          status shouldEqual StatusCodes.OK
+          val recurringPayment = responseAs[RecurringPaymentView]
+          assert(recurringPayment.`type`.isDirectDebit)
+          assert(recurringPayment.frequency.exists(_.isDaily))
+          assert(recurringPayment.firstDebitedAmount == 0)
+          assert(recurringPayment.firstFeesAmount == 0)
+          assert(recurringPayment.fixedNextAmount.exists(_.self))
+          assert(recurringPayment.nextDebitedAmount.contains(1000))
+          assert(recurringPayment.nextFeesAmount.contains(100))
+          assert(recurringPayment.numberOfRecurringPayments.getOrElse(0) == 0)
+          assert(
+            recurringPayment.nextRecurringPaymentDate.exists(
+              LocalDate.now().isEqual(_)
+            )
+          )
+        }
+      }
+    }
+
+    "execute direct debit automatically for next recurring payment" in {
+      withHeaders(
+        Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute")
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.BadRequest
+      }
+      probe.expectMessageType[Schedule4PaymentTriggered]
+      withHeaders(
+        Get(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val recurringPayment = responseAs[RecurringPaymentView]
+        assert(recurringPayment.cumulatedDebitedAmount.contains(1000))
+        assert(recurringPayment.cumulatedFeesAmount.contains(100))
+        assert(
+          recurringPayment.lastRecurringPaymentDate.exists(
+            LocalDate.now().isEqual(_)
+          )
+        )
+        assert(recurringPayment.lastRecurringPaymentTransactionId.isDefined)
+        assert(recurringPayment.numberOfRecurringPayments.contains(1))
+        assert(recurringPayment.nextRecurringPaymentDate.isEmpty)
       }
     }
   }

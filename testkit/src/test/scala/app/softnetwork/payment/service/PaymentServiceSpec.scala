@@ -522,8 +522,9 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute")
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        assert(loadPaymentAccount().bankAccount.flatMap(_.mandateId).isDefined)
-        assert(loadPaymentAccount().bankAccount.flatMap(_.mandateStatus).isDefined)
+        val paymentAccount = loadPaymentAccount()
+        assert(paymentAccount.mandate.map(_.id).isDefined)
+        assert(paymentAccount.mandate.map(_.status).isDefined)
       }
     }
 

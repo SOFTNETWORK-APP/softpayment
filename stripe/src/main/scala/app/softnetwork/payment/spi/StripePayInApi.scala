@@ -310,28 +310,29 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                   cardId = Option(payment.getPaymentMethod)
                 )
 
-            if (status == "requires_action" && payment.getNextAction.getType == "redirect_to_url") {
-              transaction = transaction.copy(
-                status = Transaction.TransactionStatus.TRANSACTION_CREATED,
-                //The URL you must redirect your customer to in order to authenticate the payment.
-                redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl)
-              )
-            } else if (status == "requires_payment_method") {
-              transaction = transaction.copy(
-                status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
-                paymentClientSecret = Option(payment.getClientSecret),
-                paymentClientReturnUrl = Option(
-                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=${payInTransaction.registerCard
-                    .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt
-                    .getOrElse(false)}&payment_intent=${payment.getId}"
+            status match {
+              case "requires_action" if payment.getNextAction.getType == "redirect_to_url" =>
+                transaction = transaction.copy(
+                  status = Transaction.TransactionStatus.TRANSACTION_CREATED,
+                  //The URL you must redirect your customer to in order to authenticate the payment.
+                  redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl)
                 )
-              )
-            } else if (status == "succeeded" || status == "requires_capture") {
-              transaction =
-                transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
-            } else {
-              transaction =
-                transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
+              case "requires_payment_method" =>
+                transaction = transaction.copy(
+                  status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
+                  paymentClientSecret = Option(payment.getClientSecret),
+                  paymentClientReturnUrl = Option(
+                    s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=${payInTransaction.registerCard
+                      .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt
+                      .getOrElse(false)}&payment_intent=${payment.getId}"
+                  )
+                )
+              case "succeeded" | "requires_capture" =>
+                transaction =
+                  transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
+              case _ =>
+                transaction =
+                  transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
             }
 
             mlog.info(
@@ -368,10 +369,11 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
               .builder()
               .setAmount(payInTransaction.debitedAmount)
               .setApplicationFeeAmount(payInTransaction.feesAmount)
-              .setCaptureMethod(PaymentIntentCreateParams.CaptureMethod.AUTOMATIC)
+              .setCaptureMethod(
+                PaymentIntentCreateParams.CaptureMethod.MANUAL
+              ) //TODO check if we can use automatic
               .setCurrency(payInTransaction.currency)
               .setCustomer(payInTransaction.authorId)
-              .addPaymentMethodType("paypal")
               .setTransferData(
                 PaymentIntentCreateParams.TransferData
                   .builder()
@@ -435,6 +437,21 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                     .getOrElse(false)}"
                 )
             case _ =>
+              params
+                .addPaymentMethodType("paypal")
+                .setPaymentMethodOptions(
+                  PaymentIntentCreateParams.PaymentMethodOptions
+                    .builder()
+                    .setPaypal(
+                      PaymentIntentCreateParams.PaymentMethodOptions.Paypal
+                        .builder()
+                        .setCaptureMethod(
+                          PaymentIntentCreateParams.PaymentMethodOptions.Paypal.CaptureMethod.MANUAL //TODO check if we can use automatic
+                        )
+                        .build()
+                    )
+                    .build()
+                )
           }
 
           mlog.info(

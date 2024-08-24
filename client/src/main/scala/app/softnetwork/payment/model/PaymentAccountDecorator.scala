@@ -51,17 +51,48 @@ trait PaymentAccountDecorator { self: PaymentAccount =>
 
   lazy val documentOutdated: Boolean = documents.exists(_.status.isKycDocumentOutOfDate)
 
-  lazy val mandateExists: Boolean = bankAccount.flatMap(_.mandateId).isDefined &&
+  private[this] lazy val oldMandateExists: Boolean = bankAccount.flatMap(_.mandateId).isDefined &&
     bankAccount
       .flatMap(_.mandateStatus)
       .exists(s => s.isMandateCreated || s.isMandateActivated || s.isMandateSubmitted)
+
+  lazy val mandateExists: Boolean = mandates.exists(m =>
+    m.mandateStatus.isMandateCreated || m.mandateStatus.isMandateActivated || m.mandateStatus.isMandateSubmitted
+  ) || oldMandateExists
 
   lazy val mandateRequired: Boolean =
     recurryingPayments.exists(r => r.`type`.isDirectDebit && r.nextPaymentDate.isDefined) ||
     transactions.exists(t => t.paymentType.isDirectDebited && t.status.isTransactionCreated)
 
-  lazy val mandateActivated: Boolean = bankAccount.flatMap(_.mandateId).isDefined &&
+  private[this] lazy val oldMandateActivated: Boolean =
+    bankAccount.flatMap(_.mandateId).isDefined &&
     bankAccount.flatMap(_.mandateStatus).exists(s => s.isMandateActivated || s.isMandateSubmitted)
+
+  lazy val mandateActivated: Boolean =
+    mandates.exists(m =>
+      m.mandateStatus.isMandateActivated || m.mandateStatus.isMandateSubmitted
+    ) || oldMandateActivated
+
+  private[this] lazy val oldMandate: Option[Mandate] =
+    bankAccount.flatMap(_.mandateId) match {
+      case Some(mandateId) =>
+        bankAccount.flatMap(_.mandateStatus).map { status =>
+          Mandate.defaultInstance.withId(mandateId).withMandateStatus(status)
+        }
+      case _ => None
+    }
+
+  lazy val mandate: Option[Mandate] = {
+    val sortedMandates = // sort mandates by lastUpdated desc
+      mandates.sortWith((m1, m2) =>
+        m1.lastUpdated.toInstant.compareTo(m2.lastUpdated.toInstant) > 0
+      )
+    sortedMandates
+      .find(m => m.mandateStatus.isMandateActivated)
+      .orElse(sortedMandates.find(m => m.mandateStatus.isMandateSubmitted))
+      .orElse(sortedMandates.find(m => m.mandateStatus.isMandateCreated))
+      .orElse(oldMandate)
+  }
 
   def resetUserId(userId: Option[String] = None): PaymentAccount = {
     val updatedBankAccount = bankAccount match {
@@ -122,7 +153,8 @@ case class PaymentAccountView(
   bankAccount: Option[BankAccountView] = None,
   documents: Seq[KycDocumentView] = Seq.empty,
   paymentAccountStatus: PaymentAccount.PaymentAccountStatus,
-  transactions: Seq[TransactionView] = Seq.empty
+  transactions: Seq[TransactionView] = Seq.empty,
+  mandate: Option[MandateView] = None
 ) extends User {
   override lazy val userId: Option[String] = legalUser.orElse(naturalUser).flatMap(_.userId)
 }
@@ -147,7 +179,8 @@ object PaymentAccountView {
       bankAccount.map(_.view),
       documents.map(_.view),
       paymentAccountStatus,
-      transactions.map(_.view)
+      transactions.map(_.view),
+      mandate.map(_.view)
     )
   }
 }

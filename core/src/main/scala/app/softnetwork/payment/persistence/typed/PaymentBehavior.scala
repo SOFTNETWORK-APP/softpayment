@@ -247,7 +247,7 @@ trait PaymentBehavior
         }
         Effect
           .persist(
-            broadcastEvent(
+            List(
               PaymentAccountCreatedOrUpdatedEvent.defaultInstance
                 .withLastUpdated(lastUpdated)
                 .withExternalUuid(updatedPaymentAccount.externalUuid)
@@ -329,7 +329,7 @@ trait PaymentBehavior
                           )
                           Effect
                             .persist(
-                              broadcastEvent(
+                              List(
                                 RefundFailedEvent.defaultInstance
                                   .withOrderUuid(orderUuid)
                                   .withResultMessage(transaction.resultMessage)
@@ -355,7 +355,7 @@ trait PaymentBehavior
                             )
                             Effect
                               .persist(
-                                broadcastEvent(
+                                List(
                                   RefundedEvent.defaultInstance
                                     .withOrderUuid(orderUuid)
                                     .withLastUpdated(lastUpdated)
@@ -380,7 +380,7 @@ trait PaymentBehavior
                             )
                             Effect
                               .persist(
-                                broadcastEvent(
+                                List(
                                   RefundFailedEvent.defaultInstance
                                     .withOrderUuid(orderUuid)
                                     .withResultMessage(transaction.resultMessage)
@@ -403,7 +403,7 @@ trait PaymentBehavior
                       )
                       Effect
                         .persist(
-                          broadcastEvent(
+                          List(
                             RefundFailedEvent.defaultInstance
                               .withOrderUuid(orderUuid)
                               .withResultMessage("no transaction returned by provider")
@@ -509,7 +509,7 @@ trait PaymentBehavior
                     }
                   Effect
                     .persist(
-                      broadcastEvent(
+                      List(
                         TransferedEvent.defaultInstance
                           .withFeesAmount(feesAmount)
                           .withDebitedAmount(debitedAmount)
@@ -542,7 +542,7 @@ trait PaymentBehavior
                 } else {
                   Effect
                     .persist(
-                      broadcastEvent(
+                      List(
                         TransferFailedEvent.defaultInstance
                           .withDebitedAccount(paymentAccount.externalUuid)
                           .withResultMessage(transaction.resultMessage)
@@ -572,25 +572,22 @@ trait PaymentBehavior
           case Some(paymentAccount) =>
             paymentAccount.userId match {
               case Some(creditedUserId) =>
-                paymentAccount.bankAccount.flatMap(_.id) match {
-                  case Some(bankAccountId) =>
-                    // check if a mandate is already associated to this bank account and activated
-                    if (paymentAccount.mandateActivated) {
-                      Effect.none.thenRun(_ => MandateAlreadyExists ~> replyTo)
-                    } else if (paymentAccount.documents.exists(!_.status.isKycDocumentValidated)) {
-                      Effect.none.thenRun(_ => MandateNotCreated ~> replyTo)
-                    } else {
-                      addMandate(
-                        entityId,
-                        replyTo,
-                        creditedAccount,
-                        paymentAccount,
-                        creditedUserId,
-                        bankAccountId,
-                        clientId
-                      )
-                    }
-                  case _ => Effect.none.thenRun(_ => BankAccountNotFound ~> replyTo)
+                // check if a mandate is already associated to this bank account and activated
+                if (paymentAccount.mandateActivated) {
+                  Effect.none.thenRun(_ => MandateAlreadyExists ~> replyTo)
+                } else if (paymentAccount.documents.exists(!_.status.isKycDocumentValidated)) {
+                  Effect.none.thenRun(_ => MandateNotCreated ~> replyTo)
+                } else {
+                  addMandate(
+                    entityId,
+                    replyTo,
+                    debitedAccount,
+                    paymentAccount,
+                    creditedUserId,
+                    paymentAccount.bankAccount.flatMap(_.id),
+                    iban,
+                    clientId
+                  )
                 }
               case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
             }
@@ -603,7 +600,7 @@ trait PaymentBehavior
             if (paymentAccount.mandateExists && paymentAccount.mandateRequired) {
               Effect
                 .persist(
-                  broadcastEvent(
+                  List(
                     MandateCancelationFailedEvent(paymentAccount.externalUuid, now())
                   )
                 )
@@ -616,47 +613,47 @@ trait PaymentBehavior
                 )
               val paymentProvider = loadPaymentProvider(clientId)
               import paymentProvider._
-              paymentAccount.bankAccount match {
-                case Some(bankAccount) =>
-                  bankAccount.mandateId match {
-                    case Some(mandateId) =>
-                      cancelMandate(mandateId) match {
-                        case Some(_) =>
-                          keyValueDao.removeKeyValue(mandateId)
-                          val lastUpdated = now()
-                          val updatePaymentAccount = paymentAccount
-                            .copy(
-                              bankAccount = paymentAccount.bankAccount.map(
-                                _.copy(
-                                  mandateId = None,
-                                  mandateStatus = None
-                                )
+              paymentAccount.mandate match {
+                case Some(value) =>
+                  cancelMandate(value.id) match {
+                    case Some(_) =>
+                      keyValueDao.removeKeyValue(value.id)
+                      val lastUpdated = now()
+                      val updatePaymentAccount = paymentAccount
+                        .copy(
+                          bankAccount = paymentAccount.bankAccount.map(
+                            _.copy(
+                              mandateId = None,
+                              mandateStatus = None
+                            )
+                          ),
+                          mandates = paymentAccount.mandates
+                            .filterNot(_.id == value.id)
+                        )
+                        .withLastUpdated(lastUpdated)
+                      Effect
+                        .persist(
+                          List(
+                            MandateUpdatedEvent.defaultInstance
+                              .withExternalUuid(paymentAccount.externalUuid)
+                              .withLastUpdated(lastUpdated)
+                              .withBankAccountId(
+                                paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
                               )
-                            )
+                              .copy(
+                                mandateId = None,
+                                mandateStatus = None
+                              )
+                          ) :+
+                          PaymentAccountUpsertedEvent.defaultInstance
                             .withLastUpdated(lastUpdated)
-                          Effect
-                            .persist(
-                              broadcastEvent(
-                                MandateUpdatedEvent.defaultInstance
-                                  .withExternalUuid(paymentAccount.externalUuid)
-                                  .withLastUpdated(lastUpdated)
-                                  .withBankAccountId(bankAccount.getId)
-                                  .copy(
-                                    mandateId = None,
-                                    mandateStatus = None
-                                  )
-                              ) :+
-                              PaymentAccountUpsertedEvent.defaultInstance
-                                .withLastUpdated(lastUpdated)
-                                .withDocument(updatePaymentAccount)
-                            )
-                            .thenRun(_ => MandateCanceled ~> replyTo)
+                            .withDocument(updatePaymentAccount)
+                        )
+                        .thenRun(_ => MandateCanceled ~> replyTo)
 
-                        case _ => Effect.none.thenRun(_ => MandateNotCanceled ~> replyTo)
-                      }
-                    case _ => Effect.none.thenRun(_ => MandateNotFound ~> replyTo)
+                    case _ => Effect.none.thenRun(_ => MandateNotCanceled ~> replyTo)
                   }
-                case _ => Effect.none.thenRun(_ => BankAccountNotFound ~> replyTo)
+                case _ => Effect.none.thenRun(_ => MandateNotFound ~> replyTo)
               }
             }
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
@@ -668,50 +665,57 @@ trait PaymentBehavior
           case Some(paymentAccount) =>
             paymentAccount.userId match {
               case Some(userId) =>
-                paymentAccount.bankAccount.flatMap(_.id) match {
-                  case Some(bankAccountId) =>
-                    val clientId = paymentAccount.clientId.orElse(
-                      internalClientId
-                    )
-                    val paymentProvider = loadPaymentProvider(clientId)
-                    import paymentProvider._
-                    loadMandate(Some(mandateId), userId, bankAccountId) match {
-                      case Some(report) =>
-                        val internalStatus =
-                          if (environment != "prod") {
-                            status.getOrElse(report.status)
-                          } else {
-                            report.status
-                          }
-                        val lastUpdated = now()
-                        val updatePaymentAccount = paymentAccount
+                val bankAccountId = paymentAccount.bankAccount.flatMap(_.id)
+                val clientId = paymentAccount.clientId.orElse(
+                  internalClientId
+                )
+                val paymentProvider = loadPaymentProvider(clientId)
+                import paymentProvider._
+                loadMandate(Some(mandateId), userId, bankAccountId) match {
+                  case Some(report) =>
+                    val internalStatus =
+                      if (environment != "prod") {
+                        status.getOrElse(report.status)
+                      } else {
+                        report.status
+                      }
+                    val lastUpdated = now()
+                    val updatePaymentAccount = paymentAccount
+                      .copy(
+                        mandates = paymentAccount.mandates
+                          .filterNot(_.id == mandateId) :+ paymentAccount.mandates
+                          .find(_.id == mandateId)
+                          .getOrElse(
+                            Mandate.defaultInstance
+                              .withId(mandateId)
+                              .withCreatedDate(lastUpdated)
+                          )
+                          .withMandateStatus(internalStatus)
                           .copy(
-                            bankAccount = paymentAccount.bankAccount.map(
-                              _.withMandateId(mandateId).withMandateStatus(internalStatus)
-                            )
+                            resultCode = report.resultCode,
+                            resultMessage = report.resultMessage
                           )
+                      )
+                      .withLastUpdated(lastUpdated)
+                    Effect
+                      .persist(
+                        List(
+                          MandateUpdatedEvent.defaultInstance
+                            .withExternalUuid(paymentAccount.externalUuid)
+                            .withLastUpdated(lastUpdated)
+                            .withMandateId(mandateId)
+                            .withMandateStatus(internalStatus)
+                            .withBankAccountId(bankAccountId.getOrElse(""))
+                        ) :+
+                        PaymentAccountUpsertedEvent.defaultInstance
                           .withLastUpdated(lastUpdated)
-                        Effect
-                          .persist(
-                            broadcastEvent(
-                              MandateUpdatedEvent.defaultInstance
-                                .withExternalUuid(paymentAccount.externalUuid)
-                                .withLastUpdated(lastUpdated)
-                                .withMandateId(mandateId)
-                                .withMandateStatus(internalStatus)
-                                .withBankAccountId(bankAccountId)
-                            ) :+
-                            PaymentAccountUpsertedEvent.defaultInstance
-                              .withLastUpdated(lastUpdated)
-                              .withDocument(updatePaymentAccount)
-                          )
-                          .thenRun(_ =>
-                            MandateStatusUpdated(report.withStatus(internalStatus)) ~> replyTo
-                          )
+                          .withDocument(updatePaymentAccount)
+                      )
+                      .thenRun(_ =>
+                        MandateStatusUpdated(report.withStatus(internalStatus)) ~> replyTo
+                      )
 
-                      case _ => Effect.none.thenRun(_ => MandateStatusNotUpdated ~> replyTo)
-                    }
-                  case _ => Effect.none.thenRun(_ => BankAccountNotFound ~> replyTo)
+                  case _ => Effect.none.thenRun(_ => MandateStatusNotUpdated ~> replyTo)
                 }
               case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
             }
@@ -726,8 +730,8 @@ trait PaymentBehavior
               case Some(creditedUserId) =>
                 paymentAccount.walletId match {
                   case Some(creditedWalletId) =>
-                    paymentAccount.bankAccount.flatMap(_.mandateId) match {
-                      case Some(mandateId) =>
+                    paymentAccount.mandate match {
+                      case Some(value) =>
                         if (paymentAccount.mandateActivated) {
                           val clientId = paymentAccount.clientId
                             .orElse(cmd.clientId)
@@ -745,7 +749,7 @@ trait PaymentBehavior
                                 .withDebitedAmount(debitedAmount)
                                 .withFeesAmount(feesAmount)
                                 .withCurrency(currency)
-                                .withMandateId(mandateId)
+                                .withMandateId(value.id)
                                 .withStatementDescriptor(statementDescriptor)
                                 .copy(externalReference = externalReference)
                             )
@@ -764,7 +768,7 @@ trait PaymentBehavior
                               ) {
                                 Effect
                                   .persist(
-                                    broadcastEvent(
+                                    List(
                                       DirectDebitedEvent.defaultInstance
                                         .withLastUpdated(lastUpdated)
                                         .withCreditedAccount(paymentAccount.externalUuid)
@@ -785,7 +789,7 @@ trait PaymentBehavior
                               } else {
                                 Effect
                                   .persist(
-                                    broadcastEvent(
+                                    List(
                                       DirectDebitFailedEvent.defaultInstance
                                         .withCreditedAccount(paymentAccount.externalUuid)
                                         .withResultMessage(transaction.resultMessage)
@@ -855,7 +859,7 @@ trait PaymentBehavior
                         if (t.status.isTransactionSucceeded || t.status.isTransactionCreated) {
                           Effect
                             .persist(
-                              broadcastEvent(
+                              List(
                                 DirectDebitedEvent.defaultInstance
                                   .withLastUpdated(lastUpdated)
                                   .withCreditedAccount(paymentAccount.externalUuid)
@@ -876,7 +880,7 @@ trait PaymentBehavior
                         } else {
                           Effect
                             .persist(
-                              broadcastEvent(
+                              List(
                                 DirectDebitFailedEvent.defaultInstance
                                   .withCreditedAccount(paymentAccount.externalUuid)
                                   .withResultMessage(updatedTransaction.resultMessage)
@@ -1233,7 +1237,7 @@ trait PaymentBehavior
 
                               // BankAccountUpdatedEvent
                               events = events ++
-                                broadcastEvent(
+                                List(
                                   BankAccountUpdatedEvent.defaultInstance
                                     .withExternalUuid(updatedPaymentAccount.externalUuid)
                                     .withLastUpdated(lastUpdated)
@@ -1254,7 +1258,7 @@ trait PaymentBehavior
                                 )
                                 // TermsOfPSPAcceptedEvent
                                 events = events ++
-                                  broadcastEvent(
+                                  List(
                                     TermsOfPSPAcceptedEvent.defaultInstance
                                       .withExternalUuid(updatedPaymentAccount.externalUuid)
                                       .withLastUpdated(lastUpdated)
@@ -1273,7 +1277,7 @@ trait PaymentBehavior
                                     )
                                     // UboDeclarationUpdatedEvent
                                     events = events ++
-                                      broadcastEvent(
+                                      List(
                                         UboDeclarationUpdatedEvent.defaultInstance
                                           .withExternalUuid(updatedPaymentAccount.externalUuid)
                                           .withLastUpdated(lastUpdated)
@@ -1303,7 +1307,7 @@ trait PaymentBehavior
 
                                 // PaymentAccountStatusUpdatedEvent
                                 events = events ++
-                                  broadcastEvent(
+                                  List(
                                     PaymentAccountStatusUpdatedEvent.defaultInstance
                                       .withExternalUuid(updatedPaymentAccount.externalUuid)
                                       .withLastUpdated(lastUpdated)
@@ -1328,7 +1332,7 @@ trait PaymentBehavior
 
                                 // MandateUpdatedEvent
                                 events = events ++
-                                  broadcastEvent(
+                                  List(
                                     MandateUpdatedEvent.defaultInstance
                                       .withExternalUuid(updatedPaymentAccount.externalUuid)
                                       .withLastUpdated(lastUpdated)
@@ -1342,7 +1346,7 @@ trait PaymentBehavior
 
                               // DocumentsUpdatedEvent
                               events = events ++
-                                broadcastEvent(
+                                List(
                                   DocumentsUpdatedEvent.defaultInstance
                                     .withExternalUuid(updatedPaymentAccount.externalUuid)
                                     .withLastUpdated(lastUpdated)
@@ -1426,12 +1430,12 @@ trait PaymentBehavior
 
             Effect
               .persist(
-                broadcastEvent(
+                List(
                   DocumentsUpdatedEvent.defaultInstance
                     .withExternalUuid(paymentAccount.externalUuid)
                     .withLastUpdated(lastUpdated)
                     .withDocuments(newDocuments)
-                ) ++ broadcastEvent(
+                ) ++ List(
                   DocumentUpdatedEvent.defaultInstance
                     .withExternalUuid(paymentAccount.externalUuid)
                     .withLastUpdated(lastUpdated)
@@ -1491,12 +1495,12 @@ trait PaymentBehavior
 
                     Effect
                       .persist(
-                        broadcastEvent(
+                        List(
                           DocumentsUpdatedEvent.defaultInstance
                             .withExternalUuid(paymentAccount.externalUuid)
                             .withLastUpdated(lastUpdated)
                             .withDocuments(newDocuments)
-                        ) ++ broadcastEvent(
+                        ) ++ List(
                           DocumentUpdatedEvent.defaultInstance
                             .withExternalUuid(paymentAccount.externalUuid)
                             .withLastUpdated(lastUpdated)
@@ -1613,7 +1617,7 @@ trait PaymentBehavior
 
                 if (declarationCreated) {
                   events = events ++
-                    broadcastEvent(
+                    List(
                       UboDeclarationUpdatedEvent.defaultInstance
                         .withExternalUuid(paymentAccount.externalUuid)
                         .withLastUpdated(lastUpdated)
@@ -1676,7 +1680,7 @@ trait PaymentBehavior
                     val lastUpdated = now()
                     Effect
                       .persist(
-                        broadcastEvent(
+                        List(
                           UboDeclarationUpdatedEvent.defaultInstance
                             .withExternalUuid(paymentAccount.externalUuid)
                             .withLastUpdated(lastUpdated)
@@ -1749,7 +1753,7 @@ trait PaymentBehavior
                       )
                       .withLastUpdated(lastUpdated)
                     events = events ++
-                      broadcastEvent(
+                      List(
                         UboDeclarationUpdatedEvent.defaultInstance
                           .withExternalUuid(paymentAccount.externalUuid)
                           .withLastUpdated(lastUpdated)
@@ -1759,7 +1763,7 @@ trait PaymentBehavior
                       internalStatus.isUboDeclarationIncomplete || internalStatus.isUboDeclarationRefused
                     ) {
                       events = events ++
-                        broadcastEvent(
+                        List(
                           PaymentAccountStatusUpdatedEvent.defaultInstance
                             .withExternalUuid(paymentAccount.externalUuid)
                             .withLastUpdated(lastUpdated)
@@ -1773,7 +1777,7 @@ trait PaymentBehavior
                       internalStatus.isUboDeclarationValidated && paymentAccount.documentsValidated
                     ) {
                       events = events ++
-                        broadcastEvent(
+                        List(
                           PaymentAccountStatusUpdatedEvent.defaultInstance
                             .withExternalUuid(paymentAccount.externalUuid)
                             .withLastUpdated(lastUpdated)
@@ -1806,13 +1810,13 @@ trait PaymentBehavior
             val lastUpdated = now()
 
             var events: List[ExternalSchedulerEvent] =
-              broadcastEvent(
+              List(
                 PaymentAccountStatusUpdatedEvent.defaultInstance
                   .withExternalUuid(paymentAccount.externalUuid)
                   .withLastUpdated(lastUpdated)
                   .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.COMPTE_OK)
               ) ++
-              broadcastEvent(
+              List(
                 RegularUserValidatedEvent.defaultInstance
                   .withExternalUuid(paymentAccount.externalUuid)
                   .withLastUpdated(lastUpdated)
@@ -1832,7 +1836,7 @@ trait PaymentBehavior
                   updatedPaymentAccount.getLegalUser.withUboDeclaration(declaration)
                 )
                 events = events ++
-                  broadcastEvent(
+                  List(
                     UboDeclarationUpdatedEvent.defaultInstance
                       .withExternalUuid(paymentAccount.externalUuid)
                       .withLastUpdated(lastUpdated)
@@ -1851,7 +1855,7 @@ trait PaymentBehavior
                 )
               )
               events = events ++
-                broadcastEvent(
+                List(
                   DocumentsUpdatedEvent.defaultInstance
                     .withExternalUuid(paymentAccount.externalUuid)
                     .withLastUpdated(lastUpdated)
@@ -1878,13 +1882,13 @@ trait PaymentBehavior
             val lastUpdated = now()
 
             val events: List[ExternalSchedulerEvent] =
-              broadcastEvent(
+              List(
                 PaymentAccountStatusUpdatedEvent.defaultInstance
                   .withExternalUuid(paymentAccount.externalUuid)
                   .withLastUpdated(lastUpdated)
                   .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO)
               ) ++
-              broadcastEvent(
+              List(
                 RegularUserInvalidatedEvent.defaultInstance
                   .withExternalUuid(paymentAccount.externalUuid)
                   .withLastUpdated(lastUpdated)
@@ -1949,7 +1953,7 @@ trait PaymentBehavior
                     .copy(bankAccount = None)
                     .withLastUpdated(lastUpdated)
                   var events: List[ExternalSchedulerEvent] = {
-                    broadcastEvent(
+                    List(
                       BankAccountDeletedEvent.defaultInstance
                         .withExternalUuid(paymentAccount.externalUuid)
                         .withLastUpdated(lastUpdated)
@@ -1963,7 +1967,7 @@ trait PaymentBehavior
                           updatedPaymentAccount.getLegalUser.copy(uboDeclaration = None)
                         )
                       events = events ++
-                        broadcastEvent(
+                        List(
                           UboDeclarationUpdatedEvent.defaultInstance
                             .withExternalUuid(paymentAccount.externalUuid)
                             .withLastUpdated(lastUpdated)
@@ -1984,13 +1988,13 @@ trait PaymentBehavior
                     )
                     .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO)
                   events = events ++
-                    broadcastEvent(
+                    List(
                       DocumentsUpdatedEvent.defaultInstance
                         .withExternalUuid(paymentAccount.externalUuid)
                         .withLastUpdated(lastUpdated)
                         .withDocuments(updatedPaymentAccount.documents)
                     ) ++
-                    broadcastEvent(
+                    List(
                       PaymentAccountStatusUpdatedEvent.defaultInstance
                         .withExternalUuid(paymentAccount.externalUuid)
                         .withLastUpdated(lastUpdated)
@@ -2021,7 +2025,8 @@ trait PaymentBehavior
     creditedAccount: String,
     paymentAccount: PaymentAccount,
     creditedUserId: String,
-    bankAccountId: String,
+    bankAccountId: Option[String],
+    iban: Option[String] = None,
     clientId: Option[String] = None
   )(implicit
     context: ActorContext[_],
@@ -2032,7 +2037,7 @@ trait PaymentBehavior
       paymentAccount.clientId.orElse(clientId).orElse(Option(softPayClientSettings.clientId))
     val paymentProvider = loadPaymentProvider(_clientId)
     import paymentProvider._
-    mandate(creditedAccount, creditedUserId, bankAccountId) match {
+    mandate(creditedAccount, creditedUserId, bankAccountId, iban) match {
       case Some(mandateResult) =>
         if (mandateResult.status.isMandateFailed) {
           Effect.none.thenRun(_ =>
@@ -2053,13 +2058,13 @@ trait PaymentBehavior
             .withLastUpdated(lastUpdated)
           Effect
             .persist(
-              broadcastEvent(
+              List(
                 MandateUpdatedEvent.defaultInstance
                   .withExternalUuid(paymentAccount.externalUuid)
                   .withLastUpdated(lastUpdated)
                   .withMandateId(mandateResult.id)
                   .withMandateStatus(mandateResult.status)
-                  .withBankAccountId(bankAccountId)
+                  .withBankAccountId(bankAccountId.getOrElse(""))
               ) :+
               PaymentAccountUpsertedEvent.defaultInstance
                 .withLastUpdated(lastUpdated)
@@ -2067,7 +2072,7 @@ trait PaymentBehavior
             )
             .thenRun(_ =>
               (mandateResult.status match {
-                case BankAccount.MandateStatus.MANDATE_CREATED =>
+                case Mandate.MandateStatus.MANDATE_CREATED =>
                   MandateConfirmationRequired(mandateResult.redirectUrl)
                 case _ => MandateCreated
               }) ~> replyTo
@@ -2127,7 +2132,7 @@ trait PaymentBehavior
         )
 
     events = events ++
-      broadcastEvent(
+      List(
         DocumentUpdatedEvent.defaultInstance
           .withExternalUuid(paymentAccount.externalUuid)
           .withLastUpdated(lastUpdated)
@@ -2141,7 +2146,7 @@ trait PaymentBehavior
       paymentAccount.withDocuments(newDocuments).withLastUpdated(lastUpdated)
 
     events = events ++
-      broadcastEvent(
+      List(
         DocumentsUpdatedEvent.defaultInstance
           .withExternalUuid(paymentAccount.externalUuid)
           .withLastUpdated(lastUpdated)
@@ -2153,7 +2158,7 @@ trait PaymentBehavior
     ) {
       if (!paymentAccount.paymentAccountStatus.isCompteOk) {
         events = events ++
-          broadcastEvent(
+          List(
             PaymentAccountStatusUpdatedEvent.defaultInstance
               .withExternalUuid(paymentAccount.externalUuid)
               .withLastUpdated(lastUpdated)
@@ -2164,7 +2169,7 @@ trait PaymentBehavior
       }
     } else if (internalStatus.isKycDocumentRefused) {
       events = events ++
-        broadcastEvent(
+        List(
           PaymentAccountStatusUpdatedEvent.defaultInstance
             .withExternalUuid(paymentAccount.externalUuid)
             .withLastUpdated(lastUpdated)
@@ -2174,7 +2179,7 @@ trait PaymentBehavior
         .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO)
     } else if (internalStatus.isKycDocumentOutOfDate && !paymentAccount.documentOutdated) {
       events = events ++
-        broadcastEvent(
+        List(
           PaymentAccountStatusUpdatedEvent.defaultInstance
             .withExternalUuid(paymentAccount.externalUuid)
             .withLastUpdated(lastUpdated)

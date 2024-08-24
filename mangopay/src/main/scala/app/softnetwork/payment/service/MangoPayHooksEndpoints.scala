@@ -2,7 +2,7 @@ package app.softnetwork.payment.service
 
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.model.{BankAccount, KycDocument, UboDeclaration}
+import app.softnetwork.payment.model.{KycDocument, Mandate, UboDeclaration}
 import com.mangopay.core.enumerations.EventType
 import sttp.tapir.Endpoint
 import sttp.tapir.server.ServerEndpoint.Full
@@ -160,7 +160,7 @@ trait MangoPayHooksEndpoints extends HooksEndpoints with PaymentHandler {
                 }
               case EventType.MANDATE_FAILED =>
                 run(
-                  UpdateMandateStatus(resourceId, Some(BankAccount.MandateStatus.MANDATE_FAILED))
+                  UpdateMandateStatus(resourceId, Some(Mandate.MandateStatus.MANDATE_FAILED))
                 ).map {
                   case _: MandateStatusUpdated =>
                     log.info(
@@ -177,7 +177,7 @@ trait MangoPayHooksEndpoints extends HooksEndpoints with PaymentHandler {
                 run(
                   UpdateMandateStatus(
                     resourceId,
-                    Some(BankAccount.MandateStatus.MANDATE_SUBMITTED)
+                    Some(Mandate.MandateStatus.MANDATE_SUBMITTED)
                   )
                 ).map {
                   case _: MandateStatusUpdated =>
@@ -193,7 +193,7 @@ trait MangoPayHooksEndpoints extends HooksEndpoints with PaymentHandler {
                 }
               case EventType.MANDATE_CREATED =>
                 run(
-                  UpdateMandateStatus(resourceId, Some(BankAccount.MandateStatus.MANDATE_CREATED))
+                  UpdateMandateStatus(resourceId, Some(Mandate.MandateStatus.MANDATE_CREATED))
                 ).map {
                   case _: MandateStatusUpdated =>
                     log.info(
@@ -208,7 +208,7 @@ trait MangoPayHooksEndpoints extends HooksEndpoints with PaymentHandler {
                 }
               case EventType.MANDATE_EXPIRED =>
                 run(
-                  UpdateMandateStatus(resourceId, Some(BankAccount.MandateStatus.MANDATE_EXPIRED))
+                  UpdateMandateStatus(resourceId, Some(Mandate.MandateStatus.MANDATE_EXPIRED))
                 ).map {
                   case _: MandateStatusUpdated =>
                     log.info(
@@ -225,7 +225,7 @@ trait MangoPayHooksEndpoints extends HooksEndpoints with PaymentHandler {
                 run(
                   UpdateMandateStatus(
                     resourceId,
-                    Some(BankAccount.MandateStatus.MANDATE_ACTIVATED)
+                    Some(Mandate.MandateStatus.MANDATE_ACTIVATED)
                   )
                 ).map {
                   case _: MandateStatusUpdated =>

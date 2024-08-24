@@ -152,7 +152,7 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
                 RefundCreateParams
                   .builder()
                   .setAmount(
-                    Math.min(payment.getAmountReceived.intValue(), refundTransaction.refundAmount)
+                    Math.min(payment.getAmount.intValue(), refundTransaction.refundAmount)
                   )
                   .setCharge(payment.getLatestCharge)
                   .setReverseTransfer(transferReversal)

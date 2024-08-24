@@ -11,7 +11,10 @@ trait DirectDebitApi { _: PaymentContext =>
     * @param userId
     *   - Provider user id
     * @param bankAccountId
-    *   - Bank account id
+    *   - optional Bank account id to associate with this mandate (required by some providers
+    *     including MangoPay)
+    * @param iban
+    *   - optional IBAN to associate with this mandate (required by some providers including Stripe)
     * @param idempotencyKey
     *   - whether to use an idempotency key for this request or not
     * @return
@@ -20,7 +23,8 @@ trait DirectDebitApi { _: PaymentContext =>
   def mandate(
     externalUuid: String,
     userId: String,
-    bankAccountId: String,
+    bankAccountId: Option[String],
+    iban: Option[String],
     idempotencyKey: Option[String] = None
   ): Option[MandateResult]
 
@@ -36,7 +40,7 @@ trait DirectDebitApi { _: PaymentContext =>
   def loadMandate(
     maybeMandateId: Option[String],
     userId: String,
-    bankAccountId: String
+    bankAccountId: Option[String]
   ): Option[MandateResult]
 
   /** @param mandateId

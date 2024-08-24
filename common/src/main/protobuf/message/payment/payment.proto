@@ -87,7 +87,7 @@ message MandateUpdatedEvent {
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     optional string mandateId = 3;
-    optional app.softnetwork.payment.model.BankAccount.MandateStatus mandateStatus = 4;
+    optional app.softnetwork.payment.model.Mandate.MandateStatus mandateStatus = 4;
     required string bankAccountId = 5;
 }
 
