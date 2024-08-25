@@ -50,6 +50,10 @@ package object serialization {
         TransactionStatus.TRANSACTION_NOT_SPECIFIED
       case Transaction.TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON =>
         TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON
+      case Transaction.TransactionStatus.TRANSACTION_CANCELED =>
+        TransactionStatus.TRANSACTION_CANCELED
+      case Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT =>
+        TransactionStatus.TRANSACTION_PENDING_PAYMENT
     }
   }
 
@@ -67,6 +71,10 @@ package object serialization {
         Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED
       case TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON =>
         Transaction.TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON
+      case TransactionStatus.TRANSACTION_CANCELED =>
+        Transaction.TransactionStatus.TRANSACTION_CANCELED
+      case TransactionStatus.TRANSACTION_PENDING_PAYMENT =>
+        Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT
     }
   }
 

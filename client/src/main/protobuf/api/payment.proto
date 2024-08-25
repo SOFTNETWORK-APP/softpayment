@@ -53,6 +53,7 @@ enum TransactionStatus{
     TRANSACTION_NOT_SPECIFIED = 4;
     TRANSACTION_FAILED_FOR_TECHNICAL_REASON = 5;
     TRANSACTION_CANCELED = 6;
+    TRANSACTION_PENDING_PAYMENT = 7;
 }
 
 message TransactionResponse {
