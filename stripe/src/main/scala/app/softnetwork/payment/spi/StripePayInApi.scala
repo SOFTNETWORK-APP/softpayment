@@ -559,8 +559,9 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
           }
         val paymentType =
           metadata.get("payment_type") match {
-            case Some("paypal") => Transaction.PaymentType.PAYPAL
-            case _              => Transaction.PaymentType.CARD
+            case Some("paypal")         => Transaction.PaymentType.PAYPAL
+            case Some("direct_debited") => Transaction.PaymentType.DIRECT_DEBITED
+            case _                      => Transaction.PaymentType.CARD
           }
         val cardId =
           paymentType match {
@@ -590,7 +591,8 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             .copy(
               cardId = cardId,
               preAuthorizationId = preAuthorizationId,
-              redirectUrl = redirectUrl
+              redirectUrl = redirectUrl,
+              mandateId = metadata.get("mandate_id")
             )
 
         if (status == "requires_action" && payment.getNextAction.getType == "redirect_to_url") {

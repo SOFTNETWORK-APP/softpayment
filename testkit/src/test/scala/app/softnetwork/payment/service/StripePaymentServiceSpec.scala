@@ -12,6 +12,7 @@ import app.softnetwork.payment.data.{
   cardId,
   cardPreRegistration,
   debitedAmount,
+  directDebitTransactionId,
   feesAmount,
   firstName,
   iban,
@@ -200,6 +201,16 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         assert(recurringPayment.lastRecurringPaymentTransactionId.isDefined)
         assert(recurringPayment.numberOfRecurringPayments.contains(1))
         assert(recurringPayment.nextRecurringPaymentDate.isEmpty)
+        directDebitTransactionId = recurringPayment.lastRecurringPaymentTransactionId.get
+        MockPaymentDao.loadDirectDebitTransaction(
+          directDebitTransactionId
+        ) await {
+          case Right(directDebited) =>
+            assert(directDebited.transactionId == directDebitTransactionId)
+            val status = directDebited.transactionStatus
+            assert(status.isTransactionSucceeded || status.isTransactionCreated)
+          case _ => fail("No transaction found")
+        }
       }
     }
   }

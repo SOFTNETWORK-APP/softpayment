@@ -28,8 +28,10 @@ import java.net.URLEncoder
 import java.util.Date
 import scala.util.{Failure, Success, Try}
 import collection.JavaConverters._
+import scala.language.implicitConversions
 
-trait StripeDirectDebitApi extends DirectDebitApi { _: StripeContext =>
+trait StripeDirectDebitApi extends DirectDebitApi {
+  _: StripeContext =>
 
   /** @param externalUuid
     *   - external unique id
@@ -287,44 +289,9 @@ trait StripeDirectDebitApi extends DirectDebitApi { _: StripeContext =>
 
     } match {
       case Success(setupIntent) =>
-        val status = setupIntent.getStatus
-        var mandate =
-          MandateResult.defaultInstance
-            .withId(Option(setupIntent.getMandate).getOrElse(setupIntent.getId))
-            .withResultCode(status)
-        status match {
-          case "succeeded" =>
-            mandate = mandate.withStatus(Mandate.MandateStatus.MANDATE_ACTIVATED)
-          case "requires_action" if setupIntent.getNextAction.getType == "redirect_to_url" =>
-            mandate = mandate
-              .withStatus(Mandate.MandateStatus.MANDATE_CREATED)
-              .withRedirectUrl(setupIntent.getNextAction.getRedirectToUrl.getUrl)
-              .withResultMessage(setupIntent.getNextAction.getType)
-          case "requires_payment_method" | "requires_confirmation" =>
-            mandate = mandate
-              .withStatus(Mandate.MandateStatus.MANDATE_PENDING)
-              .copy(
-                mandateClientSecret = Option(setupIntent.getClientSecret),
-                mandateClientReturnUrl = Option(
-                  s"${config.mandateReturnUrl}?MandateId=${mandate.id}&externalUuid=${URLEncoder
-                    .encode(externalUuid, "UTF-8")}&idempotencyKey=${idempotencyKey.getOrElse("")}"
-                )
-              )
-          case "processing" =>
-            mandate = mandate
-              .withStatus(Mandate.MandateStatus.MANDATE_SUBMITTED)
-          case "canceled" =>
-            mandate = mandate
-              .withStatus(Mandate.MandateStatus.MANDATE_EXPIRED)
-              .withResultMessage("the confirmation limit has been reached")
-          case _ =>
-            mandate = mandate
-              .withStatus(Mandate.MandateStatus.MANDATE_FAILED)
-              .withResultMessage("the mandate has failed")
-        }
-
+        mlog.info(s"Creating mandate -> ${new Gson().toJson(setupIntent)}")
+        val mandate: MandateResult = setupIntent
         mlog.info(s"Mandate created -> ${asJson(mandate)}")
-
         Some(mandate)
 
       case Failure(f) =>
@@ -349,8 +316,23 @@ trait StripeDirectDebitApi extends DirectDebitApi { _: StripeContext =>
   ): Option[MandateResult] = {
     maybeMandateId match {
       case Some(mandateId) =>
-        Try(StripeMandate.retrieve(mandateId, StripeApi().requestOptions)) match {
-          case Success(mandate) =>
+        Try {
+          val requestOptions = StripeApi().requestOptions
+          val seti = """seti_.*""".r
+          mandateId match {
+            case seti() =>
+              val setupIntent = SetupIntent.retrieve(mandateId, requestOptions)
+              Option(setupIntent.getMandate) match {
+                case Some(mandateId) =>
+                  StripeMandate.retrieve(mandateId, requestOptions)
+                case None =>
+                  setupIntent
+              }
+            case _ =>
+              StripeMandate.retrieve(mandateId, requestOptions)
+          }
+        } match {
+          case Success(mandate: StripeMandate) =>
             Some(
               MandateResult.defaultInstance
                 .withId(mandate.getId)
@@ -363,6 +345,8 @@ trait StripeDirectDebitApi extends DirectDebitApi { _: StripeContext =>
                   }
                 )
             )
+          case Success(setupIntent: SetupIntent) =>
+            Some(setupIntent)
           case Failure(f) =>
             mlog.error(f.getMessage, f)
             None
@@ -439,6 +423,7 @@ trait StripeDirectDebitApi extends DirectDebitApi { _: StripeContext =>
                 )
                 .putMetadata("transaction_type", "direct_debit")
                 .putMetadata("payment_type", "direct_debited")
+                .putMetadata("mandate_id", mandate.getId)
 
               if (directDebitTransaction.statementDescriptor.nonEmpty) {
                 params.setStatementDescriptor(directDebitTransaction.statementDescriptor)
@@ -515,5 +500,100 @@ trait StripeDirectDebitApi extends DirectDebitApi { _: StripeContext =>
     walletId: String,
     transactionId: String,
     transactionDate: Date
-  ): Option[Transaction] = None //TODO
+  ): Option[Transaction] = {
+    Try {
+      PaymentIntent.retrieve(transactionId, StripeApi().requestOptions)
+    } match {
+      case Success(payment) =>
+        val metadata = payment.getMetadata.asScala
+        val status = payment.getStatus
+        var transaction =
+          Transaction()
+            .withId(payment.getId)
+            .withNature(Transaction.TransactionNature.REGULAR)
+            .withType(Transaction.TransactionType.DIRECT_DEBIT)
+            .withPaymentType(Transaction.PaymentType.DIRECT_DEBITED)
+            .withAmount(payment.getAmount.intValue())
+            .withFees(Option(payment.getApplicationFeeAmount).map(_.intValue()).getOrElse(0))
+            .withCurrency(payment.getCurrency)
+            .withResultCode(status)
+            .withAuthorId(payment.getCustomer)
+            .withCreditedUserId(
+              payment.getTransferData.getDestination
+            )
+            .withCreditedWalletId(walletId)
+            .copy(
+              mandateId = metadata.get("mandate_id")
+            )
+
+        status match {
+          case "requires_action" if payment.getNextAction.getType == "redirect_to_url" =>
+            transaction = transaction.copy(
+              status = Transaction.TransactionStatus.TRANSACTION_CREATED,
+              //The URL you must redirect your customer to in order to authenticate the payment.
+              redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl)
+            )
+          case "requires_payment_method" =>
+            transaction = transaction.copy(
+              status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
+              paymentClientSecret = Option(payment.getClientSecret),
+              paymentClientReturnUrl = None
+            )
+          case "succeeded" | "requires_capture" =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
+          case _ =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
+        }
+
+        mlog.info(
+          s"Direct debit transaction retrieved -> ${asJson(transaction)}"
+        )
+
+        Some(transaction)
+      case Failure(f) =>
+        mlog.error(f.getMessage, f)
+        None
+    }
+  }
+
+  implicit def setupIntentToMandateResult(setupIntent: SetupIntent): MandateResult = {
+    val status = setupIntent.getStatus
+    var mandate =
+      MandateResult.defaultInstance
+        .withId(Option(setupIntent.getMandate).getOrElse(setupIntent.getId))
+        .withResultCode(status)
+    status match {
+      case "succeeded" =>
+        mandate = mandate.withStatus(Mandate.MandateStatus.MANDATE_ACTIVATED)
+      case "requires_action" if setupIntent.getNextAction.getType == "redirect_to_url" =>
+        mandate = mandate
+          .withStatus(Mandate.MandateStatus.MANDATE_CREATED)
+          .withRedirectUrl(setupIntent.getNextAction.getRedirectToUrl.getUrl)
+          .withResultMessage(setupIntent.getNextAction.getType)
+      case "requires_payment_method" | "requires_confirmation" =>
+        mandate = mandate
+          .withStatus(Mandate.MandateStatus.MANDATE_PENDING)
+          .copy(
+            mandateClientSecret = Option(setupIntent.getClientSecret),
+            mandateClientReturnUrl = Option(
+              s"${config.mandateReturnUrl}?MandateId=${mandate.id}"
+            )
+          )
+      case "processing" =>
+        mandate = mandate
+          .withStatus(Mandate.MandateStatus.MANDATE_SUBMITTED)
+      case "canceled" =>
+        mandate = mandate
+          .withStatus(Mandate.MandateStatus.MANDATE_EXPIRED)
+          .withResultMessage("the confirmation limit has been reached")
+      case _ =>
+        mandate = mandate
+          .withStatus(Mandate.MandateStatus.MANDATE_FAILED)
+          .withResultMessage("the mandate has failed")
+    }
+    mandate
+  }
+
 }

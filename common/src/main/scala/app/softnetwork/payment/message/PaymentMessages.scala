@@ -928,7 +928,7 @@ object PaymentMessages {
     mandateClientSecret: String,
     mandateClientData: String,
     mandateClientReturnUrl: String
-  )
+  ) extends PaymentResult
 
   case class RecurringPaymentRegistered(recurringPaymentRegistrationId: String)
       extends PaymentResult

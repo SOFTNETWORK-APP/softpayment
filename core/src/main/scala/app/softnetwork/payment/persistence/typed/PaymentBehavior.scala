@@ -2051,6 +2051,19 @@ trait PaymentBehavior
           val lastUpdated = now()
           val updatePaymentAccount = paymentAccount
             .copy(
+              mandates = paymentAccount.mandates
+                .filterNot(_.id == mandateResult.id) :+ paymentAccount.mandates
+                .find(_.id == mandateResult.id)
+                .getOrElse(
+                  Mandate.defaultInstance
+                    .withId(mandateResult.id)
+                    .withCreatedDate(lastUpdated)
+                )
+                .withMandateStatus(mandateResult.status)
+                .copy(
+                  resultCode = mandateResult.resultCode,
+                  resultMessage = mandateResult.resultMessage
+                ),
               bankAccount = paymentAccount.bankAccount.map(
                 _.withMandateId(mandateResult.id).withMandateStatus(mandateResult.status)
               )
@@ -2074,6 +2087,13 @@ trait PaymentBehavior
               (mandateResult.status match {
                 case Mandate.MandateStatus.MANDATE_CREATED =>
                   MandateConfirmationRequired(mandateResult.redirectUrl)
+                case Mandate.MandateStatus.MANDATE_PENDING =>
+                  MandateRequired(
+                    mandateResult.id,
+                    mandateResult.mandateClientSecret.getOrElse(""),
+                    mandateResult.mandateClientData.getOrElse(""),
+                    mandateResult.mandateClientReturnUrl.getOrElse("")
+                  )
                 case _ => MandateCreated
               }) ~> replyTo
             )
