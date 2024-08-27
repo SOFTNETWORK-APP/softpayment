@@ -49,6 +49,19 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
               .addPaymentMethodType("card")
               .setCustomer(customer.getId)
               .setUsage(SetupIntentCreateParams.Usage.OFF_SESSION)
+              .setPaymentMethodOptions(
+                SetupIntentCreateParams.PaymentMethodOptions
+                  .builder()
+                  .setCard(
+                    SetupIntentCreateParams.PaymentMethodOptions.Card
+                      .builder()
+                      .setRequestThreeDSecure(
+                        SetupIntentCreateParams.PaymentMethodOptions.Card.RequestThreeDSecure.ANY
+                      )
+                      .build()
+                  )
+                  .build()
+              )
               .addFlowDirection(SetupIntentCreateParams.FlowDirection.INBOUND)
               .putMetadata("currency", currency)
               .putMetadata("external_uuid", externalUuid)
@@ -181,6 +194,19 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
           .setCurrency(preAuthorizationTransaction.currency)
           .setCustomer(preAuthorizationTransaction.authorId)
           .setPaymentMethod(preAuthorizationTransaction.cardId)
+          .setPaymentMethodOptions(
+            PaymentIntentCreateParams.PaymentMethodOptions
+              .builder()
+              .setCard(
+                PaymentIntentCreateParams.PaymentMethodOptions.Card
+                  .builder()
+                  .setRequestThreeDSecure(
+                    PaymentIntentCreateParams.PaymentMethodOptions.Card.RequestThreeDSecure.AUTOMATIC
+                  )
+                  .build()
+              )
+              .build()
+          )
           .setCaptureMethod(
             PaymentIntentCreateParams.CaptureMethod.MANUAL
           ) // To capture funds later (https://stripe.com/docs/payments/capture-later)
