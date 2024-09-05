@@ -1835,10 +1835,10 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
   override def createOrUpdateBankAccount(maybeBankAccount: Option[BankAccount]): Option[String] = {
     maybeBankAccount match {
       case Some(bankAccount) =>
-        Try(Account.retrieve(bankAccount.userId, StripeApi().requestOptions)) match {
+        val requestOptions = StripeApi().requestOptions
+        Try(Account.retrieve(bankAccount.userId, requestOptions)) match {
           case Success(account) =>
             Try {
-              val requestOptions = StripeApi().requestOptions
               val bank_account =
                 TokenCreateParams.BankAccount
                   .builder()
@@ -1852,66 +1852,94 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     case _            => TokenCreateParams.BankAccount.AccountHolderType.COMPANY
                   })
                   .build()
-              val token = Token.create(
+              Token.create(
                 TokenCreateParams.builder().setBankAccount(bank_account).build(),
                 requestOptions
               )
-              val params =
-                ExternalAccountCollectionCreateParams
-                  .builder()
-                  .setExternalAccount(token.getId)
-                  .setDefaultForCurrency(true)
-                  .putMetadata("external_uuid", bankAccount.externalUuid)
-                  .putMetadata("active", "true")
-                  .putMetadata("default_for_currency", bank_account.getCurrency)
-                  .build()
-              account.getExternalAccounts.create(
-                params,
-                requestOptions
-              )
             } match {
-              case Success(externalAccount) =>
-                // FIXME we shouldn't have to do this
-                //  but the stripe api does not seem to take into account the request options
-                Stripe.apiKey = provider.providerApiKey
-                Try(
-                  account.getExternalAccounts
-                    .list(
-                      ExternalAccountCollectionListParams
-                        .builder()
-                        .setObject("bank_account")
-                        .build()
-                    )
-                    .getData
-                    .asScala
-                    .filter(_.getId != externalAccount.getId)
-                    .map(
-                      _.delete(
-                        StripeApi().requestOptions
-                      )
-                    )
-                ) match {
-                  case Failure(f) =>
-                    mlog.error(f.getMessage, f)
-                  case _ =>
-                }
-                /*bankAccount.id match {
-                  case Some(id) =>
+              case Success(token) =>
+                val fingerprint = token.getBankAccount.getFingerprint
+                mlog.info(s"fingerprint -> $fingerprint")
+                Try {
+                  val params =
+                    ExternalAccountCollectionCreateParams
+                      .builder()
+                      .setExternalAccount(token.getId)
+                      .setDefaultForCurrency(true)
+                      .putMetadata("external_uuid", bankAccount.externalUuid)
+                      .putMetadata("active", "true")
+                      .putMetadata("default_for_currency", bankAccount.currency.getOrElse("EUR"))
+                      .build()
+                  account.getExternalAccounts.create(
+                    params,
+                    requestOptions
+                  )
+                } match {
+                  case Success(externalAccount) =>
+                    // FIXME we shouldn't have to do this
+                    //  but the stripe api does not seem to take into account the request options
+                    Stripe.apiKey = provider.providerApiKey
                     Try(
                       account.getExternalAccounts
-                        .retrieve(id, StripeApi().requestOptions)
-                        .delete(StripeApi().requestOptions)
+                        .list(
+                          ExternalAccountCollectionListParams
+                            .builder()
+                            .setObject("bank_account")
+                            .build()
+                        )
+                        .getData
+                        .asScala
+                        .filter(_.getId != externalAccount.getId)
+                        .map(
+                          _.delete(
+                            StripeApi().requestOptions
+                          )
+                        )
                     ) match {
                       case Failure(f) =>
                         mlog.error(f.getMessage, f)
                       case _ =>
                     }
-                  case _ =>
-                }*/
-                Some(externalAccount.getId)
-              case Failure(f) =>
-                mlog.error(f.getMessage, f)
-                None
+                    Some(externalAccount.getId)
+                  case Failure(f) =>
+                    // TODO check if the error is related to the account already having the maximum 200 external accounts attached.
+                    mlog.error(
+                      s"bank account creation failed for ${bankAccount.userId} -> ${f.getMessage}"
+                    )
+                    Stripe.apiKey = provider.providerApiKey
+                    Try(
+                      account.getExternalAccounts
+                        .list(
+                          ExternalAccountCollectionListParams
+                            .builder()
+                            .setObject("bank_account")
+                            .build()
+                        )
+                        .getData
+                        .asScala
+                        .map(_.asInstanceOf[com.stripe.model.BankAccount])
+                        .filter(bank =>
+                          bank.getCurrency.toLowerCase == bankAccount.currency
+                            .getOrElse("EUR")
+                            .toLowerCase && !Option(bank.getDeleted).contains(true)
+                        )
+                    ) match {
+                      case Failure(f) =>
+                        mlog.error(f.getMessage, f)
+                        None
+                      case Success(banks) =>
+                        banks.find(bank => bank.getFingerprint == fingerprint).map(_.getId) match {
+                          case Some(value) =>
+                            mlog.info(
+                              s"bank account retrieved with fingerprint $fingerprint -> $value"
+                            )
+                            Some(value)
+                          case None =>
+                            mlog.warn(s"bank account not found with fingerprint $fingerprint")
+                            banks.headOption.map(_.getId)
+                        }
+                    }
+                }
             }
           case Failure(f) =>
             mlog.error(f.getMessage, f)
