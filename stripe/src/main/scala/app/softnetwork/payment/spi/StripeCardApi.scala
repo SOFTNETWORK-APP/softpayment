@@ -187,6 +187,20 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
     Try {
+      val mayRequire3DS =
+        preAuthorizationTransaction.preRegistrationId match {
+          case Some(preRegistrationId) =>
+            val setup = SetupIntent.retrieve(preRegistrationId, StripeApi().requestOptions)
+            mlog.info(
+              s"Setup intent retrieved for order ${preAuthorizationTransaction.orderUuid} -> ${new Gson()
+                .toJson(setup)}"
+            )
+            setup.getStatus match {
+              case "succeeded" => false
+              case _           => true
+            }
+          case _ => true
+        }
       val params =
         PaymentIntentCreateParams
           .builder()
@@ -275,11 +289,12 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
         s"Creating card pre authorization for order ${preAuthorizationTransaction.orderUuid} -> ${new Gson()
           .toJson(params.build())}"
       )
-      PaymentIntent.create(params.build(), StripeApi().requestOptions)
+      (PaymentIntent.create(params.build(), StripeApi().requestOptions), mayRequire3DS)
     } match {
-      case Success(paymentIntent) =>
+      case Success((paymentIntent, mayRequired3DS)) =>
         mlog.info(
-          s"Card pre authorization created for order -> ${preAuthorizationTransaction.orderUuid}"
+          s"Card pre authorization created for order ${preAuthorizationTransaction.orderUuid} -> ${new Gson()
+            .toJson(paymentIntent)}"
         )
         val status = paymentIntent.getStatus
         var transaction =
@@ -301,21 +316,24 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
               preRegistrationId = preAuthorizationTransaction.preRegistrationId
             )
 
-        if (
-          status == "requires_action" && paymentIntent.getNextAction.getType == "redirect_to_url"
-        ) {
-          transaction = transaction.copy(
-            status = Transaction.TransactionStatus.TRANSACTION_CREATED,
-            //The URL you must redirect your customer to in order to authenticate the payment.
-            redirectUrl = Option(paymentIntent.getNextAction.getRedirectToUrl.getUrl)
-          )
-        } else if (status == "requires_payment_method") {
-          transaction = transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_FAILED)
-        } else if (status == "succeeded" || status == "requires_capture") {
-          transaction =
-            transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
-        } else {
-          transaction = transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
+        status match {
+          case "requires_action"
+              if paymentIntent.getNextAction.getType == "redirect_to_url" && mayRequired3DS =>
+            transaction = transaction.copy(
+              status = Transaction.TransactionStatus.TRANSACTION_CREATED,
+              //The URL you must redirect your customer to in order to authenticate the payment.
+              redirectUrl = Option(paymentIntent.getNextAction.getRedirectToUrl.getUrl),
+              returnUrl = Option(paymentIntent.getNextAction.getRedirectToUrl.getReturnUrl)
+            )
+          case "requires_payment_method" =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_FAILED)
+          case "succeeded" | "requires_capture" =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
+          case _ =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
         }
 
         mlog.info(
