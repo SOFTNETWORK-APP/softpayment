@@ -134,7 +134,8 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 .copy(
                   creditedUserId =
                     Option(payment.getTransferData).flatMap(td => Option(td.getDestination)),
-                  cardId = Option(payment.getPaymentMethod)
+                  cardId = Option(payment.getPaymentMethod),
+                  preRegistrationId = payInWithCardPreAuthorizedTransaction.cardPreRegistrationId
                 )
             if (status == "succeeded") {
               transaction =
@@ -307,7 +308,8 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 )
                 .withCreditedWalletId(payInTransaction.creditedWalletId)
                 .copy(
-                  cardId = Option(payment.getPaymentMethod)
+                  cardId = Option(payment.getPaymentMethod),
+                  preRegistrationId = payInTransaction.cardPreRegistrationId
                 )
 
             status match {
@@ -315,7 +317,8 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 transaction = transaction.copy(
                   status = Transaction.TransactionStatus.TRANSACTION_CREATED,
                   //The URL you must redirect your customer to in order to authenticate the payment.
-                  redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl)
+                  redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl),
+                  returnUrl = Option(payment.getNextAction.getRedirectToUrl.getReturnUrl)
                 )
               case "requires_payment_method" =>
                 transaction = transaction.copy(

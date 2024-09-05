@@ -92,6 +92,7 @@ message Transaction {
     optional string paymentClientReturnUrl = 36;
     optional string sourceTransactionId = 37;
     optional int32 transferAmount = 38;
+    optional string preRegistrationId = 39;
 }
 
 message BrowserInfo {
@@ -125,6 +126,7 @@ message PayInTransaction {
     optional bool printReceipt = 13;
     optional string cardPreAuthorizedTransactionId = 14;
     optional int32 preAuthorizationDebitedAmount = 15;
+    optional string cardPreRegistrationId = 16;
 }
 
 message PayInWithCardTransaction {
@@ -141,6 +143,7 @@ message PayInWithCardTransaction {
     optional bool registerCard = 10;
     optional bool printReceipt = 11;
     optional string statementDescriptor = 12;
+    optional string cardPreRegistrationId = 13;
 }
 
 message PayInWithPayPalTransaction {
@@ -228,6 +231,7 @@ message PreAuthorizationTransaction {
     optional string creditedUserId = 10;
     optional int32 feesAmount = 11;
     optional string statementDescriptor = 12;
+    optional string preRegistrationId = 13;
 }
 
 message PayInWithCardPreAuthorizedTransaction {
@@ -241,6 +245,7 @@ message PayInWithCardPreAuthorizedTransaction {
     required int32 preAuthorizationDebitedAmount = 7;
     optional int32 feesAmount = 8;
     optional string statementDescriptor = 9;
+    optional string cardPreRegistrationId = 10;
 }
 
 message CardPreRegistration{

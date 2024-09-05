@@ -268,7 +268,8 @@ trait CardCommandHandler
                           ipAddress = ipAddress,
                           browserInfo = browserInfo,
                           creditedUserId = creditedUserId,
-                          feesAmount = feesAmount
+                          feesAmount = feesAmount,
+                          preRegistrationId = registrationId
                         )
                     ) match {
                       case Some(transaction) =>
@@ -452,7 +453,9 @@ trait CardCommandHandler
                                     preAuthorizationTransaction.amount
                                   )
                                   .copy(
-                                    feesAmount = feesAmount.getOrElse(0)
+                                    feesAmount = feesAmount.getOrElse(0),
+                                    cardPreRegistrationId =
+                                      preAuthorizationTransaction.preRegistrationId
                                   )
                               )
                             ) match {

@@ -712,7 +712,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
           if (debitedAmount > 5000) Option(cardPreAuthorization.getSecureModeRedirectUrl)
           else None,
         authorId = cardPreAuthorization.getAuthorId,
-        paymentType = Transaction.PaymentType.CARD
+        paymentType = Transaction.PaymentType.CARD,
+        preRegistrationId = preRegistrationId
       )
     )
   }
@@ -805,7 +806,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
               resultMessage = Option(payIn.getResultMessage).getOrElse(""),
               redirectUrl = None,
               authorId = payIn.getAuthorId,
-              creditedWalletId = Option(payIn.getCreditedWalletId)
+              creditedWalletId = Option(payIn.getCreditedWalletId),
+              preRegistrationId = payInWithCardPreAuthorizedTransaction.cardPreRegistrationId
             )
             .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
             .withPreAuthorizationId(cardPreAuthorizedTransactionId)
@@ -924,7 +926,8 @@ trait MockMangoPayProvider extends MangoPayProvider {
             redirectUrl =
               if (debitedAmount > 5000) Option(executionDetails.getSecureModeRedirectUrl) else None,
             authorId = authorId,
-            creditedWalletId = Some(creditedWalletId)
+            creditedWalletId = Some(creditedWalletId),
+            preRegistrationId = cardPreRegistrationId
           )
         )
       case _ => None

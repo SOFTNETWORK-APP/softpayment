@@ -19,7 +19,8 @@ trait PayInTransactionDecorator { _: PayInTransaction =>
               browserInfo = browserInfo,
               ipAddress = ipAddress,
               registerCard = registerCard,
-              printReceipt = printReceipt
+              printReceipt = printReceipt,
+              cardPreRegistrationId = cardPreRegistrationId
             )
         )
       case _ => None

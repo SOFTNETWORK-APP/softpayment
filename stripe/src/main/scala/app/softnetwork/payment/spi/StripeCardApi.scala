@@ -297,7 +297,8 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
             .withCurrency(paymentIntent.getCurrency)
             .copy(
               creditedUserId = preAuthorizationTransaction.creditedUserId,
-              fees = preAuthorizationTransaction.feesAmount.getOrElse(0)
+              fees = preAuthorizationTransaction.feesAmount.getOrElse(0),
+              preRegistrationId = preAuthorizationTransaction.preRegistrationId
             )
 
         if (

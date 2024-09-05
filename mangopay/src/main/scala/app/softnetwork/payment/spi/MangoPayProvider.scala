@@ -724,7 +724,8 @@ trait MangoPayProvider extends PaymentProvider {
             ),
             authorId = result.getAuthorId,
             paymentType = Transaction.PaymentType.CARD,
-            idempotencyKey = idempotencyKey
+            idempotencyKey = idempotencyKey,
+            preRegistrationId = preRegistrationId
           )
         )
       case Failure(f) =>
@@ -877,7 +878,8 @@ trait MangoPayProvider extends PaymentProvider {
                   redirectUrl = None,
                   authorId = result.getAuthorId,
                   creditedWalletId = Option(result.getCreditedWalletId),
-                  idempotencyKey = idempotencyKey
+                  idempotencyKey = idempotencyKey,
+                  preRegistrationId = payInWithCardPreAuthorizedTransaction.cardPreRegistrationId
                 )
                 .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
                 .withPreAuthorizationId(cardPreAuthorizedTransactionId)
@@ -1083,7 +1085,8 @@ trait MangoPayProvider extends PaymentProvider {
                     ),
                     authorId = result.getAuthorId,
                     creditedWalletId = Option(result.getCreditedWalletId),
-                    idempotencyKey = idempotencyKey
+                    idempotencyKey = idempotencyKey,
+                    preRegistrationId = cardPreRegistrationId
                   )
                 )
               case Failure(f) =>

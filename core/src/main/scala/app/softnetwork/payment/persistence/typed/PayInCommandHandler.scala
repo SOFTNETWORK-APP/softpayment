@@ -182,7 +182,8 @@ trait PayInCommandHandler
                                       .withPrintReceipt(printReceipt)
                                       .copy(
                                         ipAddress = ipAddress,
-                                        browserInfo = browserInfo
+                                        browserInfo = browserInfo,
+                                        cardPreRegistrationId = registrationId
                                       )
                                   )
                                 ) match {
