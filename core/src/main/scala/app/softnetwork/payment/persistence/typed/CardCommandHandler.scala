@@ -372,8 +372,11 @@ trait CardCommandHandler
               .orElse(
                 internalClientId
               )
+            log.info(s"pay in with card pre authorized: $entityId -> ${asJson(cmd)}")
             val maybeTransaction = paymentAccount.transactions
-              .filter(t => t.`type` == Transaction.TransactionType.PRE_AUTHORIZATION)
+              .filter(t =>
+                t.`type` == Transaction.TransactionType.PRE_AUTHORIZATION
+              ) //TODO check it
               .find(_.id == preAuthorizationId)
             maybeTransaction match {
               case None =>

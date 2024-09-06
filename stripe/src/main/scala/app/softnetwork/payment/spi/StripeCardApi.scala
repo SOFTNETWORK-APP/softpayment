@@ -230,6 +230,9 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
             s"${config.preAuthorizeCardReturnUrl}/${preAuthorizationTransaction.orderUuid}?preAuthorizationIdParameter=payment_intent&registerCard=${preAuthorizationTransaction.registerCard
               .getOrElse(false)}&printReceipt=${preAuthorizationTransaction.printReceipt.getOrElse(false)}"
           )
+          .setSetupFutureUsage(
+            PaymentIntentCreateParams.SetupFutureUsage.OFF_SESSION
+          ) // For off-session payments
           .setTransferGroup(preAuthorizationTransaction.orderUuid)
           .putMetadata("order_uuid", preAuthorizationTransaction.orderUuid)
           .putMetadata("transaction_type", "pre_authorization")
@@ -318,7 +321,7 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
 
         status match {
           case "requires_action"
-              if paymentIntent.getNextAction.getType == "redirect_to_url" && mayRequired3DS =>
+              if paymentIntent.getNextAction.getType == "redirect_to_url" /*&& mayRequired3DS*/ =>
             transaction = transaction.copy(
               status = Transaction.TransactionStatus.TRANSACTION_CREATED,
               //The URL you must redirect your customer to in order to authenticate the payment.
