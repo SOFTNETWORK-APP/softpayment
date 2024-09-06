@@ -62,6 +62,7 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
                   )
                   .build()
               )
+              .setUseStripeSdk(false)
               .addFlowDirection(SetupIntentCreateParams.FlowDirection.INBOUND)
               .putMetadata("currency", currency)
               .putMetadata("external_uuid", externalUuid)
