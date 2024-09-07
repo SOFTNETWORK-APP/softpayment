@@ -48,7 +48,7 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
               .builder()
               .addPaymentMethodType("card")
               .setCustomer(customer.getId)
-              .setUsage(SetupIntentCreateParams.Usage.OFF_SESSION)
+              .setUsage(SetupIntentCreateParams.Usage.ON_SESSION)
               .setPaymentMethodOptions(
                 SetupIntentCreateParams.PaymentMethodOptions
                   .builder()
@@ -62,7 +62,7 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
                   )
                   .build()
               )
-              .setUseStripeSdk(false)
+//              .setUseStripeSdk(false)
               .addFlowDirection(SetupIntentCreateParams.FlowDirection.INBOUND)
               .putMetadata("currency", currency)
               .putMetadata("external_uuid", externalUuid)
