@@ -428,7 +428,6 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             )
                             .build()
                         )
-                        .setType(AccountCreateParams.Type.CUSTOM)
                         .setMetadata(Map("external_uuid" -> naturalUser.externalUuid).asJava)
 
                     naturalUser.business match {
@@ -574,128 +573,16 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     .asScala
                     .headOption
                     .map(person => {
-                      val params =
-                        PersonUpdateParams
-                          .builder()
-                          .setAddress(
-                            PersonUpdateParams.Address
-                              .builder()
-                              .setCity(legalUser.legalRepresentativeAddress.city)
-                              .setCountry(legalUser.legalRepresentativeAddress.country)
-                              .setLine1(legalUser.legalRepresentativeAddress.addressLine)
-                              .setPostalCode(legalUser.legalRepresentativeAddress.postalCode)
-                              .build()
-                          )
-                          .setFirstName(legalUser.legalRepresentative.firstName)
-                          .setLastName(legalUser.legalRepresentative.lastName)
-                          .setDob(
-                            PersonUpdateParams.Dob
-                              .builder()
-                              .setDay(c.get(Calendar.DAY_OF_MONTH))
-                              .setMonth(c.get(Calendar.MONTH) + 1)
-                              .setYear(c.get(Calendar.YEAR))
-                              .build()
-                          )
-                          .setEmail(legalUser.legalRepresentative.email)
-                          .setNationality(legalUser.legalRepresentative.nationality)
-
-                      val relationship =
-                        PersonUpdateParams.Relationship
-                          .builder()
-                          .setRepresentative(true)
-                          .setDirector(true)
-                          .setExecutive(true)
-
-                      if (soleTrader) {
-                        relationship
-                          .setTitle(legalUser.legalRepresentative.title.getOrElse("Owner"))
-                          .setOwner(true)
-                          .setPercentOwnership(new java.math.BigDecimal(100.0))
-                      } else {
-                        relationship
-                          .setOwner(false)
-                          .setTitle(
-                            legalUser.legalRepresentative.title.getOrElse("Representative")
-                          )
-                      }
-
-                      mlog.info(s"relationship -> ${new Gson().toJson(relationship.build())}")
-
-                      params.setRelationship(relationship.build())
-
-                      legalUser.legalRepresentative.phone match {
-                        case Some(phone) =>
-                          params.setPhone(phone)
-                        case _ =>
-                      }
-
-                      mlog.info(s"person -> ${new Gson().toJson(params.build())}")
-
                       person.update(
-                        params.build(),
+                        updateLegalRepresentative(legalUser, c),
                         requestOptions
                       )
                     })
                     .getOrElse {
-                      val params =
-                        PersonCollectionCreateParams
-                          .builder()
-                          .setAddress(
-                            PersonCollectionCreateParams.Address
-                              .builder()
-                              .setCity(legalUser.legalRepresentativeAddress.city)
-                              .setCountry(legalUser.legalRepresentativeAddress.country)
-                              .setLine1(legalUser.legalRepresentativeAddress.addressLine)
-                              .setPostalCode(legalUser.legalRepresentativeAddress.postalCode)
-                              .build()
-                          )
-                          .setFirstName(legalUser.legalRepresentative.firstName)
-                          .setLastName(legalUser.legalRepresentative.lastName)
-                          .setDob(
-                            PersonCollectionCreateParams.Dob
-                              .builder()
-                              .setDay(c.get(Calendar.DAY_OF_MONTH))
-                              .setMonth(c.get(Calendar.MONTH) + 1)
-                              .setYear(c.get(Calendar.YEAR))
-                              .build()
-                          )
-                          .setEmail(legalUser.legalRepresentative.email)
-                          .setNationality(legalUser.legalRepresentative.nationality)
-                      val relationship =
-                        PersonCollectionCreateParams.Relationship
-                          .builder()
-                          .setRepresentative(true)
-                          .setDirector(true)
-                          .setExecutive(true)
-                      if (soleTrader) {
-                        relationship
-                          .setTitle(legalUser.legalRepresentative.title.getOrElse("Owner"))
-                          .setOwner(true)
-                          .setPercentOwnership(new java.math.BigDecimal(100.0))
-                      } else {
-                        relationship
-                          .setOwner(false)
-                          .setTitle(
-                            legalUser.legalRepresentative.title.getOrElse("Representative")
-                          )
-                      }
-
-                      mlog.info(s"relationship -> ${new Gson().toJson(relationship.build())}")
-
-                      params.setRelationship(relationship.build())
-
-                      legalUser.legalRepresentative.phone match {
-                        case Some(phone) =>
-                          params.setPhone(phone)
-                        case _ =>
-                      }
-
-                      mlog.info(s"person -> ${new Gson().toJson(params.build())}")
-
                       account
                         .persons()
                         .create(
-                          params.build(),
+                          createLegalRepresentative(legalUser, c),
                           requestOptions
                         )
                     }
@@ -1069,7 +956,6 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                           )
                           .build()
                       )
-                      .setType(AccountCreateParams.Type.CUSTOM)
                       .putMetadata("external_uuid", legalUser.legalRepresentative.externalUuid)
 
                   /*if (tos_shown_and_accepted) {
@@ -1132,66 +1018,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                   account
                     .persons()
                     .create(
-                      {
-                        val params =
-                          PersonCollectionCreateParams
-                            .builder()
-                            .setAddress(
-                              PersonCollectionCreateParams.Address
-                                .builder()
-                                .setCity(legalUser.legalRepresentativeAddress.city)
-                                .setCountry(legalUser.legalRepresentativeAddress.country)
-                                .setLine1(legalUser.legalRepresentativeAddress.addressLine)
-                                .setPostalCode(legalUser.legalRepresentativeAddress.postalCode)
-                                .build()
-                            )
-                            .setFirstName(legalUser.legalRepresentative.firstName)
-                            .setLastName(legalUser.legalRepresentative.lastName)
-                            .setDob(
-                              PersonCollectionCreateParams.Dob
-                                .builder()
-                                .setDay(c.get(Calendar.DAY_OF_MONTH))
-                                .setMonth(c.get(Calendar.MONTH) + 1)
-                                .setYear(c.get(Calendar.YEAR))
-                                .build()
-                            )
-                            .setEmail(legalUser.legalRepresentative.email)
-                            .setNationality(legalUser.legalRepresentative.nationality)
-
-                        val relationship =
-                          PersonCollectionCreateParams.Relationship
-                            .builder()
-                            .setRepresentative(true)
-                            .setDirector(true)
-                            .setExecutive(true)
-
-                        if (soleTrader) {
-                          relationship
-                            .setTitle(legalUser.legalRepresentative.title.getOrElse("Owner"))
-                            .setOwner(true)
-                            .setPercentOwnership(new java.math.BigDecimal(100.0))
-                        } else {
-                          relationship
-                            .setOwner(false)
-                            .setTitle(
-                              legalUser.legalRepresentative.title.getOrElse("Representative")
-                            )
-                        }
-
-                        mlog.info(s"relationship -> ${new Gson().toJson(relationship.build())}")
-
-                        params.setRelationship(relationship.build())
-
-                        legalUser.legalRepresentative.phone match {
-                          case Some(phone) =>
-                            params.setPhone(phone)
-                          case _ =>
-                        }
-
-                        mlog.info(s"person -> ${new Gson().toJson(params.build())}")
-
-                        params.build()
-                      },
+                      createLegalRepresentative(legalUser, c),
                       requestOptions
                     )
                   account
@@ -2298,5 +2125,127 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
         mlog.error(f.getMessage, f)
         None
     }
+  }
+
+  private[this] def createLegalRepresentative(legalUser: LegalUser, birthday: Calendar): PersonCollectionCreateParams = {
+    val params =
+      PersonCollectionCreateParams
+        .builder()
+        .setAddress(
+          PersonCollectionCreateParams.Address
+            .builder()
+            .setCity(legalUser.legalRepresentativeAddress.city)
+            .setCountry(legalUser.legalRepresentativeAddress.country)
+            .setLine1(legalUser.legalRepresentativeAddress.addressLine)
+            .setPostalCode(legalUser.legalRepresentativeAddress.postalCode)
+            .build()
+        )
+        .setFirstName(legalUser.legalRepresentative.firstName)
+        .setLastName(legalUser.legalRepresentative.lastName)
+        .setDob(
+          PersonCollectionCreateParams.Dob
+            .builder()
+            .setDay(birthday.get(Calendar.DAY_OF_MONTH))
+            .setMonth(birthday.get(Calendar.MONTH) + 1)
+            .setYear(birthday.get(Calendar.YEAR))
+            .build()
+        )
+        .setEmail(legalUser.legalRepresentative.email)
+        .setNationality(legalUser.legalRepresentative.nationality)
+
+    val relationship =
+      PersonCollectionCreateParams.Relationship
+        .builder()
+        .setRepresentative(true)
+        .setDirector(true)
+        .setExecutive(true)
+
+    if (legalUser.legalUserType.isSoletrader) {
+      relationship
+        .setTitle(legalUser.legalRepresentative.title.getOrElse("Owner"))
+        .setOwner(true)
+        .setPercentOwnership(new java.math.BigDecimal(100.0))
+    } else {
+      relationship
+        .setOwner(false)
+        .setTitle(
+          legalUser.legalRepresentative.title.getOrElse("Representative")
+        )
+    }
+
+    mlog.info(s"relationship -> ${new Gson().toJson(relationship.build())}")
+
+    params.setRelationship(relationship.build())
+
+    legalUser.legalRepresentative.phone match {
+      case Some(phone) =>
+        params.setPhone(phone)
+      case _ =>
+    }
+
+    mlog.info(s"person -> ${new Gson().toJson(params.build())}")
+
+    params.build()
+  }
+
+  private[this] def updateLegalRepresentative(legalUser: LegalUser, birthday: Calendar) = {
+    val params =
+      PersonUpdateParams
+        .builder()
+        .setAddress(
+          PersonUpdateParams.Address
+            .builder()
+            .setCity(legalUser.legalRepresentativeAddress.city)
+            .setCountry(legalUser.legalRepresentativeAddress.country)
+            .setLine1(legalUser.legalRepresentativeAddress.addressLine)
+            .setPostalCode(legalUser.legalRepresentativeAddress.postalCode)
+            .build()
+        )
+        .setFirstName(legalUser.legalRepresentative.firstName)
+        .setLastName(legalUser.legalRepresentative.lastName)
+        .setDob(
+          PersonUpdateParams.Dob
+            .builder()
+            .setDay(birthday.get(Calendar.DAY_OF_MONTH))
+            .setMonth(birthday.get(Calendar.MONTH) + 1)
+            .setYear(birthday.get(Calendar.YEAR))
+            .build()
+        )
+        .setEmail(legalUser.legalRepresentative.email)
+        .setNationality(legalUser.legalRepresentative.nationality)
+
+    val relationship =
+      PersonUpdateParams.Relationship
+        .builder()
+        .setRepresentative(true)
+        .setDirector(true)
+        .setExecutive(true)
+
+    if (legalUser.legalUserType.isSoletrader) {
+      relationship
+        .setTitle(legalUser.legalRepresentative.title.getOrElse("Owner"))
+        .setOwner(true)
+        .setPercentOwnership(new java.math.BigDecimal(100.0))
+    } else {
+      relationship
+        .setOwner(false)
+        .setTitle(
+          legalUser.legalRepresentative.title.getOrElse("Representative")
+        )
+    }
+
+    mlog.info(s"relationship -> ${new Gson().toJson(relationship.build())}")
+
+    params.setRelationship(relationship.build())
+
+    legalUser.legalRepresentative.phone match {
+      case Some(phone) =>
+        params.setPhone(phone)
+      case _ =>
+    }
+
+    mlog.info(s"person -> ${new Gson().toJson(params.build())}")
+
+    params.build()
   }
 }
