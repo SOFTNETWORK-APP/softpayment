@@ -67,6 +67,10 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
                   "Pre authorization redirection to 3D secure"
                 )
               )
+          ),
+          oneOfVariant[PaymentRequired](
+            statusCode(StatusCode.PaymentRequired)
+              .and(jsonBody[PaymentRequired].description("Payment required"))
           )
         )
       )
@@ -87,11 +91,13 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               browserInfo,
               printReceipt,
               creditedAccount.headOption,
-              feesAmount
+              feesAmount,
+              user = user // required for Pre authorize without pre registered card
             )
           ).map {
             case result: CardPreAuthorized  => Right(result)
             case result: PaymentRedirection => Right(result)
+            case result: PaymentRequired    => Right(result)
             case other                      => Left(error(other))
           }
       })

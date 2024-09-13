@@ -21,7 +21,8 @@ import com.stripe.param.{
 
 import scala.util.{Failure, Success, Try}
 
-trait StripeCardApi extends CardApi { _: StripeContext =>
+trait StripeCardApi extends CardApi {
+  _: StripeContext =>
 
   /** @param maybeUserId
     *   - owner of the card
@@ -62,8 +63,8 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
                   )
                   .build()
               )
-//              .setUseStripeSdk(false)
-//              .addFlowDirection(SetupIntentCreateParams.FlowDirection.INBOUND)
+              //              .setUseStripeSdk(false)
+              //              .addFlowDirection(SetupIntentCreateParams.FlowDirection.INBOUND)
               .putMetadata("currency", currency)
               .putMetadata("external_uuid", externalUuid)
           // TODO check if return url is required
@@ -101,16 +102,13 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
       val setupIntent =
         SetupIntent.retrieve(cardPreRegistrationId, StripeApi().requestOptions)
       // attach payment method to customer
-      PaymentMethod
-        .retrieve(setupIntent.getPaymentMethod, StripeApi().requestOptions)
-        .attach(
-          PaymentMethodAttachParams.builder().setCustomer(setupIntent.getCustomer).build(),
-          StripeApi().requestOptions
-        )
+      addCard(setupIntent.getPaymentMethod, setupIntent.getCustomer)
     } match {
-      case Success(paymentMethod) =>
-        mlog.info(s"Card ${paymentMethod.getId} attached to customer ${paymentMethod.getCustomer}")
-        Some(paymentMethod.getId)
+      case Success(value) =>
+        value match {
+          case Some(card) => Some(card.id)
+          case None       => None
+        }
       case Failure(f) =>
         mlog.error(s"Error while creating card for $cardPreRegistrationId", f)
         None
@@ -187,57 +185,92 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
     preAuthorizationTransaction: PreAuthorizationTransaction,
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
+    val requestOptions = StripeApi().requestOptions
     Try {
-      /*val mayRequire3DS =
-        preAuthorizationTransaction.preRegistrationId match {
-          case Some(preRegistrationId) =>
-            val setup = SetupIntent.retrieve(preRegistrationId, StripeApi().requestOptions)
-            mlog.info(
-              s"Setup intent retrieved for order ${preAuthorizationTransaction.orderUuid} -> ${new Gson()
-                .toJson(setup)}"
-            )
-            setup.getStatus match {
-              case "succeeded" => false
-              case _           => true
-            }
-          case _ => true
-        }*/
       val params =
         PaymentIntentCreateParams
           .builder()
           .setAmount(preAuthorizationTransaction.debitedAmount)
           .setCurrency(preAuthorizationTransaction.currency)
           .setCustomer(preAuthorizationTransaction.authorId)
-          .setPaymentMethod(preAuthorizationTransaction.cardId)
-          /*.setPaymentMethodOptions(
-            PaymentIntentCreateParams.PaymentMethodOptions
-              .builder()
-              .setCard(
-                PaymentIntentCreateParams.PaymentMethodOptions.Card
-                  .builder()
-                  .setRequestThreeDSecure(
-                    PaymentIntentCreateParams.PaymentMethodOptions.Card.RequestThreeDSecure.AUTOMATIC
-                  )
-                  .build()
-              )
-              .build()
-          )*/
           .setCaptureMethod(
             PaymentIntentCreateParams.CaptureMethod.MANUAL
           ) // To capture funds later (https://stripe.com/docs/payments/capture-later)
-          .setConfirm(true) // Confirm the PaymentIntent immediately
-          //.setOffSession(true) // For off-session payments
-          .setReturnUrl(
-            s"${config.preAuthorizeCardReturnUrl}/${preAuthorizationTransaction.orderUuid}?preAuthorizationIdParameter=payment_intent&registerCard=${preAuthorizationTransaction.registerCard
-              .getOrElse(false)}&printReceipt=${preAuthorizationTransaction.printReceipt.getOrElse(false)}"
-          )
-          /*.setSetupFutureUsage(
-            PaymentIntentCreateParams.SetupFutureUsage.OFF_SESSION
-          )*/ // For off-session payments
           .setTransferGroup(preAuthorizationTransaction.orderUuid)
           .putMetadata("order_uuid", preAuthorizationTransaction.orderUuid)
           .putMetadata("transaction_type", "pre_authorization")
           .putMetadata("payment_type", "card")
+          .putMetadata(
+            "register_card",
+            s"${preAuthorizationTransaction.registerCard.getOrElse(false)}"
+          )
+          .putMetadata(
+            "print_receipt",
+            s"${preAuthorizationTransaction.printReceipt.getOrElse(false)}"
+          )
+
+      preAuthorizationTransaction.preRegistrationId match {
+        case Some(preRegistrationId) =>
+          params.putMetadata("pre_registration_id", preRegistrationId)
+        case _ =>
+      }
+
+      (preAuthorizationTransaction.cardId match {
+        case None =>
+          preAuthorizationTransaction.preRegistrationId match {
+            case Some(preRegistrationId) =>
+              val setup = SetupIntent.retrieve(preRegistrationId, requestOptions)
+              mlog.info(
+                s"Setup intent retrieved for order ${preAuthorizationTransaction.orderUuid} -> ${new Gson()
+                  .toJson(setup)}"
+              )
+              setup.getStatus match {
+                case "succeeded" =>
+                  Option(setup.getPaymentMethod)
+                case _ =>
+                  None
+              }
+            case _ =>
+              None
+          }
+        case some => some
+      }) match {
+        case Some(cardId) =>
+          params
+            .setPaymentMethod(cardId)
+            .setConfirm(true) // Confirm the PaymentIntent immediately
+            .setReturnUrl(
+              s"${config.preAuthorizeCardReturnUrl}/${preAuthorizationTransaction.orderUuid}?preAuthorizationIdParameter=payment_intent&registerCard=${preAuthorizationTransaction.registerCard
+                .getOrElse(false)}&printReceipt=${preAuthorizationTransaction.printReceipt.getOrElse(false)}"
+            )
+        case _ =>
+          params
+            .addPaymentMethodType("card")
+            .setPaymentMethodOptions(
+              PaymentIntentCreateParams.PaymentMethodOptions
+                .builder()
+                .setCard(
+                  PaymentIntentCreateParams.PaymentMethodOptions.Card
+                    .builder()
+                    .setCaptureMethod(
+                      PaymentIntentCreateParams.PaymentMethodOptions.Card.CaptureMethod.MANUAL
+                    )
+                    .setRequestThreeDSecure(
+                      PaymentIntentCreateParams.PaymentMethodOptions.Card.RequestThreeDSecure.AUTOMATIC
+                    )
+                    .build()
+                )
+                .build()
+            )
+      }
+
+      preAuthorizationTransaction.registerCard match {
+        case Some(true) =>
+          params.setSetupFutureUsage(
+            PaymentIntentCreateParams.SetupFutureUsage.OFF_SESSION
+          ) // For off-session payments
+        case _ =>
+      }
 
       preAuthorizationTransaction.ipAddress match {
         case Some(ipAddress) =>
@@ -293,44 +326,56 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
         s"Creating card pre authorization for order ${preAuthorizationTransaction.orderUuid} -> ${new Gson()
           .toJson(params.build())}"
       )
-      PaymentIntent.create(params.build(), StripeApi().requestOptions)
+      PaymentIntent.create(params.build(), requestOptions)
     } match {
-      case Success(paymentIntent) =>
+      case Success(payment) =>
         mlog.info(
           s"Card pre authorization created for order ${preAuthorizationTransaction.orderUuid} -> ${new Gson()
-            .toJson(paymentIntent)}"
+            .toJson(payment)}"
         )
-        val status = paymentIntent.getStatus
+        val status = payment.getStatus
         var transaction =
           Transaction()
-            .withId(paymentIntent.getId)
+            .withId(payment.getId)
             .withOrderUuid(preAuthorizationTransaction.orderUuid)
             .withNature(Transaction.TransactionNature.REGULAR)
             .withType(Transaction.TransactionType.PRE_AUTHORIZATION)
-            .withAmount(preAuthorizationTransaction.debitedAmount)
-            .withCardId(preAuthorizationTransaction.cardId)
-            .withFees(0)
+            .withAmount(payment.getAmount.intValue())
+            //            .withCardId(preAuthorizationTransaction.cardId)
+            //            .withFees(0)
             .withResultCode(status)
-            .withAuthorId(paymentIntent.getCustomer)
+            .withAuthorId(payment.getCustomer)
             .withPaymentType(Transaction.PaymentType.CARD)
-            .withCurrency(paymentIntent.getCurrency)
+            .withCurrency(payment.getCurrency)
             .copy(
               creditedUserId = preAuthorizationTransaction.creditedUserId,
-              fees = preAuthorizationTransaction.feesAmount.getOrElse(0),
-              preRegistrationId = preAuthorizationTransaction.preRegistrationId
+              fees = Option(payment.getApplicationFeeAmount).map(_.toInt).getOrElse(0),
+              preRegistrationId = preAuthorizationTransaction.preRegistrationId,
+              cardId = Option(payment.getPaymentMethod)
             )
 
         status match {
-          case "requires_action" if paymentIntent.getNextAction.getType == "redirect_to_url" =>
+          case "requires_action" if payment.getNextAction.getType == "redirect_to_url" =>
             transaction = transaction.copy(
               status = Transaction.TransactionStatus.TRANSACTION_CREATED,
               //The URL you must redirect your customer to in order to authenticate the payment.
-              redirectUrl = Option(paymentIntent.getNextAction.getRedirectToUrl.getUrl),
-              returnUrl = Option(paymentIntent.getNextAction.getRedirectToUrl.getReturnUrl)
+              redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl),
+              returnUrl = Option(
+                s"${config.preAuthorizeCardReturnUrl}/${preAuthorizationTransaction.orderUuid}?preAuthorizationIdParameter=payment_intent&registerCard=${preAuthorizationTransaction.registerCard
+                  .getOrElse(false)}&printReceipt=${preAuthorizationTransaction.printReceipt
+                  .getOrElse(false)}&payment_intent=${payment.getId}"
+              )
             )
           case "requires_payment_method" =>
-            transaction =
-              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_FAILED)
+            transaction = transaction.copy(
+              status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
+              paymentClientSecret = Option(payment.getClientSecret),
+              paymentClientReturnUrl = Option(
+                s"${config.preAuthorizeCardReturnUrl}/${preAuthorizationTransaction.orderUuid}?preAuthorizationIdParameter=payment_intent&registerCard=${preAuthorizationTransaction.registerCard
+                  .getOrElse(false)}&printReceipt=${preAuthorizationTransaction.printReceipt
+                  .getOrElse(false)}&payment_intent=${payment.getId}"
+              )
+            )
           case "succeeded" | "requires_capture" =>
             transaction =
               transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
@@ -365,38 +410,59 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
     Try {
       PaymentIntent.retrieve(cardPreAuthorizedTransactionId, StripeApi().requestOptions)
     } match {
-      case Success(paymentIntent) =>
-        val status = paymentIntent.getStatus
+      case Success(payment) =>
+        val status = payment.getStatus
         var transaction =
           Transaction()
-            .withId(paymentIntent.getId)
+            .withId(payment.getId)
             .withOrderUuid(orderUuid)
             .withNature(Transaction.TransactionNature.REGULAR)
             .withType(Transaction.TransactionType.PRE_AUTHORIZATION)
-            .withAmount(paymentIntent.getAmount.intValue())
-            .withCardId(paymentIntent.getPaymentMethod)
-            .withFees(0)
+            .withAmount(payment.getAmount.intValue())
             .withResultCode(status)
-            .withAuthorId(paymentIntent.getCustomer)
+            .withAuthorId(payment.getCustomer)
             .withPaymentType(Transaction.PaymentType.CARD)
-            .withCurrency(paymentIntent.getCurrency)
+            .withCurrency(payment.getCurrency)
+            .copy(
+              creditedUserId = Option(payment.getTransferData).map(_.getDestination),
+              fees = Option(payment.getApplicationFeeAmount).map(_.toInt).getOrElse(0),
+              preRegistrationId = Option(payment.getMetadata.get("pre_registration_id")),
+              cardId = Option(payment.getPaymentMethod)
+            )
 
-        if (
-          status == "requires_action" && paymentIntent.getNextAction.getType == "redirect_to_url"
-        ) {
-          transaction = transaction.copy(
-            status = Transaction.TransactionStatus.TRANSACTION_CREATED,
-            //The URL you must redirect your customer to in order to authenticate the payment.
-            returnUrl = Option(paymentIntent.getNextAction.getRedirectToUrl.getUrl)
-          )
-        } else if (status == "succeeded") {
-          transaction =
-            transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
-        } else if (status == "requires_payment_method") {
-          transaction = transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_FAILED)
-        } else {
-          transaction = transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
+        status match {
+          case "requires_action" if payment.getNextAction.getType == "redirect_to_url" =>
+            transaction = transaction.copy(
+              status = Transaction.TransactionStatus.TRANSACTION_CREATED,
+              //The URL you must redirect your customer to in order to authenticate the payment.
+              redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl),
+              returnUrl = Option(
+                s"${config.preAuthorizeCardReturnUrl}/$orderUuid?preAuthorizationIdParameter=payment_intent&registerCard=${Option(payment.getMetadata.get("register_card"))
+                  .getOrElse(false)}&printReceipt=${Option(payment.getMetadata.get("print_receipt"))
+                  .getOrElse(false)}&payment_intent=${payment.getId}"
+              )
+            )
+          case "succeeded" | "requires_capture" =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
+          case "requires_payment_method" =>
+            transaction = transaction.copy(
+              status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
+              paymentClientSecret = Option(payment.getClientSecret),
+              paymentClientReturnUrl = Option(
+                s"${config.preAuthorizeCardReturnUrl}/$orderUuid?preAuthorizationIdParameter=payment_intent&registerCard=${Option(payment.getMetadata.get("register_card"))
+                  .getOrElse(false)}&printReceipt=${Option(payment.getMetadata.get("print_receipt"))
+                  .getOrElse(false)}&payment_intent=${payment.getId}"
+              )
+            )
+          case _ =>
+            transaction =
+              transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
         }
+
+        mlog.info(
+          s"Card pre authorization loaded for order $orderUuid -> ${asJson(transaction)}"
+        )
 
         // TODO retrieve preAuthorizationCanceled, preAuthorizationValidated, preAuthorizationExpired
         Some(transaction)
@@ -468,4 +534,48 @@ trait StripeCardApi extends CardApi { _: StripeContext =>
         false
     }
   }
+
+  /** Register a card
+    * @param cardId
+    *   - card id
+    * @param userId
+    *   - owner of the card
+    * @return
+    *   card registered
+    */
+  override def addCard(
+    cardId: String,
+    userId: String
+  ): Option[Card] = {
+    Try {
+      val requestOptions = StripeApi().requestOptions
+      PaymentMethod
+        .retrieve(cardId, requestOptions)
+        .attach(
+          PaymentMethodAttachParams.builder().setCustomer(userId).build(),
+          requestOptions
+        )
+    } match {
+      case Success(paymentMethod) =>
+        mlog.info(s"Card $cardId attached to customer $userId")
+        Option(paymentMethod.getCard) match {
+          case Some(card) =>
+            Some(
+              Card.defaultInstance
+                .withId(cardId)
+                .withExpirationDate(s"${card.getExpMonth}/${card.getExpYear}")
+                .withAlias(card.getLast4)
+                .withBrand(card.getBrand)
+                .withActive(
+                  Option(paymentMethod.getCustomer).isDefined
+                ) // if detached from customer, it is disabled
+            )
+          case _ => None
+        }
+      case Failure(f) =>
+        mlog.error(s"Error while attaching card $cardId to customer $userId", f)
+        None
+    }
+  }
+
 }

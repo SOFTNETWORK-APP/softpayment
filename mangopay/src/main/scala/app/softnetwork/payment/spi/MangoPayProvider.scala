@@ -654,107 +654,113 @@ trait MangoPayProvider extends PaymentProvider {
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
     import preAuthorizationTransaction._
-    val cardPreAuthorization = new CardPreAuthorization()
-    cardPreAuthorization.setTag(orderUuid)
-    cardPreAuthorization.setAuthorId(authorId)
-    if (browserInfo.isDefined) {
-      val bi = browserInfo.get
-      import bi._
-      val mangoPayBrowserInfo = new MangoPayBrowserInfo()
-      mangoPayBrowserInfo.setAcceptHeader(acceptHeader)
-      mangoPayBrowserInfo.setColorDepth(colorDepth)
-      mangoPayBrowserInfo.setJavaEnabled(javaEnabled)
-      mangoPayBrowserInfo.setJavascriptEnabled(javascriptEnabled)
-      mangoPayBrowserInfo.setLanguage(language)
-      mangoPayBrowserInfo.setScreenHeight(screenHeight)
-      mangoPayBrowserInfo.setScreenWidth(screenWidth)
-      mangoPayBrowserInfo.setTimeZoneOffset(timeZoneOffset)
-      mangoPayBrowserInfo.setUserAgent(userAgent)
-      cardPreAuthorization.setBrowserInfo(mangoPayBrowserInfo)
-    }
-    cardPreAuthorization.setCardId(cardId)
-    cardPreAuthorization.setDebitedFunds(new Money)
-    cardPreAuthorization.getDebitedFunds.setAmount(debitedAmount)
-    cardPreAuthorization.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
-    cardPreAuthorization.setExecutionType(PreAuthorizationExecutionType.DIRECT)
-    if (ipAddress.isDefined) {
-      cardPreAuthorization.setIpAddress(ipAddress.get)
-    }
-    cardPreAuthorization.setSecureMode(SecureMode.DEFAULT)
-    cardPreAuthorization.setSecureModeReturnUrl(
-      s"${config.preAuthorizeCardReturnUrl}/$orderUuid?registerCard=${registerCard
-        .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
-    )
-    cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
-    val idempotencyKey =
-      idempotency match {
-        case Some(s) if s => Some(generateUUID())
-        case _            => None
-      }
-    Try(
-      idempotencyKey match {
-        case Some(s) =>
-          MangoPay().getCardPreAuthorizationApi.create(s, cardPreAuthorization)
-        case _ => MangoPay().getCardPreAuthorizationApi.create(cardPreAuthorization)
-      }
-    ) match {
-      case Success(result) =>
-        mlog.info("preAuthorizeCard -> " + asJson(result))
-        Some(
-          Transaction().copy(
-            id = result.getId,
-            orderUuid = orderUuid,
-            nature = Transaction.TransactionNature.REGULAR,
-            `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
-            status = result.getStatus match {
-              case PreAuthorizationStatus.FAILED if Option(result.getResultCode).isDefined =>
-                if (config.technicalErrors.contains(result.getResultCode))
-                  Transaction.TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON
-                else
-                  Transaction.TransactionStatus.TRANSACTION_FAILED
-              case other => other
-            },
-            amount = debitedAmount,
-            cardId = if (cardId.trim.isEmpty) None else Some(cardId),
-            fees = 0,
-            resultCode = Option(result.getResultCode).getOrElse(""),
-            resultMessage = Option(result.getResultMessage).getOrElse(""),
-            redirectUrl = Option( // for 3D Secure
-              result.getSecureModeRedirectUrl
-            ),
-            authorId = result.getAuthorId,
-            paymentType = Transaction.PaymentType.CARD,
-            idempotencyKey = idempotencyKey,
-            preRegistrationId = preRegistrationId
-          )
+    cardId match {
+      case Some(cardId) =>
+        val cardPreAuthorization = new CardPreAuthorization()
+        cardPreAuthorization.setTag(orderUuid)
+        cardPreAuthorization.setAuthorId(authorId)
+        if (browserInfo.isDefined) {
+          val bi = browserInfo.get
+          import bi._
+          val mangoPayBrowserInfo = new MangoPayBrowserInfo()
+          mangoPayBrowserInfo.setAcceptHeader(acceptHeader)
+          mangoPayBrowserInfo.setColorDepth(colorDepth)
+          mangoPayBrowserInfo.setJavaEnabled(javaEnabled)
+          mangoPayBrowserInfo.setJavascriptEnabled(javascriptEnabled)
+          mangoPayBrowserInfo.setLanguage(language)
+          mangoPayBrowserInfo.setScreenHeight(screenHeight)
+          mangoPayBrowserInfo.setScreenWidth(screenWidth)
+          mangoPayBrowserInfo.setTimeZoneOffset(timeZoneOffset)
+          mangoPayBrowserInfo.setUserAgent(userAgent)
+          cardPreAuthorization.setBrowserInfo(mangoPayBrowserInfo)
+        }
+        cardPreAuthorization.setCardId(cardId)
+        cardPreAuthorization.setDebitedFunds(new Money)
+        cardPreAuthorization.getDebitedFunds.setAmount(debitedAmount)
+        cardPreAuthorization.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
+        cardPreAuthorization.setExecutionType(PreAuthorizationExecutionType.DIRECT)
+        if (ipAddress.isDefined) {
+          cardPreAuthorization.setIpAddress(ipAddress.get)
+        }
+        cardPreAuthorization.setSecureMode(SecureMode.DEFAULT)
+        cardPreAuthorization.setSecureModeReturnUrl(
+          s"${config.preAuthorizeCardReturnUrl}/$orderUuid?registerCard=${registerCard
+            .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
         )
-      case Failure(f) =>
-        mlog.error(f.getMessage, f)
+        cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
+        val idempotencyKey =
+          idempotency match {
+            case Some(s) if s => Some(generateUUID())
+            case _            => None
+          }
+        Try(
+          idempotencyKey match {
+            case Some(s) =>
+              MangoPay().getCardPreAuthorizationApi.create(s, cardPreAuthorization)
+            case _ => MangoPay().getCardPreAuthorizationApi.create(cardPreAuthorization)
+          }
+        ) match {
+          case Success(result) =>
+            mlog.info("preAuthorizeCard -> " + asJson(result))
+            Some(
+              Transaction().copy(
+                id = result.getId,
+                orderUuid = orderUuid,
+                nature = Transaction.TransactionNature.REGULAR,
+                `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
+                status = result.getStatus match {
+                  case PreAuthorizationStatus.FAILED if Option(result.getResultCode).isDefined =>
+                    if (config.technicalErrors.contains(result.getResultCode))
+                      Transaction.TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON
+                    else
+                      Transaction.TransactionStatus.TRANSACTION_FAILED
+                  case other => other
+                },
+                amount = debitedAmount,
+                cardId = Option(cardId),
+                fees = 0,
+                resultCode = Option(result.getResultCode).getOrElse(""),
+                resultMessage = Option(result.getResultMessage).getOrElse(""),
+                redirectUrl = Option( // for 3D Secure
+                  result.getSecureModeRedirectUrl
+                ),
+                authorId = result.getAuthorId,
+                paymentType = Transaction.PaymentType.CARD,
+                idempotencyKey = idempotencyKey,
+                preRegistrationId = preRegistrationId
+              )
+            )
+          case Failure(f) =>
+            mlog.error(f.getMessage, f)
+            None
+          /*
+                          f match {
+                            case r: ResponseException =>
+                              Some(
+                                Transaction().copy(
+                                  uuid = r.getId,
+                                  id = r.getId,
+                                  orderUuid = orderUuid,
+                                  nature = Transaction.TransactionNature.REGULAR,
+                                  `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
+                                  status = MangoPayTransactionStatus.NotSpecified,
+                                  amount = debitedAmount,
+                                  cardId = Some(cardId),
+                                  fees = 0,
+                                  resultCode = r.getType,
+                                  resultMessage = r.getApiMessage,
+                                  redirectUrl = None
+                                )
+                              )
+                            case _ =>
+                              mlog.error(f.getMessage, f)
+                              None
+                          }
+           */
+        }
+      case _ =>
+        mlog.error("cardId is required")
         None
-      /*
-                      f match {
-                        case r: ResponseException =>
-                          Some(
-                            Transaction().copy(
-                              uuid = r.getId,
-                              id = r.getId,
-                              orderUuid = orderUuid,
-                              nature = Transaction.TransactionNature.REGULAR,
-                              `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
-                              status = MangoPayTransactionStatus.NotSpecified,
-                              amount = debitedAmount,
-                              cardId = Some(cardId),
-                              fees = 0,
-                              resultCode = r.getType,
-                              resultMessage = r.getApiMessage,
-                              redirectUrl = None
-                            )
-                          )
-                        case _ =>
-                          mlog.error(f.getMessage, f)
-                          None
-                      }
-       */
     }
   }
 

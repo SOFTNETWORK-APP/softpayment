@@ -356,6 +356,37 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       cardId = card.id
     }
 
+    "pre authorize card without pre registration" in {
+      val payment =
+        Payment(
+          orderUuid,
+          debitedAmount,
+          "EUR",
+          None,
+          None,
+          registerCard = true,
+          printReceipt = true,
+          feesAmount = Some(feesAmount)
+        )
+      log.info(s"pre authorize card payment: ${serialization.write(payment)}")
+      withHeaders(
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute", payment)
+          .withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.Accepted
+        val redirection = responseAs[PaymentRedirection]
+        val params = redirection.redirectUrl
+          .split("\\?")
+          .last
+          .split("[&=]")
+          .grouped(2)
+          .map(a => (a(0), a(1)))
+          .toMap
+        preAuthorizationId = params.getOrElse("preAuthorizationId", "")
+        assert(params.getOrElse("printReceipt", "") == "true")
+      }
+    }
+
     "pay in / out with pre authorized card" in {
       createNewSession(customerSession)
       val payment =

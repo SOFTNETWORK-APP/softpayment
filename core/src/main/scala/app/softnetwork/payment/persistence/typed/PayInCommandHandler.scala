@@ -19,7 +19,6 @@ import app.softnetwork.payment.message.PaymentMessages.{
   TransactionNotFound
 }
 import app.softnetwork.payment.message.TransactionEvents.{PaidInEvent, PayInFailedEvent}
-import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model.{PayInTransaction, PaymentAccount, Transaction}
 import app.softnetwork.persistence.now
 import app.softnetwork.persistence.typed._
@@ -38,6 +37,7 @@ trait PayInCommandHandler
     ]
     with PaymentCommandHandler
     with PayInHandler
+    with CustomerHandler
     with Completion {
 
   override def apply(
@@ -61,78 +61,9 @@ trait PayInCommandHandler
           case None =>
             cmd.user match {
               case Some(user) =>
-                loadPaymentAccount(
-                  entityId,
-                  state,
-                  PaymentAccount.User.NaturalUser(user),
-                  clientId
-                ) match {
-                  case Some(paymentAccount) =>
-                    val clientId = paymentAccount.clientId
-                      .orElse(cmd.clientId)
-                      .orElse(
-                        internalClientId
-                      )
-                    val paymentProvider = loadPaymentProvider(clientId)
-                    import paymentProvider._
-                    val lastUpdated = now()
-                    (paymentAccount.userId match {
-                      case None =>
-                        createOrUpdatePaymentAccount(
-                          Some(
-                            paymentAccount.withNaturalUser(
-                              user.withNaturalUserType(NaturalUserType.PAYER)
-                            )
-                          ),
-                          acceptedTermsOfPSP = false,
-                          None,
-                          None
-                        )
-                      case some => some
-                    }) match {
-                      case Some(userId) =>
-                        keyValueDao.addKeyValue(userId, entityId)
-                        (paymentAccount.walletId match {
-                          case None =>
-                            registerWallet = true
-                            createOrUpdateWallet(Some(userId), currency, user.externalUuid, None)
-                          case some => some
-                        }) match {
-                          case Some(walletId) =>
-                            keyValueDao.addKeyValue(walletId, entityId)
-                            Some(
-                              paymentAccount
-                                .withPaymentAccountStatus(
-                                  PaymentAccount.PaymentAccountStatus.COMPTE_OK
-                                )
-                                .copy(user =
-                                  PaymentAccount.User.NaturalUser(
-                                    user
-                                      .withUserId(userId)
-                                      .withWalletId(walletId)
-                                      .withNaturalUserType(NaturalUserType.PAYER)
-                                  )
-                                )
-                                .withLastUpdated(lastUpdated)
-                            )
-                          case _ =>
-                            Some(
-                              paymentAccount
-                                .withPaymentAccountStatus(
-                                  PaymentAccount.PaymentAccountStatus.COMPTE_OK
-                                )
-                                .copy(user =
-                                  PaymentAccount.User.NaturalUser(
-                                    user
-                                      .withUserId(userId)
-                                      .withNaturalUserType(NaturalUserType.PAYER)
-                                  )
-                                )
-                                .withLastUpdated(lastUpdated)
-                            )
-                        }
-                    }
-                }
+                val (pa, rw) = createOrUpdateCustomer(entityId, state, user, currency, clientId)
+                registerWallet = rw
+                pa
               case _ =>
                 None
             }

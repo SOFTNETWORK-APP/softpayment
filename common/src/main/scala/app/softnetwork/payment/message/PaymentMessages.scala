@@ -120,6 +120,10 @@ object PaymentMessages {
     *   - account to credit
     * @param feesAmount
     *   - optional fees amount
+    * @param user
+    *   - optional payment user
+    * @param clientId
+    *   - optional client id
     */
   case class PreAuthorizeCard(
     orderUuid: String,
@@ -133,7 +137,9 @@ object PaymentMessages {
     browserInfo: Option[BrowserInfo] = None,
     printReceipt: Boolean = false,
     creditedAccount: Option[String] = None,
-    feesAmount: Option[Int] = None
+    feesAmount: Option[Int] = None,
+    user: Option[NaturalUser] = None,
+    clientId: Option[String] = None
   ) extends PaymentCommandWithKey
       with CardCommand {
     val key: String = debitedAccount

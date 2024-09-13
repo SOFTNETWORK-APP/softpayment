@@ -223,7 +223,7 @@ message PreAuthorizationTransaction {
     required int32 debitedAmount = 2;
     required string currency = 3 [default = "EUR"];
     required string authorId = 4;
-    required string cardId = 5;
+    optional string cardId = 5;
     optional string ipAddress = 6;
     optional BrowserInfo browserInfo = 7;
     optional bool registerCard = 8;

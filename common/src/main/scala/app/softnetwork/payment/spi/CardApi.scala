@@ -36,6 +36,19 @@ trait CardApi { _: PaymentContext =>
     maybeRegistrationData: Option[String]
   ): Option[String]
 
+  /** Register a card
+    * @param cardId
+    *   - card id
+    * @param userId
+    *   - owner of the card
+    * @return
+    *   card registered
+    */
+  def addCard(
+    cardId: String,
+    userId: String
+  ): Option[Card] = None
+
   /** @param cardId
     *   - card id
     * @return

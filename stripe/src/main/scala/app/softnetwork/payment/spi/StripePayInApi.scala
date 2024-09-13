@@ -318,7 +318,11 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                   status = Transaction.TransactionStatus.TRANSACTION_CREATED,
                   //The URL you must redirect your customer to in order to authenticate the payment.
                   redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl),
-                  returnUrl = Option(payment.getNextAction.getRedirectToUrl.getReturnUrl)
+                  returnUrl = Option(
+                    s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=${payInTransaction.registerCard
+                      .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt
+                      .getOrElse(false)}&payment_intent=${payment.getId}"
+                  )
                 )
               case "requires_payment_method" =>
                 transaction = transaction.copy(
@@ -504,7 +508,10 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 status = Transaction.TransactionStatus.TRANSACTION_CREATED,
                 //The URL you must redirect your customer to in order to authenticate the payment.
                 redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl),
-                returnUrl = Option(payment.getNextAction.getRedirectToUrl.getReturnUrl)
+                returnUrl = Option(
+                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=false&printReceipt=${payInTransaction.printReceipt
+                    .getOrElse(false)}&payment_intent=${payment.getId}"
+                )
               )
             } else if (status == "requires_payment_method" || status == "requires_confirmation") {
               transaction = transaction.copy(

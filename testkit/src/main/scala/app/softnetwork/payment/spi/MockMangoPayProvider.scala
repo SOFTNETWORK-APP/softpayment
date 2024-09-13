@@ -670,52 +670,67 @@ trait MockMangoPayProvider extends MangoPayProvider {
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
     import preAuthorizationTransaction._
-    val cardPreAuthorization = new CardPreAuthorization()
-    cardPreAuthorization.setTag(orderUuid)
-    cardPreAuthorization.setAuthorId(authorId)
-    cardPreAuthorization.setCardId(cardId)
-    cardPreAuthorization.setDebitedFunds(new Money)
-    cardPreAuthorization.getDebitedFunds.setAmount(debitedAmount)
-    cardPreAuthorization.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
-    cardPreAuthorization.setRemainingFunds(cardPreAuthorization.getDebitedFunds)
-    cardPreAuthorization.setExecutionType(PreAuthorizationExecutionType.DIRECT)
-    cardPreAuthorization.setSecureMode(SecureMode.DEFAULT)
-    cardPreAuthorization.setSecureModeReturnUrl(
-      s"${config.preAuthorizeCardReturnUrl}/$orderUuid?registerCard=${registerCard
-        .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
-    )
+    (cardId match {
+      case None =>
+        val cardPreRegistration = new CardRegistration()
+        cardPreRegistration.setCurrency(CurrencyIso.valueOf(currency))
+        cardPreRegistration.setId(generateUUID())
+        CardRegistrations =
+          CardRegistrations.updated(cardPreRegistration.getId, cardPreRegistration)
+        createCard(cardPreRegistration.getId, None)
+      case some => some
+    }) match {
+      case Some(cardId) =>
+        val cardPreAuthorization = new CardPreAuthorization()
+        cardPreAuthorization.setTag(orderUuid)
+        cardPreAuthorization.setAuthorId(authorId)
+        cardPreAuthorization.setCardId(cardId)
+        cardPreAuthorization.setDebitedFunds(new Money)
+        cardPreAuthorization.getDebitedFunds.setAmount(debitedAmount)
+        cardPreAuthorization.getDebitedFunds.setCurrency(CurrencyIso.valueOf(currency))
+        cardPreAuthorization.setRemainingFunds(cardPreAuthorization.getDebitedFunds)
+        cardPreAuthorization.setExecutionType(PreAuthorizationExecutionType.DIRECT)
+        cardPreAuthorization.setSecureMode(SecureMode.DEFAULT)
+        cardPreAuthorization.setSecureModeReturnUrl(
+          s"${config.preAuthorizeCardReturnUrl}/$orderUuid?registerCard=${registerCard
+            .getOrElse(false)}&printReceipt=${printReceipt.getOrElse(false)}"
+        )
 
-    cardPreAuthorization.setId(generateUUID())
-    cardPreAuthorization.setStatus(PreAuthorizationStatus.CREATED)
-    cardPreAuthorization.setResultCode(OK)
-    cardPreAuthorization.setResultMessage(CREATED)
-    cardPreAuthorization.setSecureModeRedirectUrl(
-      s"${cardPreAuthorization.getSecureModeReturnUrl}&preAuthorizationId=${cardPreAuthorization.getId}"
-    )
-    cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
-    CardPreAuthorizations =
-      CardPreAuthorizations.updated(cardPreAuthorization.getId, cardPreAuthorization)
+        cardPreAuthorization.setId(generateUUID())
+        cardPreAuthorization.setStatus(PreAuthorizationStatus.CREATED)
+        cardPreAuthorization.setResultCode(OK)
+        cardPreAuthorization.setResultMessage(CREATED)
+        cardPreAuthorization.setSecureModeRedirectUrl(
+          s"${cardPreAuthorization.getSecureModeReturnUrl}&preAuthorizationId=${cardPreAuthorization.getId}"
+        )
+        cardPreAuthorization.setPaymentStatus(PaymentStatus.WAITING)
+        CardPreAuthorizations =
+          CardPreAuthorizations.updated(cardPreAuthorization.getId, cardPreAuthorization)
 
-    Some(
-      Transaction().copy(
-        id = cardPreAuthorization.getId,
-        orderUuid = orderUuid,
-        nature = Transaction.TransactionNature.REGULAR,
-        `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
-        status = cardPreAuthorization.getStatus,
-        amount = debitedAmount,
-        cardId = Option(cardId),
-        fees = 0,
-        resultCode = cardPreAuthorization.getResultCode,
-        resultMessage = cardPreAuthorization.getResultMessage,
-        redirectUrl =
-          if (debitedAmount > 5000) Option(cardPreAuthorization.getSecureModeRedirectUrl)
-          else None,
-        authorId = cardPreAuthorization.getAuthorId,
-        paymentType = Transaction.PaymentType.CARD,
-        preRegistrationId = preRegistrationId
-      )
-    )
+        Some(
+          Transaction().copy(
+            id = cardPreAuthorization.getId,
+            orderUuid = orderUuid,
+            nature = Transaction.TransactionNature.REGULAR,
+            `type` = Transaction.TransactionType.PRE_AUTHORIZATION,
+            status = cardPreAuthorization.getStatus,
+            amount = debitedAmount,
+            cardId = Option(cardId),
+            fees = 0,
+            resultCode = cardPreAuthorization.getResultCode,
+            resultMessage = cardPreAuthorization.getResultMessage,
+            redirectUrl =
+              if (debitedAmount > 5000) Option(cardPreAuthorization.getSecureModeRedirectUrl)
+              else None,
+            authorId = cardPreAuthorization.getAuthorId,
+            paymentType = Transaction.PaymentType.CARD,
+            preRegistrationId = preRegistrationId
+          )
+        )
+      case _ =>
+        mlog.error("cardId is required for pre authorization")
+        None
+    }
   }
 
   /** @param orderUuid

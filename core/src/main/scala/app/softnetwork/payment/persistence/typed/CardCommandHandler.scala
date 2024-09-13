@@ -29,6 +29,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
   PayInWithCardPreAuthorizedFailed,
   PaymentAccountNotFound,
   PaymentRedirection,
+  PaymentRequired,
   PaymentResult,
   PreAuthorizationCanceled,
   PreAuthorizeCard,
@@ -42,7 +43,6 @@ import app.softnetwork.payment.message.TransactionEvents.{
   PayInFailedEvent,
   PreAuthorizationCanceledEvent
 }
-import app.softnetwork.payment.model.NaturalUser.NaturalUserType
 import app.softnetwork.payment.model.{
   CardOwner,
   PayInTransaction,
@@ -63,6 +63,7 @@ trait CardCommandHandler
     extends EntityCommandHandler[CardCommand, PaymentAccount, ExternalSchedulerEvent, PaymentResult]
     with PaymentCommandHandler
     with PayInHandler
+    with CustomerHandler
     with Completion {
 
   override def apply(
@@ -82,58 +83,27 @@ trait CardCommandHandler
     command match {
       case cmd: PreRegisterCard =>
         import cmd._
-        var registerWallet: Boolean = false
-        loadPaymentAccount(entityId, state, PaymentAccount.User.NaturalUser(user), clientId) match {
+        val (pa, registerWallet) = createOrUpdateCustomer(entityId, state, user, currency, clientId)
+        pa match {
           case Some(paymentAccount) =>
-            val clientId = paymentAccount.clientId
-              .orElse(cmd.clientId)
-              .orElse(
-                internalClientId
-              )
-            val paymentProvider = loadPaymentProvider(clientId)
-            import paymentProvider._
-            val lastUpdated = now()
-            (paymentAccount.userId match {
-              case None =>
-                createOrUpdatePaymentAccount(
-                  Some(
-                    paymentAccount.withNaturalUser(
-                      user.withNaturalUserType(NaturalUserType.PAYER)
-                    )
-                  ),
-                  acceptedTermsOfPSP = false,
-                  None,
-                  None
+            val paymentAccountUpsertedEvent =
+              PaymentAccountUpsertedEvent.defaultInstance
+                .withDocument(
+                  paymentAccount
                 )
-              case some => some
-            }) match {
+            paymentAccount.userId match {
               case Some(userId) =>
-                keyValueDao.addKeyValue(userId, entityId)
-                (paymentAccount.walletId match {
-                  case None =>
-                    registerWallet = true
-                    createOrUpdateWallet(Some(userId), currency, user.externalUuid, None)
-                  case some => some
-                }) match {
+                paymentAccount.walletId match {
                   case Some(walletId) =>
-                    keyValueDao.addKeyValue(walletId, entityId)
-                    val paymentAccountUpsertedEvent =
-                      PaymentAccountUpsertedEvent.defaultInstance
-                        .withDocument(
-                          paymentAccount
-                            .withPaymentAccountStatus(PaymentAccount.PaymentAccountStatus.COMPTE_OK)
-                            .copy(user =
-                              PaymentAccount.User.NaturalUser(
-                                user
-                                  .withUserId(userId)
-                                  .withWalletId(walletId)
-                                  .withNaturalUserType(NaturalUserType.PAYER)
-                              )
-                            )
-                            .withLastUpdated(lastUpdated)
-                        )
-                        .withLastUpdated(lastUpdated)
-                    preRegisterCard(Some(userId), currency, user.externalUuid) match {
+                    val clientId = paymentAccount.clientId
+                      .orElse(cmd.clientId)
+                      .orElse(
+                        internalClientId
+                      )
+                    val paymentProvider = loadPaymentProvider(clientId)
+                    import paymentProvider._
+                    val lastUpdated = now()
+                    preRegisterCard(Option(userId), currency, user.externalUuid) match {
                       case Some(cardPreRegistration) =>
                         keyValueDao.addKeyValue(cardPreRegistration.id, entityId)
                         val walletEvents: List[ExternalSchedulerEvent] =
@@ -190,44 +160,41 @@ trait CardCommandHandler
                             .thenRun(_ => CardNotPreRegistered ~> replyTo)
                         }
                     }
+
                   case _ =>
                     Effect
                       .persist(
-                        PaymentAccountUpsertedEvent.defaultInstance
-                          .withDocument(
-                            paymentAccount
-                              .copy(
-                                user = PaymentAccount.User.NaturalUser(
-                                  user.withUserId(userId).withNaturalUserType(NaturalUserType.PAYER)
-                                )
-                              )
-                              .withLastUpdated(lastUpdated)
-                          )
-                          .withLastUpdated(lastUpdated)
+                        paymentAccountUpsertedEvent
                       )
                       .thenRun(_ => CardNotPreRegistered ~> replyTo)
                 }
+
               case _ =>
                 Effect
                   .persist(
-                    PaymentAccountUpsertedEvent.defaultInstance
-                      .withDocument(
-                        paymentAccount
-                          .withNaturalUser(
-                            user.withNaturalUserType(NaturalUserType.PAYER)
-                          )
-                          .withLastUpdated(lastUpdated)
-                      )
-                      .withLastUpdated(lastUpdated)
+                    paymentAccountUpsertedEvent
                   )
                   .thenRun(_ => CardNotPreRegistered ~> replyTo)
             }
+
           case _ => Effect.none.thenRun(_ => CardNotPreRegistered ~> replyTo)
         }
 
       case cmd: PreAuthorizeCard =>
         import cmd._
-        state match {
+        var registerWallet: Boolean = false
+        (state match {
+          case None =>
+            cmd.user match {
+              case Some(user) =>
+                val (pa, rw) = createOrUpdateCustomer(entityId, state, user, currency, clientId)
+                registerWallet = rw
+                pa
+              case _ =>
+                None
+            }
+          case some => some
+        }) match {
           case Some(paymentAccount) =>
             val clientId = paymentAccount.clientId.orElse(
               internalClientId
@@ -236,56 +203,54 @@ trait CardCommandHandler
             import paymentProvider._
             paymentAccount.userId match {
               case Some(userId) =>
-                (registrationId match {
-                  case Some(id) =>
-                    createCard(id, registrationData)
-                  case _ =>
-                    paymentAccount.cards
-                      .find(card => card.active.getOrElse(true) && !card.expired)
-                      .map(_.id)
-                }) match {
-                  case Some(cardId) =>
-                    val creditedUserId: Option[String] =
-                      creditedAccount match {
-                        case Some(account) =>
-                          paymentDao.loadPaymentAccount(account, clientId) complete () match {
-                            case Success(s) => s.flatMap(_.userId)
-                            case Failure(f) =>
-                              log.error(s"Error loading credited account: ${f.getMessage}")
-                              None
-                          }
-                        case None => None
+                val cardId =
+                  registrationId match {
+                    case Some(id) =>
+                      createCard(id, registrationData)
+                    case _ =>
+                      paymentAccount.cards
+                        .find(card => card.active.getOrElse(true) && !card.expired)
+                        .map(_.id)
+                  }
+                val creditedUserId: Option[String] =
+                  creditedAccount match {
+                    case Some(account) =>
+                      paymentDao.loadPaymentAccount(account, clientId) complete () match {
+                        case Success(s) => s.flatMap(_.userId)
+                        case Failure(f) =>
+                          log.error(s"Error loading credited account: ${f.getMessage}")
+                          None
                       }
-                    preAuthorizeCard(
-                      PreAuthorizationTransaction.defaultInstance
-                        .withCardId(cardId)
-                        .withAuthorId(userId)
-                        .withDebitedAmount(debitedAmount)
-                        .withOrderUuid(orderUuid)
-                        .withRegisterCard(registerCard)
-                        .withPrintReceipt(printReceipt)
-                        .copy(
-                          ipAddress = ipAddress,
-                          browserInfo = browserInfo,
-                          creditedUserId = creditedUserId,
-                          feesAmount = feesAmount,
-                          preRegistrationId = registrationId
-                        )
-                    ) match {
-                      case Some(transaction) =>
-                        handleCardPreAuthorization(
-                          entityId,
-                          orderUuid,
-                          replyTo,
-                          paymentAccount,
-                          registerCard,
-                          printReceipt,
-                          transaction
-                        )
-                      case _ => // pre authorization failed
-                        Effect.none.thenRun(_ => CardNotPreAuthorized ~> replyTo)
-                    }
-                  case _ => // no card id
+                    case None => None
+                  }
+                preAuthorizeCard(
+                  PreAuthorizationTransaction.defaultInstance
+                    .withAuthorId(userId)
+                    .withDebitedAmount(debitedAmount)
+                    .withOrderUuid(orderUuid)
+                    .withRegisterCard(registerCard)
+                    .withPrintReceipt(printReceipt)
+                    .copy(
+                      cardId = cardId,
+                      ipAddress = ipAddress,
+                      browserInfo = browserInfo,
+                      creditedUserId = creditedUserId,
+                      feesAmount = feesAmount,
+                      preRegistrationId = registrationId
+                    )
+                ) match {
+                  case Some(transaction) =>
+                    handleCardPreAuthorization(
+                      entityId,
+                      orderUuid,
+                      replyTo,
+                      paymentAccount,
+                      registerCard,
+                      printReceipt,
+                      transaction,
+                      registerWallet
+                    )
+                  case _ => // pre authorization failed
                     Effect.none.thenRun(_ => CardNotPreAuthorized ~> replyTo)
                 }
               case _ => // no userId
@@ -568,7 +533,8 @@ trait CardCommandHandler
     paymentAccount: PaymentAccount,
     registerCard: Boolean,
     printReceipt: Boolean,
-    transaction: Transaction
+    transaction: Transaction,
+    registerWallet: Boolean = false
   )(implicit
     system: ActorSystem[_],
     log: Logger,
@@ -587,7 +553,38 @@ trait CardCommandHandler
             .copy(clientId = paymentAccount.clientId)
         )
         .withLastUpdated(lastUpdated)
+    val walletEvents: List[ExternalSchedulerEvent] =
+      if (registerWallet) {
+        List(
+          WalletRegisteredEvent.defaultInstance
+            .withOrderUuid(orderUuid)
+            .withExternalUuid(paymentAccount.externalUuid)
+            .withLastUpdated(lastUpdated)
+            .copy(
+              userId = paymentAccount.userId.get,
+              walletId = paymentAccount.walletId.get
+            )
+        )
+      } else {
+        List.empty
+      }
     transaction.status match {
+      case Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT
+          if transaction.paymentClientReturnUrl.isDefined =>
+        Effect
+          .persist(
+            PaymentAccountUpsertedEvent.defaultInstance
+              .withDocument(updatedPaymentAccount)
+              .withLastUpdated(lastUpdated) +: walletEvents
+          )
+          .thenRun(_ =>
+            PaymentRequired(
+              transaction.id,
+              transaction.paymentClientSecret.getOrElse(""),
+              transaction.paymentClientData.getOrElse(""),
+              transaction.paymentClientReturnUrl.get
+            ) ~> replyTo
+          )
       case Transaction.TransactionStatus.TRANSACTION_CREATED
           if transaction.redirectUrl.isDefined => // 3ds
         Effect
@@ -618,6 +615,12 @@ trait CardCommandHandler
                 case Some(cardId) =>
                   loadCard(cardId) match {
                     case Some(card) =>
+                      transaction.preRegistrationId match {
+                        case None =>
+                          // adding card pre authorized without pre registration
+                          addCard(cardId, transaction.authorId)
+                        case _ =>
+                      }
                       val updatedCard = updatedPaymentAccount.maybeUser match {
                         case Some(user) =>
                           card

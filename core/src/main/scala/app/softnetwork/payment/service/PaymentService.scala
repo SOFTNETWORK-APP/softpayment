@@ -174,7 +174,8 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                             browserInfo,
                             printReceipt,
                             None,
-                            feesAmount
+                            feesAmount,
+                            user
                           )
                         ) completeWith {
                           case r: CardPreAuthorized =>
@@ -188,6 +189,13 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                             complete(
                               HttpResponse(
                                 StatusCodes.Accepted,
+                                entity = r
+                              )
+                            )
+                          case r: PaymentRequired =>
+                            complete(
+                              HttpResponse(
+                                StatusCodes.PaymentRequired,
                                 entity = r
                               )
                             )
@@ -207,7 +215,8 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                             browserInfo,
                             printReceipt,
                             Some(creditedAccount),
-                            feesAmount
+                            feesAmount,
+                            user
                           )
                         ) completeWith {
                           case r: CardPreAuthorized =>
@@ -221,6 +230,13 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                             complete(
                               HttpResponse(
                                 StatusCodes.Accepted,
+                                entity = r
+                              )
+                            )
+                          case r: PaymentRequired =>
+                            complete(
+                              HttpResponse(
+                                StatusCodes.PaymentRequired,
                                 entity = r
                               )
                             )
