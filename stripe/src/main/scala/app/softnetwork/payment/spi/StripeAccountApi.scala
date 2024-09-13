@@ -13,6 +13,7 @@ import app.softnetwork.payment.model.{
   UboDeclaration
 }
 import app.softnetwork.persistence
+import app.softnetwork.serialization.asJson
 import app.softnetwork.time
 import app.softnetwork.time.dateToInstant
 import com.google.gson.Gson
@@ -112,6 +113,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
   ): Option[String] = {
     maybeNaturalUser match {
       case Some(naturalUser) =>
+        mlog.info(s"natural user -> ${asJson(naturalUser)}")
         // create or update natural user
         val birthday = naturalUser.birthday
         val sdf = new SimpleDateFormat("dd/MM/yyyy")
@@ -512,6 +514,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
   ): Option[String] = {
     maybeLegalUser match {
       case Some(legalUser) =>
+        mlog.info(s"legal user -> ${asJson(legalUser)}")
         // create or update legal user
         val birthday = legalUser.legalRepresentative.birthday
         val sdf = new SimpleDateFormat("dd/MM/yyyy")
@@ -1874,6 +1877,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     account: Account,
     owner: UltimateBeneficialOwner
   ): Option[String] = {
+    mlog.info(s"owner -> ${asJson(owner)}")
     val birthday = owner.birthday
     val sdf = new SimpleDateFormat("dd/MM/yyyy")
     sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
@@ -2034,6 +2038,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
   }
 
   private[this] def createOrUpdateCustomer(naturalUser: NaturalUser): Option[String] = {
+    mlog.info(s"customer -> ${asJson(naturalUser)}")
     Try {
       (naturalUser.userId match {
         case Some(userId) if userId.startsWith("cus_") =>
@@ -2127,7 +2132,10 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     }
   }
 
-  private[this] def createLegalRepresentative(legalUser: LegalUser, birthday: Calendar): PersonCollectionCreateParams = {
+  private[this] def createLegalRepresentative(
+    legalUser: LegalUser,
+    birthday: Calendar
+  ): PersonCollectionCreateParams = {
     val params =
       PersonCollectionCreateParams
         .builder()
