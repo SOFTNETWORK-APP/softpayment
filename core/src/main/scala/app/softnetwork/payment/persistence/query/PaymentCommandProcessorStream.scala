@@ -55,10 +55,10 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
                 )
                 Done
             }
-          case evt: PayInWithCardPreAuthorizedCommandEvent =>
+          case evt: PayInWithPreAuthorizationCommandEvent =>
             import evt._
             val command =
-              PayInWithCardPreAuthorized(
+              PayInWithPreAuthorization(
                 preAuthorizationId,
                 creditedAccount,
                 debitedAmount,

@@ -14,36 +14,37 @@ trait PayInTransactionDecorator { _: PayInTransaction =>
             .withCurrency(currency)
             .withCreditedWalletId(creditedWalletId)
             .withStatementDescriptor(statementDescriptor)
-            .withCardId(cardId.orNull)
+            .withCardId(paymentMethodId.orNull)
             .copy(
               browserInfo = browserInfo,
               ipAddress = ipAddress,
-              registerCard = registerCard,
+              registerCard = registerMeansOfPayment,
               printReceipt = printReceipt,
-              cardPreRegistrationId = cardPreRegistrationId
+              preRegistrationId = preRegistrationId
             )
         )
       case _ => None
     }
 
-  def cardPreAuthorizedTransaction: Option[PayInWithCardPreAuthorizedTransaction] =
+  def preAuthorizationTransaction: Option[PayInWithPreAuthorization] =
     paymentType match {
       case Transaction.PaymentType.PREAUTHORIZED =>
         Some(
-          PayInWithCardPreAuthorizedTransaction.defaultInstance
+          PayInWithPreAuthorization.defaultInstance
             .withOrderUuid(orderUuid)
             .withAuthorId(authorId)
             .withDebitedAmount(debitedAmount)
             .withFeesAmount(feesAmount)
             .withCurrency(currency)
             .withCreditedWalletId(creditedWalletId)
-            .withCardPreAuthorizedTransactionId(cardPreAuthorizedTransactionId.orNull)
+            .withPreAuthorizedTransactionId(preAuthorizedTransactionId.orNull)
             .withPreAuthorizationDebitedAmount(
               preAuthorizationDebitedAmount.getOrElse(debitedAmount)
             )
             .copy(
               statementDescriptor =
-                if (statementDescriptor.isEmpty) None else Some(statementDescriptor)
+                if (statementDescriptor.isEmpty) None else Some(statementDescriptor),
+              preRegistrationId = preRegistrationId
             )
         )
       case _ => None
@@ -61,11 +62,14 @@ trait PayInTransactionDecorator { _: PayInTransaction =>
             .withCurrency(currency)
             .withCreditedWalletId(creditedWalletId)
             .withStatementDescriptor(statementDescriptor)
+            .withPaypalId(paymentMethodId.orNull)
             .copy(
               browserInfo = browserInfo,
               ipAddress = ipAddress,
+              registerPaypal = registerMeansOfPayment,
               printReceipt = printReceipt,
-              language = browserInfo.map(_.language)
+              language = browserInfo.map(_.language),
+              preRegistrationId = preRegistrationId
             )
         )
       case _ => None

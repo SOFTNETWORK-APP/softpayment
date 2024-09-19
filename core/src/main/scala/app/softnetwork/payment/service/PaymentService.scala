@@ -53,6 +53,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     pathPrefix(PaymentSettings.PaymentConfig.path) {
       hooks ~
       card ~
+      paymentMethod ~
       payInCallback ~
       preAuthorizeCardCallback ~
       firstRecurringPaymentCallback ~
@@ -126,6 +127,69 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     }
   }
 
+  lazy val paymentMethod: Route = pathPrefix(paymentMethodRoute) {
+    // check anti CSRF token
+    hmacTokenCsrfProtection(checkHeader) {
+      // check if a session exists
+      requiredClientSession { (client, session) =>
+        pathEnd {
+          get {
+            run(LoadPaymentMethods(externalUuidWithProfile(session))) completeWith {
+              case r: PaymentMethodsLoaded =>
+                complete(
+                  HttpResponse(
+                    StatusCodes.OK,
+                    entity = PaymentMethodsView(r.paymentMethods)
+                  )
+                )
+              case other => error(other)
+            }
+          } ~
+          post {
+            entity(as[PreRegisterPaymentMethod]) { cmd =>
+              var updatedUser =
+                if (cmd.user.externalUuid.trim.isEmpty) {
+                  cmd.user.withExternalUuid(session.id)
+                } else {
+                  cmd.user
+                }
+              session.profile match {
+                case Some(profile) if updatedUser.profile.isEmpty =>
+                  updatedUser = updatedUser.withProfile(profile)
+                case _ =>
+              }
+              run(
+                cmd.copy(
+                  user = updatedUser,
+                  clientId = client.map(_.clientId).orElse(session.clientId)
+                )
+              ) completeWith {
+                case r: PaymentMethodPreRegistered =>
+                  complete(
+                    HttpResponse(
+                      StatusCodes.OK,
+                      entity = r.preRegistration
+                    )
+                  )
+                case other => error(other)
+              }
+            }
+          } ~
+          delete {
+            parameter("paymentMethodId") { paymentMethodId =>
+              run(
+                DisablePaymentMethod(externalUuidWithProfile(session), paymentMethodId)
+              ) completeWith {
+                case _: PaymentMethodDisabled.type => complete(HttpResponse(StatusCodes.OK))
+                case other                         => error(other)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   lazy val payment: Route = {
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
@@ -159,10 +223,10 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                         userAgent.map(_.value()),
                         payment
                       )
-                    pathPrefix(preAuthorizeCardRoute) {
+                    pathPrefix(preAuthorizeRoute) {
                       pathEnd {
                         run(
-                          PreAuthorizeCard(
+                          PreAuthorize(
                             orderUuid,
                             externalUuidWithProfile(session),
                             debitedAmount,
@@ -175,10 +239,12 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                             printReceipt,
                             None,
                             feesAmount,
-                            user
+                            user,
+                            paymentMethodId = paymentMethodId,
+                            registerMeansOfPayment = registerMeansOfPayment
                           )
                         ) completeWith {
-                          case r: CardPreAuthorized =>
+                          case r: PaymentPreAuthorized =>
                             complete(
                               HttpResponse(
                                 StatusCodes.OK,
@@ -203,7 +269,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                         }
                       } ~ pathSuffix(Segment) { creditedAccount =>
                         run(
-                          PreAuthorizeCard(
+                          PreAuthorize(
                             orderUuid,
                             externalUuidWithProfile(session),
                             debitedAmount,
@@ -216,10 +282,12 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                             printReceipt,
                             Some(creditedAccount),
                             feesAmount,
-                            user
+                            user,
+                            paymentMethodId = paymentMethodId,
+                            registerMeansOfPayment = registerMeansOfPayment
                           )
                         ) completeWith {
-                          case r: CardPreAuthorized =>
+                          case r: PaymentPreAuthorized =>
                             complete(
                               HttpResponse(
                                 StatusCodes.OK,
@@ -262,6 +330,8 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                             printReceipt,
                             feesAmount = feesAmount,
                             user = user, // required for Pay in without registered card (eg PayPal)
+                            registerMeansOfPayment = registerMeansOfPayment,
+                            paymentMethodId = paymentMethodId,
                             clientId = client.map(_.clientId).orElse(session.clientId)
                           )
                         ) completeWith {
@@ -333,51 +403,61 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
       parameterMap { params =>
         val transactionIdParameter =
           params.getOrElse("transactionIdParameter", "transactionId")
-        parameters(transactionIdParameter, "registerCard".as[Boolean], "printReceipt".as[Boolean]) {
-          (transactionId, registerCard, printReceipt) =>
-            run(PayInCallback(orderUuid, transactionId, registerCard, printReceipt)) completeWith {
-              case r: PaidIn =>
-                complete(
-                  HttpResponse(
-                    StatusCodes.OK,
-                    entity = r
-                  )
+        parameters(
+          transactionIdParameter,
+          "registerMeansOfPayment".as[Boolean],
+          "printReceipt".as[Boolean]
+        ) { (transactionId, registerMeansOfPayment, printReceipt) =>
+          run(
+            PayInCallback(orderUuid, transactionId, registerMeansOfPayment, printReceipt)
+          ) completeWith {
+            case r: PaidIn =>
+              complete(
+                HttpResponse(
+                  StatusCodes.OK,
+                  entity = r
                 )
-              case r: PaymentRedirection =>
-                complete(
-                  HttpResponse(
-                    StatusCodes.Accepted,
-                    entity = r
-                  )
+              )
+            case r: PaymentRedirection =>
+              complete(
+                HttpResponse(
+                  StatusCodes.Accepted,
+                  entity = r
                 )
-              case r: PaymentRequired =>
-                complete(
-                  HttpResponse(
-                    StatusCodes.PaymentRequired,
-                    entity = r
-                  )
+              )
+            case r: PaymentRequired =>
+              complete(
+                HttpResponse(
+                  StatusCodes.PaymentRequired,
+                  entity = r
                 )
-              case other => error(other)
-            }
+              )
+            case other => error(other)
+          }
         }
       }
     }
   }
 
-  lazy val preAuthorizeCardCallback: Route = pathPrefix(callbacksRoute / preAuthorizeCardRoute) {
+  lazy val preAuthorizeCardCallback: Route = pathPrefix(callbacksRoute / preAuthorizeRoute) {
     pathPrefix(Segment) { orderUuid =>
       parameterMap { params =>
         val preAuthorizationIdParameter =
           params.getOrElse("preAuthorizationIdParameter", "preAuthorizationId")
         parameters(
           preAuthorizationIdParameter,
-          "registerCard".as[Boolean],
+          "registerMeansOfPayment".as[Boolean],
           "printReceipt".as[Boolean]
-        ) { (preAuthorizationId, registerCard, printReceipt) =>
+        ) { (preAuthorizationId, registerMeansOfPayment, printReceipt) =>
           run(
-            PreAuthorizeCardCallback(orderUuid, preAuthorizationId, registerCard, printReceipt)
+            PreAuthorizeCallback(
+              orderUuid,
+              preAuthorizationId,
+              registerMeansOfPayment,
+              printReceipt
+            )
           ) completeWith {
-            case _: CardPreAuthorized =>
+            case _: PaymentPreAuthorized =>
               complete(
                 HttpResponse(
                   StatusCodes.OK

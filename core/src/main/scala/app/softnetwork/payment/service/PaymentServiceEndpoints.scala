@@ -19,8 +19,8 @@ import scala.language.{implicitConversions, postfixOps}
 
 trait PaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     extends RootPaymentEndpoints[SD]
-    with CardEndpoints[SD]
-    with CardPaymentEndpoints[SD]
+    with PaymentMethodEndpoints[SD]
+    with CheckoutEndpoints[SD]
     with BankAccountEndpoints[SD]
     with KycDocumentEndpoints[SD]
     with UboDeclarationEndpoints[SD]

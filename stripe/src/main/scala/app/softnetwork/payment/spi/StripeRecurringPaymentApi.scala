@@ -32,7 +32,7 @@ trait StripeRecurringPaymentApi extends RecurringPaymentApi { _: StripeContext =
           )
           .build()
       )
-    ???
+    None
   }
 
   /** @param recurringPayInRegistrationId
@@ -48,7 +48,7 @@ trait StripeRecurringPaymentApi extends RecurringPaymentApi { _: StripeContext =
     recurringPayInRegistrationId: String,
     cardId: Option[String],
     status: Option[RecurringPayment.RecurringCardPaymentStatus]
-  ): Option[RecurringPayment.RecurringCardPaymentResult] = ???
+  ): Option[RecurringPayment.RecurringCardPaymentResult] = None
 
   /** @param recurringPayInRegistrationId
     *   - recurring payIn registration id
@@ -57,7 +57,7 @@ trait StripeRecurringPaymentApi extends RecurringPaymentApi { _: StripeContext =
     */
   override def loadRecurringCardPayment(
     recurringPayInRegistrationId: String
-  ): Option[RecurringPayment.RecurringCardPaymentResult] = ???
+  ): Option[RecurringPayment.RecurringCardPaymentResult] = None
 
   /** @param recurringPaymentTransaction
     *   - recurring payment transaction
@@ -66,5 +66,5 @@ trait StripeRecurringPaymentApi extends RecurringPaymentApi { _: StripeContext =
     */
   override def createRecurringCardPayment(
     recurringPaymentTransaction: RecurringPaymentTransaction
-  ): Option[Transaction] = ???
+  ): Option[Transaction] = None
 }

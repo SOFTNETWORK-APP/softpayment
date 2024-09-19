@@ -24,7 +24,7 @@ abstract class ProviderConfig(
   lazy val callbacksUrl =
     s"""${paymentConfig.baseUrl}/$secureModePath/${paymentConfig.callbacksRoute}"""
 
-  lazy val preAuthorizeCardReturnUrl = s"$callbacksUrl/${paymentConfig.preAuthorizeCardRoute}"
+  lazy val preAuthorizeReturnUrl = s"$callbacksUrl/${paymentConfig.preAuthorizeRoute}"
 
   lazy val payInReturnUrl = s"$callbacksUrl/${paymentConfig.payInRoute}"
 

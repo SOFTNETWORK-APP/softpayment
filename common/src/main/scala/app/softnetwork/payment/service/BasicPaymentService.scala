@@ -20,20 +20,20 @@ trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
 
   def error(result: PaymentResult): ApiErrors.ErrorInfo =
     result match {
-      case PaymentAccountNotFound        => ApiErrors.NotFound(PaymentAccountNotFound.message)
-      case MandateNotFound               => ApiErrors.NotFound(MandateNotFound)
-      case UboDeclarationNotFound        => ApiErrors.NotFound(UboDeclarationNotFound)
-      case BankAccountNotFound           => ApiErrors.NotFound(BankAccountNotFound)
-      case TransactionNotFound           => ApiErrors.NotFound(TransactionNotFound.message)
-      case UserNotFound                  => ApiErrors.NotFound(UserNotFound)
-      case WalletNotFound                => ApiErrors.NotFound(WalletNotFound)
-      case CardNotFound                  => ApiErrors.NotFound(CardNotFound)
-      case RecurringPaymentNotFound      => ApiErrors.NotFound(RecurringPaymentNotFound)
-      case CardNotPreRegistered          => ApiErrors.InternalServerError(CardNotPreRegistered)
-      case r: CardPreAuthorizationFailed => ApiErrors.InternalServerError(r)
-      case r: PayInFailed                => ApiErrors.InternalServerError(r)
-      case r: PaymentError               => ApiErrors.BadRequest(r.message)
-      case _                             => ApiErrors.BadRequest("Unknown")
+      case PaymentAccountNotFound    => ApiErrors.NotFound(PaymentAccountNotFound.message)
+      case MandateNotFound           => ApiErrors.NotFound(MandateNotFound)
+      case UboDeclarationNotFound    => ApiErrors.NotFound(UboDeclarationNotFound)
+      case BankAccountNotFound       => ApiErrors.NotFound(BankAccountNotFound)
+      case TransactionNotFound       => ApiErrors.NotFound(TransactionNotFound.message)
+      case UserNotFound              => ApiErrors.NotFound(UserNotFound)
+      case WalletNotFound            => ApiErrors.NotFound(WalletNotFound)
+      case CardNotFound              => ApiErrors.NotFound(CardNotFound)
+      case RecurringPaymentNotFound  => ApiErrors.NotFound(RecurringPaymentNotFound)
+      case CardNotPreRegistered      => ApiErrors.InternalServerError(CardNotPreRegistered)
+      case r: PreAuthorizationFailed => ApiErrors.InternalServerError(r)
+      case r: PayInFailed            => ApiErrors.InternalServerError(r)
+      case r: PaymentError           => ApiErrors.BadRequest(r.message)
+      case _                         => ApiErrors.BadRequest("Unknown")
     }
 
   protected[payment] def extractBrowserInfo(

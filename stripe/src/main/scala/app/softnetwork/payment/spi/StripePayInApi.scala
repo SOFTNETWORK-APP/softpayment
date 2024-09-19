@@ -2,9 +2,9 @@ package app.softnetwork.payment.spi
 
 import app.softnetwork.payment.config.StripeApi
 import app.softnetwork.payment.model.{
-  PayInWithCardPreAuthorizedTransaction,
   PayInWithCardTransaction,
   PayInWithPayPalTransaction,
+  PayInWithPreAuthorization,
   Transaction
 }
 import app.softnetwork.serialization.asJson
@@ -21,29 +21,29 @@ import collection.JavaConverters._
 
 trait StripePayInApi extends PayInApi { _: StripeContext =>
 
-  /** @param payInWithCardPreAuthorizedTransaction
-    *   - card pre authorized pay in transaction
+  /** @param payInWithPreAuthorization
+    *   - pre authorized pay in transaction
     * @param idempotency
     *   - whether to use an idempotency key for this request or not
     * @return
     *   pay in with card pre authorized transaction result
     */
-  private[spi] override def payInWithCardPreAuthorized(
-    payInWithCardPreAuthorizedTransaction: Option[PayInWithCardPreAuthorizedTransaction],
+  private[spi] override def payInWithPreAuthorization(
+    payInWithPreAuthorization: Option[PayInWithPreAuthorization],
     idempotency: Option[Boolean]
   ): Option[Transaction] = {
-    payInWithCardPreAuthorizedTransaction match {
-      case Some(payInWithCardPreAuthorizedTransaction) =>
+    payInWithPreAuthorization match {
+      case Some(payInWithPreAuthorization) =>
         Try {
           mlog.info(
-            s"Capturing payment intent for order: ${payInWithCardPreAuthorizedTransaction.orderUuid}"
+            s"Capturing payment intent for order: ${payInWithPreAuthorization.orderUuid}"
           )
 
           val requestOptions = StripeApi().requestOptions
 
           var resource = PaymentIntent
             .retrieve(
-              payInWithCardPreAuthorizedTransaction.cardPreAuthorizedTransactionId,
+              payInWithPreAuthorization.preAuthorizedTransactionId,
               requestOptions
             )
 
@@ -51,7 +51,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
           resource =
             Option(resource.getTransferData).flatMap(td => Option(td.getDestination)) match {
               case Some(_) =>
-                payInWithCardPreAuthorizedTransaction.feesAmount match {
+                payInWithPreAuthorization.feesAmount match {
                   case Some(feesAmount)
                       if feesAmount != Option(resource.getApplicationFeeAmount)
                         .map(_.intValue())
@@ -61,7 +61,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                         .builder()
                         .setApplicationFeeAmount(feesAmount)
 
-                    payInWithCardPreAuthorizedTransaction.statementDescriptor match {
+                    payInWithPreAuthorization.statementDescriptor match {
                       case Some(statementDescriptor) =>
                         params.setStatementDescriptor(statementDescriptor)
                       case _ =>
@@ -82,18 +82,18 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                   .setAmountToCapture(
                     Math.min(
                       resource.getAmountCapturable.intValue(),
-                      payInWithCardPreAuthorizedTransaction.debitedAmount
+                      payInWithPreAuthorization.debitedAmount
                     )
                   )
                   .putMetadata("transaction_type", "pay_in")
                   .putMetadata("payment_type", "card")
                   .putMetadata(
                     "pre_authorization_id",
-                    payInWithCardPreAuthorizedTransaction.cardPreAuthorizedTransactionId
+                    payInWithPreAuthorization.preAuthorizedTransactionId
                   )
-                  .putMetadata("order_uuid", payInWithCardPreAuthorizedTransaction.orderUuid)
+                  .putMetadata("order_uuid", payInWithPreAuthorization.orderUuid)
 
-              payInWithCardPreAuthorizedTransaction.statementDescriptor match {
+              payInWithPreAuthorization.statementDescriptor match {
                 case Some(statementDescriptor) =>
                   params.setStatementDescriptor(statementDescriptor)
                 case _ =>
@@ -111,7 +111,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             var transaction =
               Transaction()
                 .withId(payment.getId)
-                .withOrderUuid(payInWithCardPreAuthorizedTransaction.orderUuid)
+                .withOrderUuid(payInWithPreAuthorization.orderUuid)
                 .withNature(Transaction.TransactionNature.REGULAR)
                 .withType(Transaction.TransactionType.PAYIN)
                 .withAmount(payment.getAmount.intValue())
@@ -119,23 +119,22 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 .withResultCode(status)
                 .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
                 .withPreAuthorizationId(
-                  payInWithCardPreAuthorizedTransaction.cardPreAuthorizedTransactionId
+                  payInWithPreAuthorization.preAuthorizedTransactionId
                 )
                 .withPreAuthorizationDebitedAmount(
                   payment.getAmountCapturable
                     .intValue() //payInWithCardPreAuthorizedTransaction.preAuthorizationDebitedAmount
                 )
-                .withCardId(payment.getPaymentMethod)
                 .withAuthorId(payment.getCustomer)
-                .withCreditedWalletId(payInWithCardPreAuthorizedTransaction.creditedWalletId)
+                .withCreditedWalletId(payInWithPreAuthorization.creditedWalletId)
                 .withSourceTransactionId(
-                  payInWithCardPreAuthorizedTransaction.cardPreAuthorizedTransactionId
+                  payInWithPreAuthorization.preAuthorizedTransactionId
                 )
                 .copy(
                   creditedUserId =
                     Option(payment.getTransferData).flatMap(td => Option(td.getDestination)),
-                  cardId = Option(payment.getPaymentMethod),
-                  preRegistrationId = payInWithCardPreAuthorizedTransaction.cardPreRegistrationId
+                  paymentMethodId = Option(payment.getPaymentMethod),
+                  preRegistrationId = payInWithPreAuthorization.preRegistrationId
                 )
             if (status == "succeeded") {
               transaction =
@@ -145,7 +144,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             }
 
             mlog.info(
-              s"Payment intent captured for order: ${payInWithCardPreAuthorizedTransaction.orderUuid} -> ${asJson(transaction)}"
+              s"Payment intent captured for order: ${payInWithPreAuthorization.orderUuid} -> ${asJson(transaction)}"
             )
 
             Some(transaction)
@@ -193,7 +192,10 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
               .putMetadata("transaction_type", "pay_in")
               .putMetadata("payment_type", "card")
               .putMetadata("print_receipt", payInTransaction.printReceipt.getOrElse(false).toString)
-              .putMetadata("register_card", payInTransaction.registerCard.getOrElse(false).toString)
+              .putMetadata(
+                "register_means_of_payment",
+                payInTransaction.registerCard.getOrElse(false).toString
+              )
 
           payInTransaction.statementDescriptor match {
             case Some(statementDescriptor) =>
@@ -207,7 +209,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 .setPaymentMethod(cardId)
                 .setConfirm(true) // Confirm the PaymentIntent immediately
                 .setReturnUrl(
-                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=${payInTransaction.registerCard
+                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerMeansOfPayment=${payInTransaction.registerCard
                     .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt.getOrElse(false)}"
                 )
             case _ =>
@@ -308,8 +310,8 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 )
                 .withCreditedWalletId(payInTransaction.creditedWalletId)
                 .copy(
-                  cardId = Option(payment.getPaymentMethod),
-                  preRegistrationId = payInTransaction.cardPreRegistrationId
+                  paymentMethodId = Option(payment.getPaymentMethod),
+                  preRegistrationId = payInTransaction.preRegistrationId
                 )
 
             status match {
@@ -319,7 +321,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                   //The URL you must redirect your customer to in order to authenticate the payment.
                   redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl),
                   returnUrl = Option(
-                    s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=${payInTransaction.registerCard
+                    s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerMeansOfPayment=${payInTransaction.registerCard
                       .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt
                       .getOrElse(false)}&payment_intent=${payment.getId}"
                   )
@@ -329,7 +331,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                   status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
                   paymentClientSecret = Option(payment.getClientSecret),
                   paymentClientReturnUrl = Option(
-                    s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=${payInTransaction.registerCard
+                    s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerMeansOfPayment=${payInTransaction.registerCard
                       .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt
                       .getOrElse(false)}&payment_intent=${payment.getId}"
                   )
@@ -395,10 +397,47 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 "print_receipt",
                 payInTransaction.printReceipt.getOrElse(false).toString
               )
+              .putMetadata(
+                "register_means_of_payment",
+                payInTransaction.registerPaypal.getOrElse(false).toString
+              )
 
           payInTransaction.statementDescriptor match {
             case Some(statementDescriptor) =>
               params.setStatementDescriptor(statementDescriptor)
+            case _ =>
+          }
+
+          payInTransaction.paypalId match {
+            case Some(paypalId) =>
+              params
+                .setPaymentMethod(paypalId)
+                .setConfirm(true) // Confirm the PaymentIntent immediately
+                .setReturnUrl(
+                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerMeansOfPayment=${payInTransaction.registerPaypal
+                    .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt.getOrElse(false)}"
+                )
+            case _ =>
+              params
+                .addPaymentMethodType("paypal")
+                .setPaymentMethodOptions(
+                  PaymentIntentCreateParams.PaymentMethodOptions
+                    .builder()
+                    .setPaypal(
+                      PaymentIntentCreateParams.PaymentMethodOptions.Paypal
+                        .builder()
+                        .setCaptureMethod(
+                          PaymentIntentCreateParams.PaymentMethodOptions.Paypal.CaptureMethod.MANUAL
+                        )
+                        .build()
+                    )
+                    .build()
+                )
+          }
+
+          payInTransaction.registerPaypal match {
+            case Some(true) =>
+              params.setSetupFutureUsage(PaymentIntentCreateParams.SetupFutureUsage.OFF_SESSION)
             case _ =>
           }
 
@@ -434,13 +473,14 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
 
           }
 
-          payInTransaction.payPalWalletId match {
-            case Some(payPalWalletId) =>
+          payInTransaction.paypalId match {
+            case Some(paypalId) =>
               params
                 .setConfirm(true) // Confirm the PaymentIntent immediately
-                .setPaymentMethod(payPalWalletId)
+                .setPaymentMethod(paypalId)
                 .setReturnUrl(
-                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=false&&printReceipt=${payInTransaction.printReceipt
+                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&&registerMeansOfPayment=${payInTransaction.registerPaypal
+                    .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt
                     .getOrElse(false)}"
                 )
             case _ =>
@@ -509,7 +549,8 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 //The URL you must redirect your customer to in order to authenticate the payment.
                 redirectUrl = Option(payment.getNextAction.getRedirectToUrl.getUrl),
                 returnUrl = Option(
-                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=false&printReceipt=${payInTransaction.printReceipt
+                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerMeansOfPayment=${payInTransaction.registerPaypal
+                    .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt
                     .getOrElse(false)}&payment_intent=${payment.getId}"
                 )
               )
@@ -518,7 +559,8 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
                 paymentClientSecret = Option(payment.getClientSecret),
                 paymentClientReturnUrl = Option(
-                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerCard=false&printReceipt=${payInTransaction.printReceipt
+                  s"${config.payInReturnUrl}/${payInTransaction.orderUuid}?transactionIdParameter=payment_intent&registerMeansOfPayment=${payInTransaction.registerPaypal
+                    .getOrElse(false)}&printReceipt=${payInTransaction.printReceipt
                     .getOrElse(false)}&payment_intent=${payment.getId}"
                 )
               )
@@ -573,10 +615,11 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             case Some("direct_debited") => Transaction.PaymentType.DIRECT_DEBITED
             case _                      => Transaction.PaymentType.CARD
           }
-        val cardId =
+        val paymentMethodId =
           paymentType match {
-            case Transaction.PaymentType.CARD => Option(payment.getPaymentMethod)
-            case _                            => None
+            case Transaction.PaymentType.CARD | Transaction.PaymentType.PAYPAL =>
+              Option(payment.getPaymentMethod)
+            case _ => None
           }
         val preAuthorizationId = metadata.get("pre_authorization_id")
         val redirectUrl =
@@ -599,7 +642,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             .withAuthorId(payment.getCustomer)
             .withCurrency(payment.getCurrency)
             .copy(
-              cardId = cardId,
+              paymentMethodId = paymentMethodId,
               preAuthorizationId = preAuthorizationId,
               redirectUrl = redirectUrl,
               mandateId = metadata.get("mandate_id")
@@ -616,8 +659,8 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             status = Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT,
             paymentClientSecret = Option(payment.getClientSecret),
             paymentClientReturnUrl = Option(
-              s"${config.payInReturnUrl}/$orderUuid?transactionIdParameter=payment_intent&registerCard=${metadata
-                .getOrElse("register_card", false)}&printReceipt=${metadata
+              s"${config.payInReturnUrl}/$orderUuid?transactionIdParameter=payment_intent&registerMeansOfPayment=${metadata
+                .getOrElse("register_means_of_payment", false)}&printReceipt=${metadata
                 .getOrElse("print_receipt", false)}&payment_intent=${payment.getId}"
             )
           )

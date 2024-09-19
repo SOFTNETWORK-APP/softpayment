@@ -25,6 +25,10 @@ object PaymentMessages {
 
   trait CardCommand extends PaymentCommand
 
+  trait PreAuthorizationCommand extends PaymentCommand
+
+  trait PaymentMethodCommand extends PaymentCommand
+
   /** @param orderUuid
     *   - order uuid
     * @param user
@@ -40,7 +44,29 @@ object PaymentMessages {
     currency: String = "EUR",
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
-      with CardCommand {
+      with PaymentMethodCommand {
+    val key: String = user.externalUuidWithProfile
+  }
+
+  /** @param orderUuid
+    *   - order uuid
+    * @param user
+    *   - payment user
+    * @param currency
+    *   - currency
+    * @param paymentType
+    *   - payment type
+    * @param clientId
+    *   - optional client id
+    */
+  case class PreRegisterPaymentMethod(
+    orderUuid: String,
+    user: NaturalUser,
+    currency: String = "EUR",
+    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey
+      with PaymentMethodCommand {
     val key: String = user.externalUuidWithProfile
   }
 
@@ -74,6 +100,10 @@ object PaymentMessages {
     *   - optional fees amount
     * @param user
     *   - optional payment user
+    * @param paymentMethodId
+    *   - optional payment method id
+    * @param registerMeansOfPayment
+    *   - optional flag to specify whether or not the means of payment should be registered
     */
   case class Payment(
     orderUuid: String,
@@ -91,10 +121,12 @@ object PaymentMessages {
     paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
     printReceipt: Boolean = false,
     feesAmount: Option[Int] = None,
-    user: Option[NaturalUser] = None
+    user: Option[NaturalUser] = None,
+    paymentMethodId: Option[String] = None,
+    registerMeansOfPayment: Option[Boolean] = None
   )
 
-  /** Flow [PreRegisterCard -> ] PreAuthorizeCard [ -> PreAuthorizeCardCallback]
+  /** Flow [PreRegister -> ] PreAuthorize [ -> PreAuthorizeCallback]
     *
     * @param orderUuid
     *   - order uuid
@@ -122,10 +154,16 @@ object PaymentMessages {
     *   - optional fees amount
     * @param user
     *   - optional payment user
+    * @param paymentType
+    *   - payment type (CARD by default)
+    * @param paymentMethodId
+    *   - optional payment method id
+    * @param registerMeansOfPayment
+    *   - optional flag to specify whether or not the means of payment should be registered
     * @param clientId
     *   - optional client id
     */
-  case class PreAuthorizeCard(
+  case class PreAuthorize(
     orderUuid: String,
     debitedAccount: String,
     debitedAmount: Int = 100,
@@ -139,48 +177,51 @@ object PaymentMessages {
     creditedAccount: Option[String] = None,
     feesAmount: Option[Int] = None,
     user: Option[NaturalUser] = None,
+    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
+    paymentMethodId: Option[String] = None,
+    registerMeansOfPayment: Option[Boolean] = None,
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
-      with CardCommand {
+      with PreAuthorizationCommand {
     val key: String = debitedAccount
   }
 
-  /** card pre authorization return command
+  /** pre authorization return command
     *
     * @param orderUuid
     *   - order unique id
     * @param preAuthorizationId
-    *   - pre authorization transaction id
-    * @param registerCard
-    *   - whether the card should be registered or not
+    *   - pre authorized transaction id
+    * @param registerMeansOfPayment
+    *   - whether the means of payment should be registered or not
     * @param printReceipt
     *   - whether or not the client asks to print a receipt
     */
   @InternalApi
-  private[payment] case class PreAuthorizeCardCallback(
+  private[payment] case class PreAuthorizeCallback(
     orderUuid: String,
     preAuthorizationId: String,
-    registerCard: Boolean = true,
+    registerMeansOfPayment: Boolean = true,
     printReceipt: Boolean = false
   ) extends PaymentCommandWithKey
-      with CardCommand {
+      with PreAuthorizationCommand {
     lazy val key: String = preAuthorizationId
   }
 
   /** @param orderUuid
     *   - order unique id
-    * @param cardPreAuthorizedTransactionId
-    *   - card pre authorized transaction id
+    * @param preAuthorizationId
+    *   - pre authorization transaction id
     * @param clientId
     *   - optional client id
     */
   case class CancelPreAuthorization(
     orderUuid: String,
-    cardPreAuthorizedTransactionId: String,
+    preAuthorizationId: String,
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
-      with CardCommand {
-    lazy val key: String = cardPreAuthorizedTransactionId
+      with PreAuthorizationCommand {
+    lazy val key: String = preAuthorizationId
   }
 
   /** @param orderUuid
@@ -198,11 +239,10 @@ object PaymentMessages {
 
   trait PayInCommand extends PaymentCommand
 
-  /** Flow [PreRegisterCard -> ] PreAuthorizeCard [ -> PreAuthorizeCardCallback] ->
-    * PayInWithCardPreAuthorized
+  /** Flow [PreRegister -> ] PreAuthorize [ -> PreAuthorizeCallback] -> PayInWithPreAuthorization
     *
     * @param preAuthorizationId
-    *   - pre authorization transaction id
+    *   - pre authorized transaction id
     * @param creditedAccount
     *   - account to credit
     * @param debitedAmount
@@ -213,19 +253,18 @@ object PaymentMessages {
     * @param clientId
     *   - optional client id
     */
-  case class PayInWithCardPreAuthorized(
+  case class PayInWithPreAuthorization(
     preAuthorizationId: String,
     creditedAccount: String,
     debitedAmount: Option[Int],
     feesAmount: Option[Int] = None,
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
-      with PayInCommand
-      with CardCommand {
+      with PayInCommand {
     lazy val key: String = preAuthorizationId
   }
 
-  /** Flow [PreRegisterCard ->] PayIn [ -> PayInCallback]
+  /** Flow [PreRegister ->] [PreAuthorize [ -> PreAuthorizeCallback] ->] PayIn [ -> PayInCallback]
     *
     * @param orderUuid
     *   - order uuid
@@ -272,6 +311,8 @@ object PaymentMessages {
     printReceipt: Boolean = false,
     feesAmount: Option[Int] = None,
     user: Option[NaturalUser] = None,
+    registerMeansOfPayment: Option[Boolean] = None,
+    paymentMethodId: Option[String] = None,
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
       with PayInCommand {
@@ -284,8 +325,8 @@ object PaymentMessages {
     *   - order unique id
     * @param transactionId
     *   - payIn transaction id
-    * @param registerCard
-    *   - the card should be registered or not
+    * @param registerMeansOfPayment
+    *   - the means of payment should be registered or not
     * @param printReceipt
     *   - whether or not the client asks to print a receipt
     */
@@ -293,7 +334,7 @@ object PaymentMessages {
   private[payment] case class PayInCallback(
     orderUuid: String,
     transactionId: String,
-    registerCard: Boolean,
+    registerMeansOfPayment: Boolean,
     printReceipt: Boolean = false
   ) extends PaymentCommandWithKey
       with PayInCommand {
@@ -696,7 +737,15 @@ object PaymentMessages {
   /** @param debitedAccount
     *   - account owning the cards to load
     */
-  case class LoadCards(debitedAccount: String) extends PaymentCommandWithKey with CardCommand {
+  case class LoadCards(debitedAccount: String)
+      extends PaymentCommandWithKey
+      with PaymentMethodCommand {
+    val key: String = debitedAccount
+  }
+
+  case class LoadPaymentMethods(debitedAccount: String)
+      extends PaymentCommandWithKey
+      with PaymentMethodCommand {
     val key: String = debitedAccount
   }
 
@@ -707,7 +756,18 @@ object PaymentMessages {
     */
   case class DisableCard(debitedAccount: String, cardId: String)
       extends PaymentCommandWithKey
-      with CardCommand {
+      with PaymentMethodCommand {
+    val key: String = debitedAccount
+  }
+
+  /** @param debitedAccount
+    *   - account owning the card to disable
+    * @param paymentMethodId
+    *   - id of payment method to disable
+    */
+  case class DisablePaymentMethod(debitedAccount: String, paymentMethodId: String)
+      extends PaymentCommandWithKey
+      with PaymentMethodCommand {
     val key: String = debitedAccount
   }
 
@@ -898,7 +958,9 @@ object PaymentMessages {
 
   case class CardPreRegistered(cardPreRegistration: CardPreRegistration) extends PaymentResult
 
-  case class CardPreAuthorized(transactionId: String) extends PaymentResult
+  case class PaymentMethodPreRegistered(preRegistration: PreRegistration) extends PaymentResult
+
+  case class PaymentPreAuthorized(transactionId: String) extends PaymentResult
 
   trait PaidInResult extends PaymentResult
 
@@ -1012,7 +1074,11 @@ object PaymentMessages {
 
   case class CardsLoaded(cards: Seq[Card]) extends PaymentResult
 
+  case class PaymentMethodsLoaded(paymentMethods: Seq[PaymentMethod]) extends PaymentResult
+
   case object CardDisabled extends PaymentResult
+
+  case object PaymentMethodDisabled extends PaymentResult
 
   case object PaymentAccountCreated extends PaymentResult
 
@@ -1034,9 +1100,11 @@ object PaymentMessages {
 
   case object CardNotPreRegistered extends PaymentError("CardNotPreRegistered")
 
-  case object CardNotPreAuthorized extends PaymentError("CardNotPreAuthorized")
+  case object PaymentMethodNotPreRegistered extends PaymentError("PaymentMethodNotPreRegistered")
 
-  case class CardPreAuthorizationFailed(resultMessage: String) extends PaymentError(resultMessage)
+  case object PaymentNotPreAuthorized extends PaymentError("PaymentNotPreAuthorized")
+
+  case class PreAuthorizationFailed(resultMessage: String) extends PaymentError(resultMessage)
 
   case class PayInFailed(
     transactionId: String,
@@ -1139,7 +1207,11 @@ object PaymentMessages {
 
   case object CardsNotLoaded extends PaymentError("CardsNotLoaded")
 
+  case object PaymentMethodsNotLoaded extends PaymentError("PaymentMethodsNotLoaded")
+
   case object CardNotDisabled extends PaymentError("CardNotDisabled")
+
+  case object PaymentMethodNotDisabled extends PaymentError("PaymentMethodNotDisabled")
 
   case object UserNotFound extends PaymentError("UserNotFound")
 
@@ -1177,7 +1249,7 @@ object PaymentMessages {
     override def command: Option[PaymentCommandEvent] =
       wrapped match {
         case r: ExternalEntityToPaymentEvent.Wrapped.CreateOrUpdatePaymentAccount => Some(r.value)
-        case r: ExternalEntityToPaymentEvent.Wrapped.PayInWithCardPreAuthorized   => Some(r.value)
+        case r: ExternalEntityToPaymentEvent.Wrapped.PayInWithPreAuthorization    => Some(r.value)
         case r: ExternalEntityToPaymentEvent.Wrapped.Refund                       => Some(r.value)
         case r: ExternalEntityToPaymentEvent.Wrapped.PayOut                       => Some(r.value)
         case r: ExternalEntityToPaymentEvent.Wrapped.Transfer                     => Some(r.value)

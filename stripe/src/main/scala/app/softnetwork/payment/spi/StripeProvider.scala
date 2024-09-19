@@ -30,7 +30,8 @@ trait StripeProvider
     with StripeContext
     with StripeAccountApi
     with StripeDirectDebitApi
-    with StripeCardApi
+    with StripePreAuthorizationApi
+    with StripePaymentMethodApi
     with StripePayInApi
     with StripePayOutApi
     with StripeRecurringPaymentApi

@@ -25,7 +25,7 @@ option (scalapb.options) = {
     preamble: "trait RecurringPaymentEvent extends DebitedAccountEvent {def debitedAmount: Int; def feesAmount: Int; def currency: String; def recurringPaymentRegistrationId: String; def frequency: RecurringPayment.RecurringPaymentFrequency}"
 };
 
-message CardPreAuthorizedEvent {
+message PreAuthorizedEvent {
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "DebitedAccountEvent";
     required string orderUuid = 1;
@@ -33,11 +33,11 @@ message CardPreAuthorizedEvent {
     required string debitedAccount = 3;
     required int32 debitedAmount = 4;
     required string transactionId = 5;
-    required string cardId = 6;
+    required string paymentMethodId = 6;
     optional bool printReceipt = 7;
 }
 
-message CardPreAuthorizationFailedEvent {
+message PreAuthorizationFailedEvent {
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "TransactionFailedEvent";
     required string orderUuid = 1;
@@ -54,7 +54,7 @@ message PaidInEvent {
     required int32 debitedAmount = 4;
     required string currency = 5 [default = "EUR"];
     required string transactionId = 6;
-    required string cardId = 7;
+    required string paymentMethodId = 7;
     required app.softnetwork.payment.model.Transaction.PaymentType paymentType = 8;
     optional bool printReceipt = 9;
 }
@@ -229,6 +229,6 @@ message PreAuthorizationCanceledEvent {
     required google.protobuf.Timestamp lastUpdated = 1 [(scalapb.field).type = "java.time.Instant"];
     required string debitedAccount = 2;
     required string orderUuid = 3;
-    required string cardPreAuthorizedTransactionId = 4;
+    required string preAuthorizedTransactionId = 4;
     required bool preAuthorizationCanceled = 5;
 }

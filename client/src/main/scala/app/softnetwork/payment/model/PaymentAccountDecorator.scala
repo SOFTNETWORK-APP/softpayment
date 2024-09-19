@@ -142,6 +142,8 @@ trait PaymentAccountDecorator { self: PaymentAccount =>
     !legalUser || getLegalUser.lastAcceptedTermsOfPSP.isDefined
 
   lazy val view: PaymentAccountView = payment.model.PaymentAccountView(self)
+
+  lazy val paymentMethods: Seq[PaymentMethod] = cards ++ paypals
 }
 
 case class PaymentAccountView(
@@ -154,7 +156,8 @@ case class PaymentAccountView(
   documents: Seq[KycDocumentView] = Seq.empty,
   paymentAccountStatus: PaymentAccount.PaymentAccountStatus,
   transactions: Seq[TransactionView] = Seq.empty,
-  mandate: Option[MandateView] = None
+  mandate: Option[MandateView] = None,
+  paypals: Seq[Paypal] = Seq.empty
 ) extends User {
   override lazy val userId: Option[String] = legalUser.orElse(naturalUser).flatMap(_.userId)
 }
@@ -180,7 +183,8 @@ object PaymentAccountView {
       documents.map(_.view),
       paymentAccountStatus,
       transactions.map(_.view),
-      mandate.map(_.view)
+      mandate.map(_.view),
+      paypals
     )
   }
 }

@@ -68,7 +68,7 @@ class PaymentHandlerSpec
 
     "pre authorize card" in {
       !?(
-        PreAuthorizeCard(
+        PreAuthorize(
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           5100,
@@ -94,12 +94,12 @@ class PaymentHandlerSpec
 
     "update card pre authorization" in {
       !?(
-        PreAuthorizeCardCallback(
+        PreAuthorizeCallback(
           orderUuid,
           preAuthorizationId
         )
       ) await {
-        case cardPreAuthorized: CardPreAuthorized =>
+        case cardPreAuthorized: PaymentPreAuthorized =>
           val transactionId = cardPreAuthorized.transactionId
           !?(
             LoadPaymentAccount(computeExternalUuidWithProfile(customerUuid, Some("customer")))
@@ -815,7 +815,7 @@ class PaymentHandlerSpec
 
     "cancel pre authorized card" in {
       !?(
-        PreAuthorizeCard(
+        PreAuthorize(
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
@@ -826,7 +826,7 @@ class PaymentHandlerSpec
           creditedAccount = Some(computeExternalUuidWithProfile(sellerUuid, Some("seller")))
         )
       ) await {
-        case result: CardPreAuthorized =>
+        case result: PaymentPreAuthorized =>
           val transactionId = result.transactionId
           preAuthorizationId = transactionId
           !?(CancelPreAuthorization(orderUuid, preAuthorizationId)) await {
@@ -840,7 +840,7 @@ class PaymentHandlerSpec
 
     "pay in / out with pre authorized card" in {
       !?(
-        PreAuthorizeCard(
+        PreAuthorize(
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
@@ -851,10 +851,10 @@ class PaymentHandlerSpec
           creditedAccount = Some(computeExternalUuidWithProfile(sellerUuid, Some("seller")))
         )
       ) await {
-        case result: CardPreAuthorized =>
+        case result: PaymentPreAuthorized =>
           val transactionId = result.transactionId
           preAuthorizationId = transactionId
-          paymentClient.payInWithCardPreAuthorized(
+          paymentClient.payInWithPreAuthorization(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             Some(110)
@@ -864,7 +864,7 @@ class PaymentHandlerSpec
               assert(result.error.getOrElse("") == "DebitedAmountAbovePreAuthorizationAmount")
             case Failure(f) => fail(f.getMessage)
           }
-          paymentClient.payInWithCardPreAuthorized(
+          paymentClient.payInWithPreAuthorization(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             Some(90)

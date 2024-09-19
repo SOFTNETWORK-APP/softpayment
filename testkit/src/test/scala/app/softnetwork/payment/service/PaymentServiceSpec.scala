@@ -318,7 +318,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         )
       log.info(s"pre authorize card payment: ${serialization.write(payment)}")
       withHeaders(
-        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute", payment)
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute", payment)
           .withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.Accepted
@@ -337,7 +337,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
     "pre authorize card callback" in {
       Get(
-        s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$preAuthorizeCardRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerCard=true&printReceipt=true"
+        s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$preAuthorizeRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerMeansOfPayment=true&printReceipt=true"
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         val paymentAccount = loadPaymentAccount()
@@ -366,11 +366,45 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           None,
           registerCard = true,
           printReceipt = true,
-          feesAmount = Some(feesAmount)
+          feesAmount = Some(feesAmount),
+          user = Option(naturalUser)
         )
-      log.info(s"pre authorize card payment: ${serialization.write(payment)}")
+      log.info(s"pre authorize without pre registration: ${serialization.write(payment)}")
       withHeaders(
-        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute", payment)
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute", payment)
+          .withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.Accepted
+        val redirection = responseAs[PaymentRedirection]
+        val params = redirection.redirectUrl
+          .split("\\?")
+          .last
+          .split("[&=]")
+          .grouped(2)
+          .map(a => (a(0), a(1)))
+          .toMap
+        preAuthorizationId = params.getOrElse("preAuthorizationId", "")
+        assert(params.getOrElse("printReceipt", "") == "true")
+      }
+    }
+
+    "pre authorize with registered card" in {
+      val payment =
+        Payment(
+          orderUuid,
+          debitedAmount,
+          "EUR",
+          None,
+          None,
+          registerCard = true,
+          printReceipt = true,
+          feesAmount = Some(feesAmount),
+          user = Option(naturalUser),
+          paymentMethodId = Option(cardId)
+        )
+      log.info(s"pre authorize with registered card: ${serialization.write(payment)}")
+      withHeaders(
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute", payment)
           .withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.Accepted
@@ -402,14 +436,14 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       log.info(s"pay in / out with pre authorized card payment: ${serialization.write(payment)}")
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute/${URLEncoder
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute/${URLEncoder
             .encode(computeExternalUuidWithProfile(sellerUuid, Some("seller")), "UTF-8")}",
           payment
         ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        preAuthorizationId = responseAs[CardPreAuthorized].transactionId
-        paymentClient.payInWithCardPreAuthorized(
+        preAuthorizationId = responseAs[PaymentPreAuthorized].transactionId
+        paymentClient.payInWithPreAuthorization(
           preAuthorizationId,
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           None
@@ -467,12 +501,12 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           .map(a => (a(0), a(1)))
           .toMap
         val transactionId = params.getOrElse("transactionId", "")
-        val registerCard = params.getOrElse("registerCard", "")
-        assert(registerCard == "true")
+        val registerMeansOfPayment = params.getOrElse("registerMeansOfPayment", "")
+        assert(registerMeansOfPayment == "true")
         val printReceipt = params.getOrElse("printReceipt", "")
         assert(printReceipt == "true")
         Get(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$payInRoute/$orderUuid?transactionId=$transactionId&registerCard=$registerCard&printReceipt=$printReceipt"
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$payInRoute/$orderUuid?transactionId=$transactionId&registerMeansOfPayment=$registerMeansOfPayment&printReceipt=$printReceipt"
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
@@ -525,7 +559,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         val printReceipt = params.getOrElse("printReceipt", "")
         assert(printReceipt == "true")
         Get(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$payInRoute/$orderUuid?transactionId=$transactionId&registerCard=false&printReceipt=$printReceipt"
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$payInRoute/$orderUuid?transactionId=$transactionId&registerMeansOfPayment=false&printReceipt=$printReceipt"
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)

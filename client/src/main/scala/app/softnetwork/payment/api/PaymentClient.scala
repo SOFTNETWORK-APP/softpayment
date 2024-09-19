@@ -48,7 +48,7 @@ trait PaymentClient extends GrpcClient {
       ) map (_.succeeded)
   }
 
-  def payInWithCardPreAuthorized(
+  def payInWithPreAuthorization(
     preAuthorizationId: String,
     creditedAccount: String,
     debitedAmount: Option[Int],
@@ -56,11 +56,11 @@ trait PaymentClient extends GrpcClient {
     token: Option[String] = None
   ): Future[TransactionResponse] = {
     withAuthorization(
-      grpcClient.payInWithCardPreAuthorized(),
+      grpcClient.payInWithPreAuthorization(),
       token
     )
       .invoke(
-        PayInWithCardPreAuthorizedRequest(
+        PayInWithPreAuthorizationRequest(
           preAuthorizationId,
           creditedAccount,
           debitedAmount,

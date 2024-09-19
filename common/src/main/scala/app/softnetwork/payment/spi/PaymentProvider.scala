@@ -9,7 +9,8 @@ import org.slf4j.LoggerFactory
 private[payment] trait PaymentProvider
     extends PaymentContext
     with PaymentAccountApi
-    with CardApi
+    with PreAuthorizationApi
+    with PaymentMethodApi
     with DirectDebitApi
     with PayInApi
     with PayOutApi

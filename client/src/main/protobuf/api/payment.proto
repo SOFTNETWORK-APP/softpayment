@@ -15,7 +15,7 @@ option (scalapb.options) = {
 
 service PaymentServiceApi {
     rpc CreateOrUpdatePaymentAccount (CreateOrUpdatePaymentAccountRequest) returns (CreateOrUpdatePaymentAccountResponse) {}
-    rpc PayInWithCardPreAuthorized (PayInWithCardPreAuthorizedRequest) returns (TransactionResponse) {}
+    rpc PayInWithPreAuthorization (PayInWithPreAuthorizationRequest) returns (TransactionResponse) {}
     rpc CancelPreAuthorization (CancelPreAuthorizationRequest) returns (CancelPreAuthorizationResponse) {}
     rpc Refund (RefundRequest) returns (TransactionResponse) {}
     rpc PayOut (PayOutRequest) returns (TransactionResponse) {}
@@ -38,7 +38,7 @@ message CreateOrUpdatePaymentAccountResponse {
     bool succeeded = 1;
 }
 
-message PayInWithCardPreAuthorizedRequest {
+message PayInWithPreAuthorizationRequest {
     string preAuthorizationId = 1;
     string creditedAccount = 2;
     google.protobuf.Int32Value debitedAmount = 3;

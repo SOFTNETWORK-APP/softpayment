@@ -80,13 +80,32 @@ trait PaymentBehavior
       case _ => Set(persistenceId)
     }
 
-  private[this] lazy val cardCommandHandler: PartialFunction[PaymentCommand, EntityCommandHandler[
-    PaymentCommand,
-    PaymentAccount,
-    ExternalSchedulerEvent,
-    PaymentResult
-  ]] = { case _: CardCommand =>
-    new CardCommandHandler {
+  private[this] lazy val paymentMethodCommandHandler
+    : PartialFunction[PaymentCommand, EntityCommandHandler[
+      PaymentCommand,
+      PaymentAccount,
+      ExternalSchedulerEvent,
+      PaymentResult
+    ]] = { case _: PaymentMethodCommand =>
+    new PaymentMethodCommandHandler {
+      override def paymentDao: PaymentDao = self.paymentDao
+      override def softPayAccountDao: SoftPayAccountDao = self.softPayAccountDao
+    }.asInstanceOf[EntityCommandHandler[
+      PaymentCommand,
+      PaymentAccount,
+      ExternalSchedulerEvent,
+      PaymentResult
+    ]]
+  }
+
+  private[this] lazy val preAuthorizationCommandHandler
+    : PartialFunction[PaymentCommand, EntityCommandHandler[
+      PaymentCommand,
+      PaymentAccount,
+      ExternalSchedulerEvent,
+      PaymentResult
+    ]] = { case _: PreAuthorizationCommand =>
+    new PreAuthorizationCommandHandler {
       override def paymentDao: PaymentDao = self.paymentDao
       override def softPayAccountDao: SoftPayAccountDao = self.softPayAccountDao
     }.asInstanceOf[EntityCommandHandler[
@@ -156,7 +175,12 @@ trait PaymentBehavior
     ExternalSchedulerEvent,
     PaymentResult
   ]] = {
-    cardCommandHandler orElse payInCommandHandler orElse payOutCommandHandler orElse recurringPaymentCommandHandler orElse super.entityCommandHandler
+    paymentMethodCommandHandler orElse
+    preAuthorizationCommandHandler orElse
+    payInCommandHandler orElse
+    payOutCommandHandler orElse
+    recurringPaymentCommandHandler orElse
+    super.entityCommandHandler
   }
 
   /** @param entityId

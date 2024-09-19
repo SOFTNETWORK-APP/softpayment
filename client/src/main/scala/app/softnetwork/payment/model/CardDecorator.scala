@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import scala.util.{Failure, Success, Try}
 
-trait CardDecorator extends StrictLogging { self: Card =>
+trait CardDecorator extends PaymentMethod with StrictLogging { self: Card =>
   lazy val expired: Boolean = {
     val pattern =
       expirationDate.split("/").toSeq match {
@@ -37,6 +37,10 @@ trait CardDecorator extends StrictLogging { self: Card =>
       .withBirthday(birthday)
 
   lazy val view: CardView = model.CardView(self)
+
+  override val paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD
+
+  override lazy val enabled: Boolean = active.getOrElse(true) && !expired
 }
 
 case class CardView(
@@ -48,7 +52,7 @@ case class CardView(
   expirationDate: String,
   active: Boolean,
   expired: Boolean
-)
+) extends PaymentMethodView
 
 object CardView {
   def apply(card: Card): CardView = {

@@ -4,25 +4,36 @@ import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.concurrent.Completion
+import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.config.PaymentSettings.PaymentConfig.payInStatementDescriptor
-import app.softnetwork.payment.message.PaymentEvents.PaymentAccountUpsertedEvent
+import app.softnetwork.payment.message.PaymentEvents.{
+  PaymentAccountUpsertedEvent,
+  PaymentMethodRegisteredEvent,
+  WalletRegisteredEvent
+}
 import app.softnetwork.payment.message.PaymentMessages.{
   LoadPayInTransaction,
+  PaidIn,
   PayIn,
   PayInCallback,
   PayInCommand,
   PayInFailed,
   PayInTransactionLoaded,
+  PayInWithCardPreAuthorizedFailed,
+  PayInWithPreAuthorization,
   PaymentAccountNotFound,
+  PaymentRedirection,
+  PaymentRequired,
   PaymentResult,
   TransactionNotFound
 }
 import app.softnetwork.payment.message.TransactionEvents.{PaidInEvent, PayInFailedEvent}
-import app.softnetwork.payment.model.{PayInTransaction, PaymentAccount, Transaction}
+import app.softnetwork.payment.model.{Card, PayInTransaction, PaymentAccount, Paypal, Transaction}
 import app.softnetwork.persistence.now
 import app.softnetwork.persistence.typed._
 import app.softnetwork.scheduler.message.SchedulerEvents.ExternalSchedulerEvent
+import app.softnetwork.serialization.asJson
 import app.softnetwork.time._
 import org.slf4j.Logger
 
@@ -36,7 +47,6 @@ trait PayInCommandHandler
       PaymentResult
     ]
     with PaymentCommandHandler
-    with PayInHandler
     with CustomerHandler
     with Completion {
 
@@ -82,11 +92,25 @@ trait PayInCommandHandler
                     val cardId =
                       registrationId match {
                         case Some(id) =>
-                          createCard(id, registrationData)
+                          registerPaymentMethod(
+                            id,
+                            registrationData
+                          )
                         case _ =>
-                          paymentAccount.cards
-                            .find(card => card.active.getOrElse(true) && !card.expired)
-                            .map(_.id)
+                          cmd.paymentMethodId match {
+                            case Some(paymentMethodId) =>
+                              paymentAccount.cards
+                                .find(card => card.id == paymentMethodId) match {
+                                case Some(card) if card.enabled =>
+                                  Some(paymentMethodId)
+                                case Some(_) =>
+                                  log.warn(s"Card $paymentMethodId selected is disabled")
+                                  None
+                                case _ =>
+                                  None
+                              }
+                            case _ => None
+                          }
                       }
                     // load credited payment account
                     paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
@@ -95,6 +119,8 @@ trait PayInCommandHandler
                           case Some(creditedPaymentAccount) =>
                             creditedPaymentAccount.walletId match {
                               case Some(creditedWalletId) =>
+                                val registerMeansOfPayment =
+                                  cmd.registerMeansOfPayment.getOrElse(cmd.registerCard)
                                 payIn(
                                   Some(
                                     PayInTransaction.defaultInstance
@@ -104,17 +130,17 @@ trait PayInCommandHandler
                                       .withCurrency(currency)
                                       .withOrderUuid(orderUuid)
                                       .withCreditedWalletId(creditedWalletId)
-                                      .withCardId(cardId.orNull)
+                                      .withPaymentMethodId(cardId.orNull)
                                       .withPaymentType(paymentType)
                                       .withStatementDescriptor(
                                         statementDescriptor.getOrElse(payInStatementDescriptor)
                                       )
-                                      .withRegisterCard(registerCard)
+                                      .withRegisterMeansOfPayment(registerMeansOfPayment)
                                       .withPrintReceipt(printReceipt)
                                       .copy(
                                         ipAddress = ipAddress,
                                         browserInfo = browserInfo,
-                                        cardPreRegistrationId = registrationId
+                                        preRegistrationId = registrationId
                                       )
                                   )
                                 ) match {
@@ -124,7 +150,7 @@ trait PayInCommandHandler
                                       orderUuid,
                                       replyTo,
                                       paymentAccount,
-                                      registerCard,
+                                      registerMeansOfPayment,
                                       printReceipt,
                                       transaction,
                                       registerWallet
@@ -155,9 +181,32 @@ trait PayInCommandHandler
                   case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
                 }
 
-              case Transaction.PaymentType.PAYPAL => // TODO should be the default behavior
+              case Transaction.PaymentType.PAYPAL =>
                 paymentAccount.userId match {
                   case Some(userId) =>
+                    val paypalId =
+                      registrationId match {
+                        case Some(id) =>
+                          registerPaymentMethod(
+                            id,
+                            registrationData
+                          )
+                        case _ =>
+                          cmd.paymentMethodId match {
+                            case Some(paymentMethodId) =>
+                              paymentAccount.paypals
+                                .find(paypal => paypal.id == paymentMethodId) match {
+                                case Some(paypal) if paypal.enabled =>
+                                  Some(paymentMethodId)
+                                case Some(_) =>
+                                  log.warn(s"Paypal $paymentMethodId selected is disabled")
+                                  None
+                                case _ =>
+                                  None
+                              }
+                            case _ => None
+                          }
+                      }
                     // load credited payment account
                     paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
                       case Success(s) =>
@@ -165,6 +214,8 @@ trait PayInCommandHandler
                           case Some(creditedPaymentAccount) =>
                             creditedPaymentAccount.walletId match {
                               case Some(creditedWalletId) =>
+                                val registerMeansOfPayment =
+                                  cmd.registerMeansOfPayment.getOrElse(false)
                                 payIn(
                                   Some(
                                     PayInTransaction.defaultInstance
@@ -175,13 +226,16 @@ trait PayInCommandHandler
                                       .withCurrency(currency)
                                       .withOrderUuid(orderUuid)
                                       .withCreditedWalletId(creditedWalletId)
+                                      .withPaymentMethodId(paypalId.orNull)
                                       .withStatementDescriptor(
                                         statementDescriptor.getOrElse(payInStatementDescriptor)
                                       )
+                                      .withRegisterMeansOfPayment(registerMeansOfPayment)
                                       .withPrintReceipt(printReceipt)
                                       .copy(
                                         ipAddress = ipAddress,
-                                        browserInfo = browserInfo
+                                        browserInfo = browserInfo,
+                                        preRegistrationId = registrationId
                                       )
                                   )
                                 ) match {
@@ -191,7 +245,7 @@ trait PayInCommandHandler
                                       orderUuid,
                                       replyTo,
                                       paymentAccount,
-                                      registerCard = false,
+                                      registerMeansOfPayment,
                                       printReceipt = printReceipt,
                                       transaction,
                                       registerWallet
@@ -232,7 +286,7 @@ trait PayInCommandHandler
                         .withDebitedAccount(paymentAccount.externalUuid)
                         .withDebitedAmount(debitedAmount)
                         .withLastUpdated(now())
-                        .withCardId("")
+                        .withPaymentMethodId("")
                         .withPaymentType(paymentType)
                     )
                   )
@@ -263,7 +317,7 @@ trait PayInCommandHandler
                   orderUuid,
                   replyTo,
                   paymentAccount,
-                  registerCard = registerCard,
+                  registerMeansOfPayment = cmd.registerMeansOfPayment,
                   printReceipt = printReceipt,
                   transaction
                 )
@@ -297,6 +351,7 @@ trait PayInCommandHandler
                 loadPayInTransaction(orderUuid, transactionId, None) match {
                   case Some(t) =>
                     val lastUpdated = now()
+                    val paymentMethodId = t.paymentMethodId.orElse(transaction.paymentMethodId)
                     val updatedTransaction = transaction
                       .withStatus(t.status)
                       .withId(t.id)
@@ -307,7 +362,7 @@ trait PayInCommandHandler
                       .withResultCode(t.resultCode)
                       .withResultMessage(t.resultMessage)
                       .copy(
-                        cardId = t.cardId.orElse(transaction.cardId)
+                        paymentMethodId = paymentMethodId
                       )
                     val updatedPaymentAccount = paymentAccount
                       .withTransactions(
@@ -325,7 +380,7 @@ trait PayInCommandHandler
                               .withDebitedAccount(t.authorId)
                               .withDebitedAmount(t.amount)
                               .withLastUpdated(lastUpdated)
-                              .withCardId(t.cardId.orElse(transaction.cardId).getOrElse(""))
+                              .withPaymentMethodId(paymentMethodId.getOrElse(""))
                               .withPaymentType(t.paymentType)
                           ) :+
                           PaymentAccountUpsertedEvent.defaultInstance
@@ -367,7 +422,365 @@ trait PayInCommandHandler
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
 
+      case cmd: PayInWithPreAuthorization =>
+        import cmd._
+        state match {
+          case Some(paymentAccount) =>
+            val clientId = paymentAccount.clientId
+              .orElse(cmd.clientId)
+              .orElse(
+                internalClientId
+              )
+            log.info(s"pay in with pre authorization: $entityId -> ${asJson(cmd)}")
+            val maybeTransaction = paymentAccount.transactions
+              .filter(t =>
+                t.`type` == Transaction.TransactionType.PRE_AUTHORIZATION
+              ) //TODO check it
+              .find(_.id == preAuthorizationId)
+            maybeTransaction match {
+              case None =>
+                handlePayInWithPreAuthorizationFailure(
+                  "",
+                  replyTo,
+                  "PreAuthorizationTransactionNotFound"
+                )
+              case Some(preAuthorizationTransaction)
+                  if !Seq(
+                    Transaction.TransactionStatus.TRANSACTION_CREATED,
+                    Transaction.TransactionStatus.TRANSACTION_SUCCEEDED
+                  ).contains(
+                    preAuthorizationTransaction.status
+                  ) =>
+                handlePayInWithPreAuthorizationFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "IllegalPreAuthorizationTransactionStatus"
+                )
+              case Some(preAuthorizationTransaction)
+                  if preAuthorizationTransaction.preAuthorizationCanceled.getOrElse(false) =>
+                handlePayInWithPreAuthorizationFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "PreAuthorizationCanceled"
+                )
+              case Some(preAuthorizationTransaction)
+                  if preAuthorizationTransaction.preAuthorizationValidated.getOrElse(false) =>
+                handlePayInWithPreAuthorizationFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "PreAuthorizationValidated"
+                )
+              case Some(preAuthorizationTransaction)
+                  if preAuthorizationTransaction.preAuthorizationExpired.getOrElse(false) =>
+                handlePayInWithPreAuthorizationFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "PreAuthorizationExpired"
+                )
+              case Some(preAuthorizationTransaction)
+                  if debitedAmount.getOrElse(
+                    preAuthorizationTransaction.amount
+                  ) > preAuthorizationTransaction.amount =>
+                handlePayInWithPreAuthorizationFailure(
+                  preAuthorizationTransaction.orderUuid,
+                  replyTo,
+                  "DebitedAmountAbovePreAuthorizationAmount"
+                )
+              case Some(preAuthorizationTransaction) =>
+                // load credited payment account
+                paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
+                  case Success(s) =>
+                    s match {
+                      case Some(creditedPaymentAccount) =>
+                        val clientId = creditedPaymentAccount.clientId.orElse(
+                          internalClientId
+                        )
+                        val paymentProvider = loadPaymentProvider(clientId)
+                        import paymentProvider._
+                        creditedPaymentAccount.walletId match {
+                          case Some(creditedWalletId) =>
+                            payIn(
+                              Some(
+                                PayInTransaction.defaultInstance
+                                  .withPaymentType(Transaction.PaymentType.PREAUTHORIZED)
+                                  .withPreAuthorizedTransactionId(preAuthorizationId)
+                                  .withAuthorId(preAuthorizationTransaction.authorId)
+                                  .withDebitedAmount(
+                                    debitedAmount.getOrElse(preAuthorizationTransaction.amount)
+                                  )
+                                  .withCurrency(preAuthorizationTransaction.currency)
+                                  .withOrderUuid(preAuthorizationTransaction.orderUuid)
+                                  .withCreditedWalletId(creditedWalletId)
+                                  .withPreAuthorizationDebitedAmount(
+                                    preAuthorizationTransaction.amount
+                                  )
+                                  .copy(
+                                    feesAmount = feesAmount.getOrElse(0),
+                                    preRegistrationId =
+                                      preAuthorizationTransaction.preRegistrationId
+                                  )
+                              )
+                            ) match {
+                              case Some(transaction) =>
+                                handlePayIn(
+                                  entityId,
+                                  transaction.orderUuid,
+                                  replyTo,
+                                  paymentAccount,
+                                  registerMeansOfPayment = false,
+                                  printReceipt = false,
+                                  transaction
+                                )
+                              case _ =>
+                                handlePayInWithPreAuthorizationFailure(
+                                  preAuthorizationTransaction.orderUuid,
+                                  replyTo,
+                                  "TransactionNotSpecified"
+                                )
+                            }
+                          case _ =>
+                            handlePayInWithPreAuthorizationFailure(
+                              preAuthorizationTransaction.orderUuid,
+                              replyTo,
+                              "CreditedWalletNotFound"
+                            )
+                        }
+                      case _ =>
+                        handlePayInWithPreAuthorizationFailure(
+                          preAuthorizationTransaction.orderUuid,
+                          replyTo,
+                          "CreditedPaymentAccountNotFound"
+                        )
+                    }
+                  case Failure(_) =>
+                    handlePayInWithPreAuthorizationFailure(
+                      preAuthorizationTransaction.orderUuid,
+                      replyTo,
+                      "CreditedPaymentAccountNotFound"
+                    )
+                }
+            }
+          case _ =>
+            handlePayInWithPreAuthorizationFailure(
+              "",
+              replyTo,
+              "PaymentAccountNotFound"
+            )
+        }
+
     }
+  }
+
+  @InternalApi
+  private[payment] def handlePayIn(
+    entityId: String,
+    orderUuid: String,
+    replyTo: Option[ActorRef[PaymentResult]],
+    paymentAccount: PaymentAccount,
+    registerMeansOfPayment: Boolean,
+    printReceipt: Boolean,
+    transaction: Transaction,
+    registerWallet: Boolean = false
+  )(implicit
+    system: ActorSystem[_],
+    log: Logger,
+    softPayClientSettings: SoftPayClientSettings
+  ): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
+    keyValueDao.addKeyValue(
+      transaction.id,
+      entityId
+    ) // add transaction id as a key for this payment account
+    val lastUpdated = now()
+    var updatedPaymentAccount =
+      paymentAccount
+        .withTransactions(
+          paymentAccount.transactions
+            .filterNot(_.id == transaction.id) :+ transaction
+        )
+        .withLastUpdated(lastUpdated)
+    val walletEvents: List[ExternalSchedulerEvent] =
+      if (registerWallet) {
+        List(
+          WalletRegisteredEvent.defaultInstance
+            .withOrderUuid(orderUuid)
+            .withExternalUuid(paymentAccount.externalUuid)
+            .withLastUpdated(lastUpdated)
+            .copy(
+              userId = paymentAccount.userId.get,
+              walletId = paymentAccount.walletId.get
+            )
+        )
+      } else {
+        List.empty
+      }
+    transaction.status match {
+      case Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT
+          if transaction.paymentClientReturnUrl.isDefined =>
+        Effect
+          .persist(
+            PaymentAccountUpsertedEvent.defaultInstance
+              .withDocument(updatedPaymentAccount)
+              .withLastUpdated(lastUpdated) +: walletEvents
+          )
+          .thenRun(_ =>
+            PaymentRequired(
+              transaction.id,
+              transaction.paymentClientSecret.getOrElse(""),
+              transaction.paymentClientData.getOrElse(""),
+              transaction.paymentClientReturnUrl.get
+            ) ~> replyTo
+          )
+      case Transaction.TransactionStatus.TRANSACTION_CREATED
+          if transaction.redirectUrl.isDefined => // 3ds | PayPal
+        Effect
+          .persist(
+            PaymentAccountUpsertedEvent.defaultInstance
+              .withDocument(updatedPaymentAccount)
+              .withLastUpdated(lastUpdated) +: walletEvents
+          )
+          .thenRun(_ => PaymentRedirection(transaction.redirectUrl.get) ~> replyTo)
+      case _ =>
+        if (transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated) {
+          log.debug("Order-{} paid in: {} -> {}", orderUuid, transaction.id, asJson(transaction))
+          val clientId = paymentAccount.clientId.orElse(
+            Option(softPayClientSettings.clientId)
+          )
+          val paymentProvider = loadPaymentProvider(clientId)
+          import paymentProvider._
+          val registerPaymentMethodEvents: List[ExternalSchedulerEvent] =
+            if (registerMeansOfPayment) {
+              transaction.paymentMethodId match {
+                case Some(paymentMethodId) =>
+                  loadPaymentMethod(paymentMethodId) match {
+                    case Some(paymentMethod) =>
+                      paymentMethod match {
+                        case card: Card =>
+                          val updatedCard = updatedPaymentAccount.maybeUser match {
+                            case Some(user) =>
+                              card
+                                .withFirstName(user.firstName)
+                                .withLastName(user.lastName)
+                                .withBirthday(user.birthday)
+                            case _ => card
+                          }
+                          updatedPaymentAccount = updatedPaymentAccount.withCards(
+                            updatedPaymentAccount.cards.filterNot(
+                              _.id == updatedCard.id
+                            ) :+ updatedCard
+                          )
+                          List(
+                            PaymentMethodRegisteredEvent.defaultInstance
+                              .withOrderUuid(orderUuid)
+                              .withExternalUuid(paymentAccount.externalUuid)
+                              .withCard(updatedCard)
+                              .withLastUpdated(lastUpdated)
+                          )
+                        case paypal: Paypal =>
+                          updatedPaymentAccount = updatedPaymentAccount.withPaypals(
+                            updatedPaymentAccount.paypals.filterNot(_.id == paypal.id) :+ paypal
+                          )
+                          List(
+                            PaymentMethodRegisteredEvent.defaultInstance
+                              .withOrderUuid(orderUuid)
+                              .withExternalUuid(paymentAccount.externalUuid)
+                              .withPaypal(paypal)
+                              .withLastUpdated(lastUpdated)
+                          )
+                        case _ => List.empty
+                      }
+                    case _ => List.empty
+                  }
+                case _ => List.empty
+              }
+            } else {
+              List.empty
+            }
+          updatedPaymentAccount = transaction.preAuthorizationId match {
+            case Some(preAuthorizationId) =>
+              transaction.preAuthorizationDebitedAmount match {
+                case Some(preAuthorizationDebitedAmount)
+                    if transaction.amount < preAuthorizationDebitedAmount =>
+                  // validation required
+                  val updatedTransaction = updatedPaymentAccount.transactions
+                    .find(_.id == preAuthorizationId)
+                    .map(
+                      _.copy(
+                        preAuthorizationValidated = Some(
+                          validatePreAuthorization(
+                            transaction.orderUuid,
+                            preAuthorizationId
+                          )
+                        ),
+                        clientId = clientId
+                      )
+                    )
+                  updatedPaymentAccount.withTransactions(
+                    updatedPaymentAccount.transactions.filterNot(_.id == preAuthorizationId) ++ Seq(
+                      updatedTransaction
+                    ).flatten
+                  )
+                case _ => updatedPaymentAccount
+              }
+            case _ => updatedPaymentAccount
+          }
+          Effect
+            .persist(
+              registerPaymentMethodEvents ++
+              List(
+                PaidInEvent.defaultInstance
+                  .withOrderUuid(orderUuid)
+                  .withTransactionId(transaction.id)
+                  .withDebitedAccount(paymentAccount.externalUuid)
+                  .withDebitedAmount(transaction.amount)
+                  .withLastUpdated(lastUpdated)
+                  .withPaymentMethodId(transaction.paymentMethodId.getOrElse(""))
+                  .withPaymentType(transaction.paymentType)
+                  .withPrintReceipt(printReceipt)
+              ) ++
+              (PaymentAccountUpsertedEvent.defaultInstance
+                .withDocument(updatedPaymentAccount)
+                .withLastUpdated(lastUpdated) +: walletEvents)
+            )
+            .thenRun(_ => PaidIn(transaction.id, transaction.status) ~> replyTo)
+        } else {
+          log.error(
+            "Order-{} could not be paid in: {} -> {}",
+            orderUuid,
+            transaction.id,
+            asJson(transaction)
+          )
+          Effect
+            .persist(
+              List(
+                PayInFailedEvent.defaultInstance
+                  .withOrderUuid(orderUuid)
+                  .withResultMessage(transaction.resultMessage)
+                  .withTransaction(transaction)
+              ) ++
+              (PaymentAccountUpsertedEvent.defaultInstance
+                .withDocument(updatedPaymentAccount)
+                .withLastUpdated(lastUpdated) +: walletEvents)
+            )
+            .thenRun(_ =>
+              PayInFailed(transaction.id, transaction.status, transaction.resultMessage) ~> replyTo
+            )
+        }
+    }
+  }
+
+  private[payment] def handlePayInWithPreAuthorizationFailure(
+    orderUuid: String,
+    replyTo: Option[ActorRef[PaymentResult]],
+    reason: String
+  )(implicit context: ActorContext[_]): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
+
+    Effect
+      .persist(
+        List(
+          PayInFailedEvent.defaultInstance.withOrderUuid(orderUuid).withResultMessage(reason)
+        )
+      )
+      .thenRun(_ => PayInWithCardPreAuthorizedFailed(reason) ~> replyTo)
   }
 
 }

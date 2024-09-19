@@ -45,11 +45,11 @@ trait PaymentServer extends PaymentServiceApi with PaymentDao {
     }
   }
 
-  override def payInWithCardPreAuthorized(
-    in: PayInWithCardPreAuthorizedRequest
+  override def payInWithPreAuthorization(
+    in: PayInWithPreAuthorizationRequest
   ): Future[TransactionResponse] = {
     import in._
-    payInWithCardPreAuthorized(
+    payInWithPreAuthorization(
       preAuthorizationId,
       creditedAccount,
       debitedAmount,

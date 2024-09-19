@@ -7,14 +7,14 @@ import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
-import sttp.model.{HeaderNames, Method, StatusCode}
 import sttp.model.headers.CookieValueWithMeta
+import sttp.model.{HeaderNames, Method, StatusCode}
 import sttp.tapir.json.json4s.jsonBody
 import sttp.tapir.server.{PartialServerEndpointWithSecurityOutput, ServerEndpoint}
 
 import scala.concurrent.Future
 
-trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
+trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   _: RootPaymentEndpoints[SD] with PaymentHandler =>
 
   import app.softnetwork.serialization._
@@ -40,7 +40,7 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           .example(payment)
       )
 
-  val preAuthorizeCard: ServerEndpoint[Any with AkkaStreams, Future] =
+  val preAuthorize: ServerEndpoint[Any with AkkaStreams, Future] =
     payment(
       Payment(
         "pre-authorize-order-96",
@@ -51,14 +51,14 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         printReceipt = true
       )
     )
-      .in(PaymentSettings.PaymentConfig.preAuthorizeCardRoute)
+      .in(PaymentSettings.PaymentConfig.preAuthorizeRoute)
       .in(paths.description("optional credited account"))
       .post
       .out(
         oneOf[PaymentResult](
-          oneOfVariant[CardPreAuthorized](
+          oneOfVariant[PaymentPreAuthorized](
             statusCode(StatusCode.Ok)
-              .and(jsonBody[CardPreAuthorized].description("Card pre authorization transaction id"))
+              .and(jsonBody[PaymentPreAuthorized].description("Card pre authorized transaction id"))
           ),
           oneOfVariant[PaymentRedirection](
             statusCode(StatusCode.Accepted)
@@ -79,7 +79,7 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
           import payment._
           run(
-            PreAuthorizeCard(
+            PreAuthorize(
               orderUuid,
               externalUuidWithProfile(principal._2),
               debitedAmount,
@@ -92,37 +92,39 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               printReceipt,
               creditedAccount.headOption,
               feesAmount,
-              user = user // required for Pre authorize without pre registered card
+              user = user, // required for Pre authorize without pre registered card
+              paymentMethodId = paymentMethodId,
+              registerMeansOfPayment = registerMeansOfPayment
             )
           ).map {
-            case result: CardPreAuthorized  => Right(result)
-            case result: PaymentRedirection => Right(result)
-            case result: PaymentRequired    => Right(result)
-            case other                      => Left(error(other))
+            case result: PaymentPreAuthorized => Right(result)
+            case result: PaymentRedirection   => Right(result)
+            case result: PaymentRequired      => Right(result)
+            case other                        => Left(error(other))
           }
       })
       .description("Pre authorize card")
 
-  val preAuthorizeCardCallback: ServerEndpoint[Any with AkkaStreams, Future] =
+  val preAuthorizeCallback: ServerEndpoint[Any with AkkaStreams, Future] =
     rootEndpoint
       .in(
-        PaymentSettings.PaymentConfig.callbacksRoute / PaymentSettings.PaymentConfig.preAuthorizeCardRoute
+        PaymentSettings.PaymentConfig.callbacksRoute / PaymentSettings.PaymentConfig.preAuthorizeRoute
       )
       .in(path[String].description("Order uuid"))
       .in(queryParams)
       .description("Pre authorization query parameters")
-      /*.in(query[String]("preAuthorizationId").description("Pre authorization transaction id"))
+      /*.in(query[String]("preAuthorizationId").description("pre authorized transaction id"))
       .in(
-        query[Boolean]("registerCard").description(
-          "Whether to register or not the card after successfully pre authorization"
+        query[Boolean]("registerMeansOfPayment").description(
+          "Whether to register or not the payment method after pre authorization"
         )
       )
       .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))*/
       .out(
         oneOf[PaymentResult](
-          oneOfVariant[CardPreAuthorized](
+          oneOfVariant[PaymentPreAuthorized](
             statusCode(StatusCode.Ok)
-              .and(jsonBody[CardPreAuthorized].description("Card pre authorization transaction Id"))
+              .and(jsonBody[PaymentPreAuthorized].description("Card pre authorized transaction Id"))
           ),
           oneOfVariant[PaymentRedirection](
             statusCode(StatusCode.Accepted)
@@ -139,14 +141,15 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         val preAuthorizationIdParameter =
           params.get("preAuthorizationIdParameter").getOrElse("preAuthorizationId")
         val preAuthorizationId = params.get(preAuthorizationIdParameter).getOrElse("")
-        val registerCard = params.get("registerCard").getOrElse("false").toBoolean
+        val registerMeansOfPayment =
+          params.get("registerMeansOfPayment").getOrElse("false").toBoolean
         val printReceipt = params.get("printReceipt").getOrElse("false").toBoolean
         run(
-          PreAuthorizeCardCallback(orderUuid, preAuthorizationId, registerCard, printReceipt)
+          PreAuthorizeCallback(orderUuid, preAuthorizationId, registerMeansOfPayment, printReceipt)
         ).map {
-          case result: CardPreAuthorized  => Right(result)
-          case result: PaymentRedirection => Right(result)
-          case other                      => Left(error(other))
+          case result: PaymentPreAuthorized => Right(result)
+          case result: PaymentRedirection   => Right(result)
+          case other                        => Left(error(other))
         }
       }
 
@@ -201,6 +204,8 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               printReceipt,
               feesAmount,
               user = user, // required for Pay in without registered card (eg PayPal)
+              registerMeansOfPayment = registerMeansOfPayment,
+              paymentMethodId = paymentMethodId,
               clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
             )
           ).map {
@@ -241,10 +246,11 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         val transactionIdParameter =
           params.get("transactionIdParameter").getOrElse("transactionId")
         val transactionId = params.get(transactionIdParameter).getOrElse("")
-        val registerCard = params.get("registerCard").getOrElse("false").toBoolean
+        val registerMeansOfPayment =
+          params.get("registerMeansOfPayment").getOrElse("false").toBoolean
         val printReceipt = params.get("printReceipt").getOrElse("false").toBoolean
         run(
-          PayInCallback(orderUuid, transactionId, registerCard, printReceipt)
+          PayInCallback(orderUuid, transactionId, registerMeansOfPayment, printReceipt)
         ).map {
           case result: PaidIn             => Right(result)
           case result: PaymentRedirection => Right(result)
@@ -331,8 +337,8 @@ trait CardPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
 
   val cardPaymentEndpoints: List[ServerEndpoint[AkkaStreams with capabilities.WebSockets, Future]] =
     List(
-      preAuthorizeCard,
-      preAuthorizeCardCallback,
+      preAuthorize,
+      preAuthorizeCallback,
       payIn,
       payInCallback,
       executeFirstRecurringCardPayment,

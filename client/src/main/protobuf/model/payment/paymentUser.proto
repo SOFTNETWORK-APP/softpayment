@@ -149,6 +149,7 @@ message PaymentAccount {
     repeated RecurringPayment recurryingPayments = 11;
     optional string clientId = 12;
     repeated Mandate mandates = 13;
+    repeated Paypal paypals = 14;
 }
 
 message Business {

@@ -5,6 +5,7 @@ import "google/protobuf/timestamp.proto";
 import "model/payment/card.proto";
 import "model/payment/document.proto";
 import "model/payment/paymentUser.proto";
+import "model/payment/transaction.proto";
 
 package app.softnetwork.payment.message.PaymentEvents;
 
@@ -51,6 +52,20 @@ message CardPreRegisteredEvent {
     required app.softnetwork.payment.model.CardOwner owner = 7;
 }
 
+message PaymentMethodPreRegisteredEvent {
+    option (scalapb.message).extends = "ProtobufEvent";
+    option (scalapb.message).extends = "PaymentAccountEvent";
+    option (scalapb.message).extends = "BroadcastEvent";
+    required string orderUuid = 1;
+    required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
+    required string externalUuid = 3;
+    required string userId = 4;
+    required string walletId = 5;
+    required string preRegistrationId = 6;
+    required app.softnetwork.payment.model.Transaction.PaymentType paymentType = 7;
+    optional app.softnetwork.payment.model.CardOwner owner = 8;
+}
+
 message CardRegisteredEvent {
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "PaymentAccountEvent";
@@ -59,6 +74,19 @@ message CardRegisteredEvent {
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     required string externalUuid = 3;
     required app.softnetwork.payment.model.Card card = 4;
+}
+
+message PaymentMethodRegisteredEvent {
+    option (scalapb.message).extends = "ProtobufEvent";
+    option (scalapb.message).extends = "PaymentAccountEvent";
+    option (scalapb.message).extends = "BroadcastEvent";
+    required string orderUuid = 1;
+    required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
+    required string externalUuid = 3;
+    oneof paymentMethod {
+        app.softnetwork.payment.model.Card card = 4;
+        app.softnetwork.payment.model.Paypal paypal = 5;
+    }
 }
 
 message PaymentAccountUpsertedEvent {
@@ -167,7 +195,7 @@ message ExternalEntityToPaymentEvent{
     option (scalapb.message).extends = "PaymentEventWithCommand";
     option (scalapb.message).extends = "ExternalEntityToPaymentEventDecorator";
     oneof wrapped {
-        PayInWithCardPreAuthorizedCommandEvent payInWithCardPreAuthorized = 1;
+        PayInWithPreAuthorizationCommandEvent payInWithPreAuthorization = 1;
         RefundCommandEvent refund = 2;
         PayOutCommandEvent payOut = 3;
         TransferCommandEvent transfer = 4;
@@ -180,7 +208,7 @@ message ExternalEntityToPaymentEvent{
     }
 }
 
-message PayInWithCardPreAuthorizedCommandEvent{
+message PayInWithPreAuthorizationCommandEvent{
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "PaymentCommandEvent";
     required string preAuthorizationId = 1;

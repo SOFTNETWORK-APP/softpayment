@@ -65,7 +65,7 @@ message Transaction {
     required int32 amount = 9;
     required string currency = 10 [default = "EUR"];
     required int32 fees = 11 [default = 0];
-    optional string cardId =  12;
+    optional string paymentMethodId =  12;
     required string resultCode = 13;
     required string resultMessage = 14;
     optional string redirectUrl = 15 [default = ""]; // for 3D Secure
@@ -84,7 +84,7 @@ message Transaction {
     optional bool preAuthorizationExpired = 28;
     optional int32 preAuthorizationDebitedAmount = 29;
     optional string returnUrl = 30;
-    optional string payPalBuyerAccountEmail = 31;
+    optional string payPalPayerEmail = 31;
     optional string idempotencyKey = 32;
     optional string clientId = 33;
     optional string paymentClientSecret = 34;
@@ -93,6 +93,7 @@ message Transaction {
     optional string sourceTransactionId = 37;
     optional int32 transferAmount = 38;
     optional string preRegistrationId = 39;
+    optional string payPalPayerId = 40;
 }
 
 message BrowserInfo {
@@ -119,14 +120,14 @@ message PayInTransaction {
     required string authorId = 6;
     required string statementDescriptor = 7;
     required Transaction.PaymentType paymentType = 8 [default = CARD];
-    optional string cardId = 9;
+    optional string paymentMethodId = 9;
     optional string ipAddress = 10;
     optional BrowserInfo browserInfo = 11;
-    optional bool registerCard = 12;
+    optional bool registerMeansOfPayment = 12;
     optional bool printReceipt = 13;
-    optional string cardPreAuthorizedTransactionId = 14;
+    optional string preAuthorizedTransactionId = 14;
     optional int32 preAuthorizationDebitedAmount = 15;
-    optional string cardPreRegistrationId = 16;
+    optional string preRegistrationId = 16;
 }
 
 message PayInWithCardTransaction {
@@ -143,7 +144,7 @@ message PayInWithCardTransaction {
     optional bool registerCard = 10;
     optional bool printReceipt = 11;
     optional string statementDescriptor = 12;
-    optional string cardPreRegistrationId = 13;
+    optional string preRegistrationId = 13;
 }
 
 message PayInWithPayPalTransaction {
@@ -157,9 +158,11 @@ message PayInWithPayPalTransaction {
     optional string language = 7;
     optional string statementDescriptor = 8;
     optional bool printReceipt = 9;
-    optional string payPalWalletId = 10;
+    optional string paypalId = 10;
     optional string ipAddress = 11;
     optional BrowserInfo browserInfo = 12;
+    optional bool registerPaypal = 13;
+    optional string preRegistrationId = 14;
 }
 
 message RefundTransaction {
@@ -223,29 +226,30 @@ message PreAuthorizationTransaction {
     required int32 debitedAmount = 2;
     required string currency = 3 [default = "EUR"];
     required string authorId = 4;
-    optional string cardId = 5;
+    optional string paymentMethodId = 5;
     optional string ipAddress = 6;
     optional BrowserInfo browserInfo = 7;
-    optional bool registerCard = 8;
+    optional bool registerMeansOfPayment = 8;
     optional bool printReceipt = 9;
     optional string creditedUserId = 10;
     optional int32 feesAmount = 11;
     optional string statementDescriptor = 12;
     optional string preRegistrationId = 13;
+    required Transaction.PaymentType paymentType = 14 [default = CARD];
 }
 
-message PayInWithCardPreAuthorizedTransaction {
+message PayInWithPreAuthorization {
     option (scalapb.message).extends = "ProtobufDomainObject";
     required string orderUuid = 1;
     required int32 debitedAmount = 2;
     required string currency = 3 [default = "EUR"];
     required string creditedWalletId = 4;
     required string authorId = 5;
-    required string cardPreAuthorizedTransactionId = 6;
+    required string preAuthorizedTransactionId = 6;
     required int32 preAuthorizationDebitedAmount = 7;
     optional int32 feesAmount = 8;
     optional string statementDescriptor = 9;
-    optional string cardPreRegistrationId = 10;
+    optional string preRegistrationId = 10;
 }
 
 message CardPreRegistration{
@@ -255,6 +259,15 @@ message CardPreRegistration{
     required string preregistrationData = 3;
     required string cardRegistrationURL = 4;
     required bool registerCard = 5;
+}
+
+message PreRegistration{
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    required string id = 1;
+    required string secretKey = 2;
+    optional string registrationData = 3;
+    optional string registrationURL = 4;
+    required bool registerMeansOfPayment = 5;
 }
 
 message RecurringPaymentTransaction{

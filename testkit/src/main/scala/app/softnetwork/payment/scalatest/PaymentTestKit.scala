@@ -118,17 +118,17 @@ trait PaymentTestKit
     printReceipt: Boolean = false
   )(implicit
     ec: ExecutionContext
-  ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
-    MockPaymentHandler !? PreAuthorizeCardCallback(
+  ): Future[Either[PreAuthorizationFailed, Either[PaymentRedirection, PaymentPreAuthorized]]] = {
+    MockPaymentHandler !? PreAuthorizeCallback(
       orderUuid,
       preAuthorizationId,
       registerCard,
       printReceipt
     ) map {
-      case result: PaymentRedirection        => Right(Left(result))
-      case result: CardPreAuthorized         => Right(Right(result))
-      case error: CardPreAuthorizationFailed => Left(error)
-      case _                                 => Left(CardPreAuthorizationFailed("unknown"))
+      case result: PaymentRedirection    => Right(Left(result))
+      case result: PaymentPreAuthorized  => Right(Right(result))
+      case error: PreAuthorizationFailed => Left(error)
+      case _                             => Left(PreAuthorizationFailed("unknown"))
     }
   }
 

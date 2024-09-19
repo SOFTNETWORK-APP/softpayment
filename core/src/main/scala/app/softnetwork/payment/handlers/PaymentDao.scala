@@ -6,7 +6,7 @@ import app.softnetwork.kv.handlers.GenericKeyValueDao
 import app.softnetwork.payment.annotation.InternalApi
 import app.softnetwork.payment.message.PaymentMessages.{MandateCanceled, _}
 import app.softnetwork.persistence.typed.scaladsl.EntityPattern
-import app.softnetwork.payment.model._
+import app.softnetwork.payment.model.{PayInWithPreAuthorization => _, _}
 import app.softnetwork.payment.persistence.typed.PaymentBehavior
 import app.softnetwork.persistence._
 import app.softnetwork.persistence.typed.CommandTypeKey
@@ -111,7 +111,9 @@ trait PaymentDao extends PaymentHandler {
     browserInfo: Option[BrowserInfo] = None,
     statementDescriptor: Option[String] = None,
     paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
-    printReceipt: Boolean = false
+    printReceipt: Boolean = false,
+    registerMeansOfPayment: Option[Boolean],
+    paymentMethodId: Option[String]
   )(implicit
     system: ActorSystem[_]
   ): Future[Either[PayInFailed, Either[PaymentRedirection, PaidIn]]] = {
@@ -130,7 +132,9 @@ trait PaymentDao extends PaymentHandler {
         browserInfo,
         statementDescriptor,
         paymentType,
-        printReceipt
+        printReceipt,
+        registerMeansOfPayment = registerMeansOfPayment,
+        paymentMethodId = paymentMethodId
       )
     ) map {
       case result: PaymentRedirection => Right(Left(result))
@@ -141,7 +145,7 @@ trait PaymentDao extends PaymentHandler {
     }
   }
 
-  def preAuthorizeCard(
+  def preAuthorize(
     orderUuid: String,
     debitedAccount: String,
     debitedAmount: Int = 100,
@@ -153,13 +157,17 @@ trait PaymentDao extends PaymentHandler {
     browserInfo: Option[BrowserInfo] = None,
     printReceipt: Boolean = false,
     creditedAccount: Option[String] = None,
-    feesAmount: Option[Int] = None
+    feesAmount: Option[Int] = None,
+    user: Option[NaturalUser] = None,
+    paymentType: Transaction.PaymentType = Transaction.PaymentType.CARD,
+    paymentMethodId: Option[String] = None,
+    registerMeansOfPayment: Option[Boolean] = None
   )(implicit
     system: ActorSystem[_]
-  ): Future[Either[CardPreAuthorizationFailed, Either[PaymentRedirection, CardPreAuthorized]]] = {
+  ): Future[Either[PreAuthorizationFailed, Either[PaymentRedirection, PaymentPreAuthorized]]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
     !?(
-      PreAuthorizeCard(
+      PreAuthorize(
         orderUuid,
         debitedAccount,
         debitedAmount,
@@ -171,24 +179,28 @@ trait PaymentDao extends PaymentHandler {
         browserInfo,
         printReceipt,
         creditedAccount,
-        feesAmount
+        feesAmount,
+        user = user,
+        paymentType = paymentType,
+        paymentMethodId = paymentMethodId,
+        registerMeansOfPayment = registerMeansOfPayment
       )
     ) map {
-      case result: PaymentRedirection        => Right(Left(result))
-      case result: CardPreAuthorized         => Right(Right(result))
-      case error: CardPreAuthorizationFailed => Left(error)
-      case _                                 => Left(CardPreAuthorizationFailed("unknown"))
+      case result: PaymentRedirection    => Right(Left(result))
+      case result: PaymentPreAuthorized  => Right(Right(result))
+      case error: PreAuthorizationFailed => Left(error)
+      case _                             => Left(PreAuthorizationFailed("unknown"))
     }
   }
 
   @InternalApi
   private[payment] def cancelPreAuthorization(
     orderUuid: String,
-    cardPreAuthorizedTransactionId: String,
+    preAuthorizationId: String,
     clientId: Option[String] = None
   )(implicit system: ActorSystem[_]): Future[Either[String, PreAuthorizationCanceled]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    !?(CancelPreAuthorization(orderUuid, cardPreAuthorizedTransactionId, clientId)) map {
+    !?(CancelPreAuthorization(orderUuid, preAuthorizationId, clientId)) map {
       case result: PreAuthorizationCanceled => Right(result)
       case error: PaymentError              => Left(error.message)
       case _                                => Left("unknown")
@@ -196,7 +208,7 @@ trait PaymentDao extends PaymentHandler {
   }
 
   @InternalApi
-  private[payment] def payInWithCardPreAuthorized(
+  private[payment] def payInWithPreAuthorization(
     preAuthorizationId: String,
     creditedAccount: String,
     debitedAmount: Option[Int],
@@ -207,7 +219,7 @@ trait PaymentDao extends PaymentHandler {
   ): Future[Either[PayInFailed, PaidIn]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
     !?(
-      PayInWithCardPreAuthorized(
+      PayInWithPreAuthorization(
         preAuthorizationId,
         creditedAccount,
         debitedAmount,

@@ -2,9 +2,9 @@ package app.softnetwork.payment.spi
 
 import app.softnetwork.payment.model.{
   PayInTransaction,
-  PayInWithCardPreAuthorizedTransaction,
   PayInWithCardTransaction,
   PayInWithPayPalTransaction,
+  PayInWithPreAuthorization,
   Transaction
 }
 
@@ -27,7 +27,7 @@ trait PayInApi { _: PaymentContext =>
           case Transaction.PaymentType.CARD =>
             payInWithCard(payInTransaction.cardTransaction, idempotency)
           case Transaction.PaymentType.PREAUTHORIZED =>
-            payInWithCardPreAuthorized(payInTransaction.cardPreAuthorizedTransaction, idempotency)
+            payInWithPreAuthorization(payInTransaction.preAuthorizationTransaction, idempotency)
           case Transaction.PaymentType.PAYPAL =>
             payInWithPayPal(payInTransaction.payPalTransaction, idempotency)
           case _ => None
@@ -36,15 +36,15 @@ trait PayInApi { _: PaymentContext =>
     }
   }
 
-  /** @param payInWithCardPreAuthorizedTransaction
-    *   - card pre authorized pay in transaction
+  /** @param payInWithPreAuthorization
+    *   - pay in with pre authorization transaction
     * @param idempotency
     *   - whether to use an idempotency key for this request or not
     * @return
     *   pay in with card pre authorized transaction result
     */
-  private[spi] def payInWithCardPreAuthorized(
-    payInWithCardPreAuthorizedTransaction: Option[PayInWithCardPreAuthorizedTransaction],
+  private[spi] def payInWithPreAuthorization(
+    payInWithPreAuthorization: Option[PayInWithPreAuthorization],
     idempotency: Option[Boolean] = None
   ): Option[Transaction]
 

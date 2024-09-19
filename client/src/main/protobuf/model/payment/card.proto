@@ -26,6 +26,7 @@ message Card {
     optional bool active = 7;
     optional string holderName = 8;
     optional string brand = 9;
+    optional string fingerprint = 10;
 }
 
 message CardOwner {
@@ -33,4 +34,14 @@ message CardOwner {
     required string firstName = 2;
     required string lastName = 3;
     required string birthday = 4;
+}
+
+message Paypal {
+    option (scalapb.message).extends = "ProtobufDomainObject";
+    option (scalapb.message).extends = "PaypalDecorator";
+    required string id = 1;
+    required string payerId = 2;
+    optional string payerEmail = 3;
+    optional bool active = 4;
+    optional string hash = 5;
 }
