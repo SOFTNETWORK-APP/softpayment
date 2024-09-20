@@ -297,7 +297,7 @@ trait PaymentMethodCommandHandler
                     val paymentProvider = loadPaymentProvider(clientId)
                     import paymentProvider._
                     disablePaymentMethod(cmd.paymentMethodId) match {
-                      case Some(paymentMethod) =>
+                      case Some(_) =>
                         val lastUpdated = now()
                         val updatedPaymentAccount =
                           paymentMethod match {

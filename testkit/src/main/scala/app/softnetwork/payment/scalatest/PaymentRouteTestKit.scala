@@ -64,6 +64,15 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     }
   }
 
+  def loadPaymentMethods(): PaymentMethodsView = {
+    withHeaders(
+      Get(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$paymentMethodRoute")
+    ) ~> routes ~> check {
+      status shouldEqual StatusCodes.OK
+      responseAs[PaymentMethodsView]
+    }
+  }
+
   def loadBankAccount(): BankAccountView = {
     withHeaders(
       Get(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute")

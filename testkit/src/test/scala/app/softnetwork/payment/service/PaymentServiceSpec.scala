@@ -778,7 +778,7 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    "disable card" in {
+    "disable card(s)" in {
       createNewSession(customerSession)
       withHeaders(
         Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute?cardId=$cardId")
@@ -807,6 +807,108 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         assert(card.map(_.lastName).getOrElse("") == lastName)
         assert(card.map(_.birthday).getOrElse("") == birthday)
         assert(card.exists(!_.getActive))
+      }
+      loadCards()
+        .filter(_.getActive)
+        .foreach(card =>
+          withHeaders(
+            Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute?cardId=${card.id}")
+          ) ~> routes ~> check {
+            status shouldEqual StatusCodes.OK
+          }
+        )
+    }
+
+    "pre register payment method" in {
+      createNewSession(customerSession)
+      val command =
+        PreRegisterPaymentMethod(
+          orderUuid,
+          naturalUser
+        )
+      log.info(s"pre register payment method command: ${serialization.write(command)}")
+      withHeaders(
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$paymentMethodRoute", command)
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        preRegistration = responseAs[PreRegistration]
+        log.info(s"pre registration: ${serialization.write(preRegistration)}")
+      }
+    }
+
+    "pre authorize payment method" in {
+      val payment =
+        Payment(
+          orderUuid,
+          debitedAmount,
+          "EUR",
+          Some(preRegistration.id),
+          preRegistration.registrationData,
+          registerCard = true,
+          printReceipt = true,
+          feesAmount = Some(feesAmount),
+          user = Option(naturalUser)
+        )
+      log.info(s"pre authorize payment: ${serialization.write(payment)}")
+      withHeaders(
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute", payment)
+          .withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.Accepted
+        val redirection = responseAs[PaymentRedirection]
+        val params = redirection.redirectUrl
+          .split("\\?")
+          .last
+          .split("[&=]")
+          .grouped(2)
+          .map(a => (a(0), a(1)))
+          .toMap
+        preAuthorizationId = params.getOrElse("preAuthorizationId", "")
+        assert(params.getOrElse("printReceipt", "") == "true")
+      }
+    }
+
+    "pre authorize payment method callback" in {
+      Get(
+        s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$preAuthorizeRoute/$orderUuid?preAuthorizationId=$preAuthorizationId&registerMeansOfPayment=true&printReceipt=true"
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val paymentAccount = loadPaymentAccount()
+        log.info(serialization.write(paymentAccount))
+        assert(paymentAccount.cards.nonEmpty)
+      }
+    }
+
+    "load payment methods" in {
+      loadPaymentMethods().cards.find(_.active) match {
+        case Some(card) =>
+          assert(card.firstName == firstName)
+          assert(card.lastName == lastName)
+          assert(card.birthday == birthday)
+          assert(card.active)
+          assert(!card.expired)
+          cardId = card.id
+        case _ => fail("no card found")
+      }
+    }
+
+    "disable payment method" in {
+      createNewSession(customerSession)
+      withHeaders(
+        Delete(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$paymentMethodRoute?paymentMethodId=$cardId"
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        loadPaymentMethods().cards.find(_.id == cardId) match {
+          case Some(card) =>
+            assert(card.firstName == firstName)
+            assert(card.lastName == lastName)
+            assert(card.birthday == birthday)
+            assert(!card.active)
+            assert(!card.expired)
+          case _ => fail("no card found")
+        }
       }
     }
 
