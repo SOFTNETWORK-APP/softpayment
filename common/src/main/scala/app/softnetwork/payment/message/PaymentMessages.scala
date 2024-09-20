@@ -35,25 +35,6 @@ object PaymentMessages {
     *   - payment user
     * @param currency
     *   - currency
-    * @param clientId
-    *   - optional client id
-    */
-  case class PreRegisterCard(
-    orderUuid: String,
-    user: NaturalUser,
-    currency: String = "EUR",
-    clientId: Option[String] = None
-  ) extends PaymentCommandWithKey
-      with PaymentMethodCommand {
-    val key: String = user.externalUuidWithProfile
-  }
-
-  /** @param orderUuid
-    *   - order uuid
-    * @param user
-    *   - payment user
-    * @param currency
-    *   - currency
     * @param paymentType
     *   - payment type
     * @param clientId
@@ -737,24 +718,7 @@ object PaymentMessages {
   /** @param debitedAccount
     *   - account owning the cards to load
     */
-  case class LoadCards(debitedAccount: String)
-      extends PaymentCommandWithKey
-      with PaymentMethodCommand {
-    val key: String = debitedAccount
-  }
-
   case class LoadPaymentMethods(debitedAccount: String)
-      extends PaymentCommandWithKey
-      with PaymentMethodCommand {
-    val key: String = debitedAccount
-  }
-
-  /** @param debitedAccount
-    *   - account owning the card to disable
-    * @param cardId
-    *   - card id
-    */
-  case class DisableCard(debitedAccount: String, cardId: String)
       extends PaymentCommandWithKey
       with PaymentMethodCommand {
     val key: String = debitedAccount
@@ -956,8 +920,6 @@ object PaymentMessages {
 
   trait PaymentResult extends CommandResult
 
-  case class CardPreRegistered(cardPreRegistration: CardPreRegistration) extends PaymentResult
-
   case class PaymentMethodPreRegistered(preRegistration: PreRegistration) extends PaymentResult
 
   case class PaymentPreAuthorized(transactionId: String) extends PaymentResult
@@ -1072,11 +1034,7 @@ object PaymentMessages {
 
   case class TransactionLoaded(transaction: Transaction) extends PaymentResult
 
-  case class CardsLoaded(cards: Seq[Card]) extends PaymentResult
-
   case class PaymentMethodsLoaded(paymentMethods: Seq[PaymentMethod]) extends PaymentResult
-
-  case object CardDisabled extends PaymentResult
 
   case object PaymentMethodDisabled extends PaymentResult
 
@@ -1097,8 +1055,6 @@ object PaymentMessages {
   ) extends PaymentResult
 
   class PaymentError(override val message: String) extends ErrorMessage(message) with PaymentResult
-
-  case object CardNotPreRegistered extends PaymentError("CardNotPreRegistered")
 
   case object PaymentMethodNotPreRegistered extends PaymentError("PaymentMethodNotPreRegistered")
 
@@ -1205,11 +1161,7 @@ object PaymentMessages {
 
   case object IllegalTransactionAmount extends PaymentError("IllegalTransactionAmount")
 
-  case object CardsNotLoaded extends PaymentError("CardsNotLoaded")
-
   case object PaymentMethodsNotLoaded extends PaymentError("PaymentMethodsNotLoaded")
-
-  case object CardNotDisabled extends PaymentError("CardNotDisabled")
 
   case object PaymentMethodNotDisabled extends PaymentError("PaymentMethodNotDisabled")
 

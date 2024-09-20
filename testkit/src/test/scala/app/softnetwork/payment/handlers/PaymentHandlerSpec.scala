@@ -36,14 +36,15 @@ class PaymentHandlerSpec
   "Payment handler" must {
     "pre register card" in {
       !?(
-        PreRegisterCard(
+        PreRegisterPaymentMethod(
           orderUuid,
           naturalUser.withProfile("customer"),
+          paymentType = Transaction.PaymentType.CARD,
           clientId = Some(clientId)
         )
       ) await {
-        case cardPreRegistered: CardPreRegistered =>
-          cardPreRegistration = cardPreRegistered.cardPreRegistration
+        case preRegistered: PaymentMethodPreRegistered =>
+          preRegistration = preRegistered.preRegistration
           !?(
             LoadPaymentAccount(computeExternalUuidWithProfile(customerUuid, Some("customer")))
           ) await {
@@ -73,8 +74,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           5100,
           "EUR",
-          Some(cardPreRegistration.id),
-          Some(cardPreRegistration.preregistrationData),
+          Some(preRegistration.id),
+          Some(preRegistration.registrationData),
           registerCard = true,
           creditedAccount = Some(computeExternalUuidWithProfile(sellerUuid, Some("seller")))
         )
@@ -119,14 +120,14 @@ class PaymentHandlerSpec
     }
 
     "load cards" in {
-      !?(LoadCards(computeExternalUuidWithProfile(customerUuid, Some("customer")))) await {
-        case result: CardsLoaded =>
-          val card = result.cards.find(_.id == cardId)
+      !?(LoadPaymentMethods(computeExternalUuidWithProfile(customerUuid, Some("customer")))) await {
+        case result: PaymentMethodsLoaded =>
+          val card = PaymentMethodsView(result.paymentMethods).cards.find(_.id == cardId)
           assert(card.isDefined)
           assert(card.map(_.firstName).getOrElse("") == firstName)
           assert(card.map(_.lastName).getOrElse("") == lastName)
           assert(card.map(_.birthday).getOrElse("") == birthday)
-          assert(card.exists(_.getActive))
+          assert(card.exists(_.active))
         case other => fail(other.toString)
       }
     }
@@ -820,8 +821,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
           "EUR",
-          Some(cardPreRegistration.id),
-          Some(cardPreRegistration.preregistrationData),
+          Some(preRegistration.id),
+          Some(preRegistration.registrationData),
           registerCard = true,
           creditedAccount = Some(computeExternalUuidWithProfile(sellerUuid, Some("seller")))
         )
@@ -845,8 +846,8 @@ class PaymentHandlerSpec
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
           "EUR",
-          Some(cardPreRegistration.id),
-          Some(cardPreRegistration.preregistrationData),
+          Some(preRegistration.id),
+          Some(preRegistration.registrationData),
           registerCard = true,
           creditedAccount = Some(computeExternalUuidWithProfile(sellerUuid, Some("seller")))
         )
@@ -1360,10 +1361,10 @@ class PaymentHandlerSpec
 
     "disable card" in {
       !?(
-        DisableCard(computeExternalUuidWithProfile(customerUuid, Some("customer")), cardId)
+        DisablePaymentMethod(computeExternalUuidWithProfile(customerUuid, Some("customer")), cardId)
       ) await {
-        case CardNotDisabled => // card associated with recurring payment not ended
-        case other           => fail(other.toString)
+        case PaymentMethodNotDisabled => // card associated with recurring payment not ended
+        case other                    => fail(other.toString)
       }
       !?(
         UpdateRecurringCardPaymentRegistration(
@@ -1376,14 +1377,16 @@ class PaymentHandlerSpec
         case other                                      => fail(other.toString)
       }
       !?(
-        DisableCard(computeExternalUuidWithProfile(customerUuid, Some("customer")), cardId)
+        DisablePaymentMethod(computeExternalUuidWithProfile(customerUuid, Some("customer")), cardId)
       ) await {
-        case CardDisabled =>
-          !?(LoadCards(computeExternalUuidWithProfile(customerUuid, Some("customer")))) await {
-            case result: CardsLoaded =>
-              val card = result.cards.find(_.id == cardId)
+        case PaymentMethodDisabled =>
+          !?(
+            LoadPaymentMethods(computeExternalUuidWithProfile(customerUuid, Some("customer")))
+          ) await {
+            case result: PaymentMethodsLoaded =>
+              val card = PaymentMethodsView(result.paymentMethods).cards.find(_.id == cardId)
               assert(card.isDefined)
-              assert(!card.exists(_.getActive))
+              assert(!card.exists(_.active))
             case other => fail(other.toString)
           }
         case other => fail(other.toString)

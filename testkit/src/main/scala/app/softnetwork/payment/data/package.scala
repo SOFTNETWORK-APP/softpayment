@@ -6,7 +6,8 @@ import app.softnetwork.payment.model.{
   BusinessSupport,
   CardPreRegistration,
   LegalUser,
-  NaturalUser
+  NaturalUser,
+  PreRegistration
 }
 import app.softnetwork.payment.model.UboDeclaration.UltimateBeneficialOwner
 import app.softnetwork.payment.model.UboDeclaration.UltimateBeneficialOwner.BirthPlace
@@ -21,7 +22,7 @@ package object data {
 
   val vendorUuid = "vendor"
 
-  var cardPreRegistration: CardPreRegistration = _
+  var preRegistration: PreRegistration = _
 
   var preAuthorizationId: String = _
 

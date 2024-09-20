@@ -3,12 +3,7 @@ package app.softnetwork.payment.service
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.model.{
-  CardPreRegistration,
-  CardView,
-  PaymentMethodsView,
-  PreRegistration
-}
+import app.softnetwork.payment.model.{CardView, PaymentMethodsView, PreRegistration, Transaction}
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
@@ -33,9 +28,9 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       )
       .serverLogic(principal =>
         _ => {
-          run(LoadCards(externalUuidWithProfile(principal._2))).map {
-            case r: CardsLoaded => Right(r.cards.map(_.view))
-            case other          => Left(error(other))
+          run(LoadPaymentMethods(externalUuidWithProfile(principal._2))).map {
+            case r: PaymentMethodsLoaded => Right(PaymentMethodsView(r.paymentMethods).cards)
+            case other                   => Left(error(other))
           }
         }
       )
@@ -62,10 +57,10 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val preRegisterCard: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
       .in(PaymentSettings.PaymentConfig.cardRoute)
-      .in(jsonBody[PreRegisterCard])
+      .in(jsonBody[PreRegisterPaymentMethod])
       .out(
         statusCode(StatusCode.Ok).and(
-          jsonBody[CardPreRegistration]
+          jsonBody[PreRegistration]
             .description("Card pre registration data")
         )
       )
@@ -85,11 +80,12 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           run(
             cmd.copy(
               user = updatedUser,
+              paymentType = Transaction.PaymentType.CARD,
               clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
             )
           ).map {
-            case r: CardPreRegistered => Right(r.cardPreRegistration)
-            case other                => Left(error(other))
+            case r: PaymentMethodPreRegistered => Right(r.preRegistration)
+            case other                         => Left(error(other))
           }
         }
       )
@@ -136,13 +132,13 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .in(PaymentSettings.PaymentConfig.cardRoute)
       .in(query[String]("cardId").description("Card id to disable"))
       .out(
-        statusCode(StatusCode.Ok).and(jsonBody[CardDisabled.type])
+        statusCode(StatusCode.Ok).and(jsonBody[PaymentMethodDisabled.type])
       )
       .serverLogic(principal =>
         cardId => {
-          run(DisableCard(externalUuidWithProfile(principal._2), cardId)).map {
-            case CardDisabled => Right(CardDisabled)
-            case other        => Left(error(other))
+          run(DisablePaymentMethod(externalUuidWithProfile(principal._2), cardId)).map {
+            case PaymentMethodDisabled => Right(PaymentMethodDisabled)
+            case other                 => Left(error(other))
           }
         }
       )

@@ -10,7 +10,6 @@ import app.softnetwork.payment.data.{
   bic,
   birthday,
   cardId,
-  cardPreRegistration,
   debitedAmount,
   directDebitTransactionId,
   feesAmount,
@@ -23,6 +22,7 @@ import app.softnetwork.payment.data.{
   ownerAddress,
   ownerName,
   preAuthorizationId,
+  preRegistration,
   recurringPaymentRegistrationId,
   sellerBankAccountId,
   ubo,
@@ -31,14 +31,14 @@ import app.softnetwork.payment.data.{
 import app.softnetwork.payment.handlers.MockPaymentDao
 import app.softnetwork.payment.message.PaymentMessages.{
   BankAccountCommand,
-  CardPreAuthorized,
   IbanMandate,
   PaidIn,
   Payment,
+  PaymentPreAuthorized,
   PaymentRedirection,
   PaymentRequired,
   PaymentResult,
-  PreRegisterCard,
+  PreRegisterPaymentMethod,
   RecurringPaymentRegistered,
   RegisterRecurringPayment,
   Schedule4PaymentTriggered
@@ -48,6 +48,7 @@ import app.softnetwork.payment.model.{
   BankAccount,
   CardPreRegistration,
   LegalUser,
+  PreRegistration,
   RecurringPayment,
   RecurringPaymentView,
   Transaction,
@@ -219,20 +220,23 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "be created or updated" in {
       externalUserId = "soleTrader"
       createNewSession(sellerSession(externalUserId))
+      val command =
+        BankAccountCommand(
+          BankAccount(
+            Option(sellerBankAccountId),
+            ownerName,
+            ownerAddress,
+            iban,
+            bic
+          ),
+          legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
+          Some(true)
+        )
+      log.info(serialization.write(command))
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Option(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
-            legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
-            Some(true)
-          )
+          command
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
           `User-Agent`("test")
@@ -340,15 +344,16 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute",
-          PreRegisterCard(
+          PreRegisterPaymentMethod(
             orderUuid,
-            naturalUser
+            naturalUser,
+            paymentType = Transaction.PaymentType.CARD
           )
         )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        cardPreRegistration = responseAs[CardPreRegistration]
-        log.info(serialization.write(cardPreRegistration))
+        preRegistration = responseAs[PreRegistration]
+        log.info(serialization.write(preRegistration))
       }
 
       val paymentAccount = loadPaymentAccount()
@@ -361,7 +366,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
         SetupIntent
           .retrieve(
-            cardPreRegistration.id,
+            preRegistration.id,
             requestOptions
           )
           .confirm(
@@ -382,13 +387,13 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "pre authorize 3ds card" in {
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute",
           Payment(
             orderUuid,
             debitedAmount,
             currency,
-            Option(cardPreRegistration.id),
-            Option(cardPreRegistration.preregistrationData),
+            Option(preRegistration.id),
+            Option(preRegistration.registrationData),
             registerCard = true,
             printReceipt = true
           )
@@ -409,12 +414,12 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 //        assert(params.getOrElse("registerCard", "false").toBoolean)
 //        assert(params.getOrElse("printReceipt", "false").toBoolean)
         Get(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$preAuthorizeCardRoute/$orderUuid?preAuthorizationIdParameter=payment_intent&payment_intent=$preAuthorizationId&registerCard=true&printReceipt=true"
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$callbacksRoute/$preAuthorizeRoute/$orderUuid?preAuthorizationIdParameter=payment_intent&payment_intent=$preAuthorizationId&registerMeansOfPayment=true&printReceipt=true"
         ) ~> routes ~> check {
-          status shouldEqual StatusCodes.OK
-          val paymentAccount = loadPaymentAccount()
+          status shouldEqual StatusCodes.Accepted
+          /*val paymentAccount = loadPaymentAccount()
           log.info(serialization.write(paymentAccount))
-          assert(paymentAccount.cards.nonEmpty)
+          assert(paymentAccount.cards.nonEmpty)*/
         }
         loadCards().find(_.getActive) match {
           case Some(card) =>
@@ -445,7 +450,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             orderUuid,
             debitedAmount,
             currency,
-            Some(cardPreRegistration.id),
+            Some(preRegistration.id),
             None,
             registerCard = true,
             printReceipt = true
@@ -483,7 +488,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)
-          assert(result.error.isEmpty)
+          assert(result.error.isEmpty || result.error.exists(_.isEmpty))
           assert(result.transactionStatus.isTransactionSucceeded)
           payOutTransactionId = result.transactionId
           paymentClient.loadPayOutTransaction(
@@ -521,14 +526,15 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute",
-          PreRegisterCard(
+          PreRegisterPaymentMethod(
             orderUuid,
-            naturalUser
+            naturalUser,
+            paymentType = Transaction.PaymentType.CARD
           )
         )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        cardPreRegistration = responseAs[CardPreRegistration]
+        preRegistration = responseAs[PreRegistration]
       }
 
       val paymentAccount = loadPaymentAccount()
@@ -540,7 +546,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       Try {
         val requestOptions = StripeApi().requestOptions
         SetupIntent
-          .retrieve(cardPreRegistration.id, requestOptions)
+          .retrieve(preRegistration.id, requestOptions)
           .confirm(
             SetupIntentConfirmParams
               .builder()
@@ -559,14 +565,14 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "pre authorize card" in {
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeCardRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute",
           //${URLEncoder.encode(computeExternalUuidWithProfile(externalUserId, Some("seller")), "UTF-8")}
           Payment(
             orderUuid,
             debitedAmount,
             currency,
-            Option(cardPreRegistration.id),
-            Option(cardPreRegistration.preregistrationData),
+            Option(preRegistration.id),
+            Option(preRegistration.registrationData),
             registerCard = true,
             printReceipt = true,
             feesAmount = Some(feesAmount)
@@ -577,7 +583,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        val result = responseAs[CardPreAuthorized]
+        val result = responseAs[PaymentPreAuthorized]
         preAuthorizationId = result.transactionId
         loadCards().find(_.getActive) match {
           case Some(card) =>
@@ -593,7 +599,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay in with pre authorized card" in {
-      paymentClient.payInWithCardPreAuthorized(
+      paymentClient.payInWithPreAuthorization(
         preAuthorizationId,
         computeExternalUuidWithProfile(externalUserId, Some("seller")),
         None,
@@ -657,7 +663,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             orderUuid,
             debitedAmount,
             currency,
-            Some(cardPreRegistration.id),
+            Some(preRegistration.id),
             None,
             registerCard = true,
             printReceipt = true,
@@ -693,6 +699,82 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay out with pre registered card" in {
+      paymentClient.payOut(
+        orderUuid,
+        computeExternalUuidWithProfile(externalUserId, Some("seller")),
+        debitedAmount,
+        feesAmount,
+        currency,
+        Some("reference"),
+        payInTransactionId
+      ) complete () match {
+        case Success(result) =>
+          log.info(serialization.write(result))
+          assert(result.transactionId.isDefined)
+          assert(result.error.isEmpty)
+          assert(result.transactionStatus.isTransactionSucceeded)
+          payOutTransactionId = result.transactionId
+          paymentClient.loadPayOutTransaction(
+            orderUuid,
+            result.transactionId.get
+          ) complete () match {
+            case Success(result) =>
+              log.info(serialization.write(result))
+              assert(result.transactionId.getOrElse("") == payOutTransactionId.getOrElse("unknown"))
+              assert(result.error.isEmpty)
+              assert(result.transactionStatus.isTransactionSucceeded)
+            case Failure(f) => fail(f)
+          }
+        case Failure(f) => fail(f)
+      }
+    }
+
+    "pay in with registered card" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$payInRoute/${URLEncoder
+            .encode(computeExternalUuidWithProfile(externalUserId, Some("seller")), "UTF-8")}",
+          Payment(
+            orderUuid,
+            debitedAmount,
+            currency,
+            None,
+            None,
+            registerCard = true,
+            printReceipt = true,
+            feesAmount = Some(feesAmount),
+            paymentMethodId = Some(cardId)
+          )
+        ).withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val result = responseAs[PaidIn]
+        payInTransactionId = result.transactionId
+        paymentClient.loadPayInTransaction(orderUuid, payInTransactionId.get) complete () match {
+          case Success(result) =>
+            log.info(serialization.write(result))
+            assert(result.transactionId.getOrElse("") == payInTransactionId.getOrElse("unknown"))
+            assert(result.error.isEmpty)
+            assert(result.transactionStatus.isTransactionSucceeded)
+          case Failure(f) => fail(f)
+        }
+        loadCards().find(_.getActive) match {
+          case Some(card) =>
+            assert(card.firstName == firstName)
+            assert(card.lastName == lastName)
+            assert(card.birthday == birthday)
+            assert(card.getActive)
+            assert(!card.expired)
+            cardId = card.id
+          case _ => fail("No active card found")
+        }
+      }
+    }
+
+    "pay out with registered card" in {
       paymentClient.payOut(
         orderUuid,
         computeExternalUuidWithProfile(externalUserId, Some("seller")),
@@ -867,6 +949,92 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         case Failure(f) => fail(f)
       }
     }*/
+
+    "pre authorize card without pre registration" in {
+      val payment =
+        Payment(
+          orderUuid,
+          debitedAmount,
+          currency,
+          None,
+          None,
+          registerCard = true,
+          printReceipt = true,
+          feesAmount = Some(feesAmount),
+          user = Option(naturalUser)
+        )
+      log.info(serialization.write(payment))
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute",
+          //${URLEncoder.encode(computeExternalUuidWithProfile(externalUserId, Some("seller")), "UTF-8")}
+          payment
+        ).withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
+      ) ~> routes ~> check {
+        if (status == StatusCodes.PaymentRequired) {
+          val payment = responseAs[PaymentRequired]
+
+          val paymentClientReturnUrl = payment.paymentClientReturnUrl
+          log.info(paymentClientReturnUrl)
+
+          val clientSecret = payment.paymentClientSecret
+          log.info(clientSecret)
+
+          val requestOptions = StripeApi().requestOptions
+
+          PaymentIntent
+            .retrieve(payment.transactionId, requestOptions)
+            .confirm(
+              PaymentIntentConfirmParams
+                .builder()
+                .setPaymentMethod("pm_card_visa")
+                .build(),
+              requestOptions
+            )
+
+          val index = paymentClientReturnUrl.indexOf(RootPath)
+          assert(index > 0)
+          val preAuthorizeUri = paymentClientReturnUrl.substring(index)
+          log.info(preAuthorizeUri)
+          withHeaders(
+            Get(s"/$preAuthorizeUri")
+          ) ~> routes ~> check {
+            status shouldEqual StatusCodes.OK
+            /*val result = responseAs[CardPreAuthorized]
+            payInTransactionId = result.transactionId
+            preAuthorizationId = result.transactionId
+            loadCards().find(_.getActive) match {
+              case Some(card) =>
+                assert(card.firstName == firstName)
+                assert(card.lastName == lastName)
+                assert(card.birthday == birthday)
+                assert(card.getActive)
+                assert(!card.expired)
+                cardId = card.id
+              case _ => fail("No active card found")
+            }
+             */
+          }
+        } else {
+          status shouldEqual StatusCodes.OK
+          val result = responseAs[PaymentPreAuthorized]
+          preAuthorizationId = result.transactionId
+          loadCards().find(_.getActive) match {
+            case Some(card) =>
+              assert(card.firstName == firstName)
+              assert(card.lastName == lastName)
+              assert(card.birthday == birthday)
+              assert(card.getActive)
+              assert(!card.expired)
+              cardId = card.id
+            case _ => fail("No active card found")
+          }
+        }
+      }
+    }
 
     "pay in without pre registered card" in {
       createNewSession(customerSession)

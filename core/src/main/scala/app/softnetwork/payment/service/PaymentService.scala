@@ -73,19 +73,19 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
       requiredClientSession { (client, session) =>
         pathEnd {
           get {
-            run(LoadCards(externalUuidWithProfile(session))) completeWith {
-              case r: CardsLoaded =>
+            run(LoadPaymentMethods(externalUuidWithProfile(session))) completeWith {
+              case r: PaymentMethodsLoaded =>
                 complete(
                   HttpResponse(
                     StatusCodes.OK,
-                    entity = r.cards.map(_.view)
+                    entity = PaymentMethodsView(r.paymentMethods).cards
                   )
                 )
               case other => error(other)
             }
           } ~
           post {
-            entity(as[PreRegisterCard]) { cmd =>
+            entity(as[PreRegisterPaymentMethod]) { cmd =>
               var updatedUser =
                 if (cmd.user.externalUuid.trim.isEmpty) {
                   cmd.user.withExternalUuid(session.id)
@@ -100,14 +100,15 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
               run(
                 cmd.copy(
                   user = updatedUser,
+                  paymentType = Transaction.PaymentType.CARD,
                   clientId = client.map(_.clientId).orElse(session.clientId)
                 )
               ) completeWith {
-                case r: CardPreRegistered =>
+                case r: PaymentMethodPreRegistered =>
                   complete(
                     HttpResponse(
                       StatusCodes.OK,
-                      entity = r.cardPreRegistration
+                      entity = r.preRegistration
                     )
                   )
                 case other => error(other)
@@ -116,9 +117,9 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
           } ~
           delete {
             parameter("cardId") { cardId =>
-              run(DisableCard(externalUuidWithProfile(session), cardId)) completeWith {
-                case _: CardDisabled.type => complete(HttpResponse(StatusCodes.OK))
-                case other                => error(other)
+              run(DisablePaymentMethod(externalUuidWithProfile(session), cardId)) completeWith {
+                case _: PaymentMethodDisabled.type => complete(HttpResponse(StatusCodes.OK))
+                case other                         => error(other)
               }
             }
           }

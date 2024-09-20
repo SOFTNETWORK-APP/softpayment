@@ -89,12 +89,25 @@ trait PaymentDao extends PaymentHandler {
     clientId: Option[String] = None
   )(implicit
     system: ActorSystem[_]
-  ): Future[Either[String, CardPreRegistration]] = {
+  ): Future[Either[String, PreRegistration]] = {
+    preRegisterPaymentMethod(orderUuid, user, currency, Transaction.PaymentType.CARD, clientId)
+  }
+
+  @InternalApi
+  private[payment] def preRegisterPaymentMethod(
+    orderUuid: String,
+    user: NaturalUser,
+    currency: String = "EUR",
+    paymentType: Transaction.PaymentType,
+    clientId: Option[String] = None
+  )(implicit
+    system: ActorSystem[_]
+  ): Future[Either[String, PreRegistration]] = {
     implicit val ec: ExecutionContextExecutor = system.executionContext
-    !?(PreRegisterCard(orderUuid, user, currency, clientId)) map {
-      case result: CardPreRegistered => Right(result.cardPreRegistration)
-      case error: PaymentError       => Left(error.message)
-      case _                         => Left("unknown")
+    !?(PreRegisterPaymentMethod(orderUuid, user, currency, paymentType, clientId)) map {
+      case result: PaymentMethodPreRegistered => Right(result.preRegistration)
+      case error: PaymentError                => Left(error.message)
+      case _                                  => Left("unknown")
     }
   }
 

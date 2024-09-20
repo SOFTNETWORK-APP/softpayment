@@ -288,17 +288,18 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         status shouldEqual StatusCodes.BadRequest
       }
       val command =
-        PreRegisterCard(
+        PreRegisterPaymentMethod(
           orderUuid,
-          naturalUser
+          naturalUser,
+          paymentType = Transaction.PaymentType.CARD
         )
       log.info(s"pre register card command: ${serialization.write(command)}")
       withHeaders(
         Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute", command)
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        cardPreRegistration = responseAs[CardPreRegistration]
-        log.info(s"card pre registration: ${serialization.write(cardPreRegistration)}")
+        preRegistration = responseAs[PreRegistration]
+        log.info(s"card pre registration: ${serialization.write(preRegistration)}")
       }
       val paymentAccount = loadPaymentAccount()
       assert(paymentAccount.naturalUser.isDefined)
@@ -310,8 +311,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           orderUuid,
           debitedAmount,
           "EUR",
-          Some(cardPreRegistration.id),
-          Some(cardPreRegistration.preregistrationData),
+          Some(preRegistration.id),
+          Some(preRegistration.registrationData),
           registerCard = true,
           printReceipt = true,
           feesAmount = Some(feesAmount)
@@ -428,8 +429,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           orderUuid,
           100,
           "EUR",
-          Some(cardPreRegistration.id),
-          Some(cardPreRegistration.preregistrationData),
+          Some(preRegistration.id),
+          Some(preRegistration.registrationData),
           registerCard = true,
           printReceipt = true
         )
@@ -477,8 +478,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           orderUuid,
           debitedAmount,
           "EUR",
-          Some(cardPreRegistration.id),
-          Some(cardPreRegistration.preregistrationData),
+          Some(preRegistration.id),
+          Some(preRegistration.registrationData),
           registerCard = true,
           printReceipt = true,
           feesAmount = Some(feesAmount)
@@ -824,7 +825,8 @@ trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       val command =
         PreRegisterPaymentMethod(
           orderUuid,
-          naturalUser
+          naturalUser,
+          paymentType = Transaction.PaymentType.CARD
         )
       log.info(s"pre register payment method command: ${serialization.write(command)}")
       withHeaders(
