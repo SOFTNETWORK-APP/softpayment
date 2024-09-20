@@ -252,22 +252,13 @@ message PayInWithPreAuthorization {
     optional string preRegistrationId = 10;
 }
 
-message CardPreRegistration{
-    option (scalapb.message).extends = "ProtobufDomainObject";
-    required string id = 1;
-    required string accessKey = 2;
-    required string preregistrationData = 3;
-    required string cardRegistrationURL = 4;
-    required bool registerCard = 5;
-}
-
 message PreRegistration{
     option (scalapb.message).extends = "ProtobufDomainObject";
     required string id = 1;
-    required string secretKey = 2;
-    optional string registrationData = 3;
-    optional string registrationURL = 4;
-    required bool registerMeansOfPayment = 5;
+    required string secretKey = 2; // replace accessKey
+    optional string registrationData = 3; // replace preregistrationData
+    optional string registrationURL = 4; // replace cardRegistrationURL
+    required bool registerMeansOfPayment = 5; // replace registerCard
 }
 
 message RecurringPaymentTransaction{

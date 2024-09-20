@@ -46,7 +46,6 @@ import app.softnetwork.payment.message.PaymentMessages.{
 import app.softnetwork.payment.model.{
   computeExternalUuidWithProfile,
   BankAccount,
-  CardPreRegistration,
   LegalUser,
   PreRegistration,
   RecurringPayment,

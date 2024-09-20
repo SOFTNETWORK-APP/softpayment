@@ -4,7 +4,6 @@ import app.softnetwork.payment.model.{
   Address,
   Business,
   BusinessSupport,
-  CardPreRegistration,
   LegalUser,
   NaturalUser,
   PreRegistration
