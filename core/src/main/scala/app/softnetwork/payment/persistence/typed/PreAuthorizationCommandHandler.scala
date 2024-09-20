@@ -374,6 +374,7 @@ trait PreAuthorizationCommandHandler
                   .withDebitedAmount(transaction.amount)
                   .withLastUpdated(lastUpdated)
                   .withPrintReceipt(printReceipt)
+                  .withPaymentType(transaction.paymentType)
               ) :+
               PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)

@@ -35,6 +35,7 @@ message PreAuthorizedEvent {
     required string transactionId = 5;
     required string paymentMethodId = 6;
     optional bool printReceipt = 7;
+    required app.softnetwork.payment.model.Transaction.PaymentType paymentType = 8;
 }
 
 message PreAuthorizationFailedEvent {
