@@ -56,6 +56,8 @@ package object data {
       .withEmail(email)
       .withPhone(phone)
       .withBusiness(business)
+      .withNationality("FR")
+      .withCountryOfResidence("FR")
 
   /** bank account */
   var sellerBankAccountId: String = _

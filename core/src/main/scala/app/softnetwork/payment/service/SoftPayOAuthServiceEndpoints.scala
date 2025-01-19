@@ -7,6 +7,7 @@ import app.softnetwork.account.message.{
   AccessTokenRefreshed,
   AccountErrorMessage,
   BearerAuthenticationFailed,
+  GenerateAccessToken,
   Tokens
 }
 import app.softnetwork.account.service.OAuthServiceEndpoints
@@ -49,8 +50,8 @@ trait SoftPayOAuthServiceEndpoints[SD <: SessionData with SessionDataDecorator[S
     : List[ServerEndpoint[AkkaStreams with capabilities.WebSockets, Future]] =
     List(
       token,
-      me
-    ) ++ services.map(signin) ++ services.map(backup)
+      client
+    ) ++ services.map(signin) ++ services.map(callback)
 
   override val token: ServerEndpoint[Any with AkkaStreams, Future] =
     endpoint.post
@@ -78,54 +79,74 @@ trait SoftPayOAuthServiceEndpoints[SD <: SessionData with SessionDataDecorator[S
           )
       )
       .out(jsonBody[Tokens])
-      .serverLogic {
-        case tokenRequest: ClientCredentials =>
-          import tokenRequest._
-          val httpCredentials = BasicHttpCredentials(credentials)
-          val clientId = httpCredentials.username
-          val clientSecret = httpCredentials.password
-          run(clientId, GenerateClientToken(clientId, clientSecret)) map {
-            case r: AccessTokenGenerated =>
-              Right(
-                Tokens(
-                  r.accessToken.token,
-                  r.accessToken.tokenType.toLowerCase(),
-                  r.accessToken.expiresIn,
-                  r.accessToken.refreshToken,
-                  r.accessToken.refreshExpiresIn
-                )
-              )
-            case error: AccountErrorMessage =>
-              Left(ApiErrors.BadRequest(error.message))
-            case _ => Left(ApiErrors.BadRequest("Unknown"))
-          }
-        case tokenRequest: RefreshToken =>
-          import tokenRequest._
-          run(refreshToken, RefreshClientToken(refreshToken)) map {
-            case r: AccessTokenRefreshed =>
-              Right(
-                Tokens(
-                  r.accessToken.token,
-                  r.accessToken.tokenType.toLowerCase(),
-                  r.accessToken.expiresIn,
-                  r.accessToken.refreshToken,
-                  r.accessToken.refreshExpiresIn
-                )
-              )
-            case error: AccountErrorMessage =>
-              Left(ApiErrors.BadRequest(error.message))
-            case _ => Left(ApiErrors.BadRequest("Unknown"))
-          }
-        case tokenRequest: UnsupportedGrantType =>
-          Future.successful(
-            Left(ApiErrors.BadRequest(s"Unknown grant_type ${tokenRequest.grantType}"))
-          )
+      .serverLogic { case tokenRequest: ClientTokenRequest =>
+        handleGrantType(tokenRequest)
       }
 
-  override val me: ServerEndpoint[Any with AkkaStreams, Future] =
+  protected def handleGrantType(
+    tokenRequest: ClientTokenRequest
+  ): Future[Either[ApiErrors.BadRequest, Tokens]] = {
+    tokenRequest match {
+      case tokenRequest: ClientCredentials =>
+        handleClientCredentialsGrantType(tokenRequest)
+      case tokenRequest: RefreshToken =>
+        handleRefreshTokenGrantType(tokenRequest)
+      case tokenRequest: UnsupportedGrantType =>
+        Future.successful(
+          Left(ApiErrors.BadRequest(s"Unknown grant_type ${tokenRequest.grantType}"))
+        )
+    }
+  }
+
+  private def handleRefreshTokenGrantType(
+    tokenRequest: RefreshToken
+  ): Future[Either[ApiErrors.BadRequest, Tokens]] = {
+    run(tokenRequest.refreshToken, RefreshClientToken(tokenRequest.refreshToken)) map {
+      case r: AccessTokenRefreshed =>
+        Right(
+          Tokens(
+            r.accessToken.token,
+            r.accessToken.tokenType.toLowerCase(),
+            r.accessToken.expiresIn,
+            r.accessToken.refreshToken,
+            r.accessToken.refreshExpiresIn
+          )
+        )
+      case error: AccountErrorMessage =>
+        Left(ApiErrors.BadRequest(error.message))
+      case _ => Left(ApiErrors.BadRequest("Unknown"))
+    }
+  }
+
+  private def handleClientCredentialsGrantType(
+    tokenRequest: ClientCredentials
+  ): Future[Either[ApiErrors.BadRequest, Tokens]] = {
+    val httpCredentials = BasicHttpCredentials(tokenRequest.credentials)
+    val clientId = httpCredentials.username
+    val clientSecret = httpCredentials.password
+    run(clientId, GenerateClientToken(clientId, clientSecret)) map {
+      case r: AccessTokenGenerated =>
+        Right(
+          Tokens(
+            r.accessToken.token,
+            r.accessToken.tokenType.toLowerCase(),
+            r.accessToken.expiresIn,
+            r.accessToken.refreshToken,
+            r.accessToken.refreshExpiresIn
+          )
+        )
+      case error: AccountErrorMessage =>
+        Left(ApiErrors.BadRequest(error.message))
+      case _ => Left(ApiErrors.BadRequest("Unknown"))
+    }
+  }
+
+  val pmClient: String = "me"
+
+  lazy val client: ServerEndpoint[Any with AkkaStreams, Future] =
     endpoint.get
-      .in(AccountSettings.OAuthPath / "me")
-      .description("OAuth2 me endpoint")
+      .in(AccountSettings.OAuthPath / pmClient)
+      .description("OAuth2 client endpoint")
       .securityIn(auth.bearer[String](WWWAuthenticateChallenge.bearer(AccountSettings.Realm)))
       .errorOut(ApiErrors.oneOfApiErrors)
       .out(setCookieOpt(clientCookieName))
@@ -162,6 +183,21 @@ sealed trait ClientTokenRequest {
   def asMap(): Map[String, String]
 }
 
+case class AuthorizationCodeRequest(
+  grant_type: String,
+  code: String,
+  redirect_uri: Option[String],
+  client_id: String
+) extends ClientTokenRequest {
+  override def asMap(): Map[String, String] =
+    Map(
+      "grant_type"   -> grant_type,
+      "code"         -> code,
+      "redirect_uri" -> redirect_uri.getOrElse(""),
+      "client_id"    -> client_id
+    )
+}
+
 case class ClientCredentials(credentials: String, scope: Option[String] = None)
     extends ClientTokenRequest {
   override def asMap(): Map[String, String] =
@@ -190,6 +226,13 @@ case class UnsupportedGrantType(grantType: String) extends ClientTokenRequest {
 object ClientTokenRequest {
   def decode(form: Map[String, String]): ClientTokenRequest = {
     form.getOrElse("grant_type", "") match {
+      case "authorization_code" =>
+        AuthorizationCodeRequest(
+          "authorization_code",
+          form.getOrElse("code", ""),
+          form.get("redirect_uri"),
+          form.getOrElse("client_id", "")
+        )
       case "client_credentials" =>
         ClientCredentials(
           form("credentials"),

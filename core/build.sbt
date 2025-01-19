@@ -8,6 +8,9 @@ Compile / PB.protoSources := Seq(sourceDirectory.value / ".." / ".." / "client/s
 
 libraryDependencies ++= Seq(
   "app.softnetwork.persistence" %% "persistence-kv" % Versions.genericPersistence,
-  "app.softnetwork.account" %% "account-core" % Versions.account,
+  "app.softnetwork.account" %% "account-core" % Versions.account excludeAll(
+    ExclusionRule(organization = "app.softnetwork.notification")
+  ),
+  "app.softnetwork.notification" %% "notification-common" % Versions.notification,
   "app.softnetwork.session" %% "session-core" % Versions.genericPersistence
 )

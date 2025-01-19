@@ -288,9 +288,13 @@ trait SoftPayAccountBehavior extends AccountBehavior[SoftPayAccount, BasicAccoun
                   }
 
               case _ =>
-                Effect.none.thenRun { _ =>
-                  AccountMessages.ClientNotFound ~> replyTo
-                }
+                super.handleCommand(
+                  entityId,
+                  state,
+                  RefreshAccessToken(refreshToken),
+                  replyTo,
+                  timers
+                )
             }
 
           case Some(account) if !account.status.isActive =>

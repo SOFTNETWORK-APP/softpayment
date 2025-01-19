@@ -11,10 +11,18 @@ import app.softnetwork.payment.handlers.{MockSoftPayAccountDao, SoftPayAccountDa
 import app.softnetwork.payment.launch.SoftPayRoutes
 import app.softnetwork.payment.service.{MockSoftPayAccountService, MockSoftPayOAuthService}
 import app.softnetwork.persistence.schema.SchemaProvider
+import app.softnetwork.session.CsrfCheckHeader
 import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
-import app.softnetwork.session.scalatest.SessionTestKit
+import app.softnetwork.session.scalatest.{
+  OneOffCookieSessionServiceTestKit,
+  OneOffHeaderSessionServiceTestKit,
+  RefreshableCookieSessionServiceTestKit,
+  RefreshableHeaderSessionServiceTestKit,
+  SessionTestKit
+}
 import app.softnetwork.session.service.SessionMaterials
 import com.softwaremill.session.{RefreshTokenStorage, SessionConfig, SessionManager}
+import org.scalatest.Suite
 import org.slf4j.{Logger, LoggerFactory}
 import org.softnetwork.session.model.Session
 
@@ -64,3 +72,29 @@ trait SoftPayRoutesTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
 }
+
+trait SoftPayRoutesWithOneOfCookieSessionTestKit[SD <: SessionData with SessionDataDecorator[SD]]
+    extends SoftPayRouteTestKit[SD]
+    with OneOffCookieSessionServiceTestKit[SD]
+    with SoftPayRoutesTestKit[SD]
+    with CsrfCheckHeader { self: Suite with SessionMaterials[SD] => }
+
+trait SoftPayRoutesWithOneOfHeaderSessionTestKit[SD <: SessionData with SessionDataDecorator[SD]]
+    extends SoftPayRouteTestKit[SD]
+    with OneOffHeaderSessionServiceTestKit[SD]
+    with SoftPayRoutesTestKit[SD]
+    with CsrfCheckHeader { self: Suite with SessionMaterials[SD] => }
+
+trait SoftPayRoutesWithRefreshableCookieSessionTestKit[SD <: SessionData with SessionDataDecorator[
+  SD
+]] extends SoftPayRouteTestKit[SD]
+    with RefreshableCookieSessionServiceTestKit[SD]
+    with SoftPayRoutesTestKit[SD]
+    with CsrfCheckHeader { self: Suite with SessionMaterials[SD] => }
+
+trait SoftPayRoutesWithRefreshableHeaderSessionTestKit[SD <: SessionData with SessionDataDecorator[
+  SD
+]] extends SoftPayRouteTestKit[SD]
+    with RefreshableHeaderSessionServiceTestKit[SD]
+    with SoftPayRoutesTestKit[SD]
+    with CsrfCheckHeader { self: Suite with SessionMaterials[SD] => }

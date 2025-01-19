@@ -49,6 +49,9 @@ jobs:
 #        verbose: true
     - name: Run tests
       run: STRIPE_CLIENT_ID=${{secrets.STRIPE_CLIENT_ID}} STRIPE_API_KEY=${{secrets.STRIPE_API_KEY}} sbt clean test
+      env:
+        STRIPE_CLIENT_ID: ${{secrets.STRIPE_CLIENT_ID}}
+        STRIPE_API_KEY: ${{secrets.STRIPE_API_KEY}}
     # Optional: This step uploads information to the GitHub dependency graph and unblocking Dependabot alerts for the repository
     # - name: Upload dependency graph
     #   uses: scalacenter/sbt-dependency-submission@ab086b50c947c9774b70f39fc7f6e20ca2706c91

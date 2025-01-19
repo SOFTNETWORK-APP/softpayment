@@ -1,20 +1,19 @@
-package app.softnetwork.payment.service
+package app.softnetwork.payment.scalatest
 
-import akka.http.scaladsl.model.{RemoteAddress, StatusCodes}
 import akka.http.scaladsl.model.headers.{`User-Agent`, `X-Forwarded-For`}
+import akka.http.scaladsl.model.{RemoteAddress, StatusCodes}
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.api.server.config.ServerSettings.RootPath
-import app.softnetwork.payment.data._
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.config.PaymentSettings.PaymentConfig._
+import app.softnetwork.payment.data._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model._
-import app.softnetwork.payment.scalatest.PaymentRouteTestKit
-import app.softnetwork.time._
 import app.softnetwork.persistence.now
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import app.softnetwork.session.service.SessionMaterials
+import app.softnetwork.time._
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -23,7 +22,7 @@ import java.time.LocalDate
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
-trait PaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
+trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
     extends AnyWordSpecLike
     with PaymentRouteTestKit[SD] {
   _: ApiRoutes with SessionMaterials[SD] =>

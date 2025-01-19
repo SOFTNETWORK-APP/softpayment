@@ -26,7 +26,6 @@ trait SoftPayAccountServiceEndpoints[SD <: SessionData with SessionDataDecorator
     : List[ServerEndpoint[AkkaStreams with capabilities.WebSockets, Future]] =
     List(
       signUp,
-      basic,
       login,
       signIn,
       activate,

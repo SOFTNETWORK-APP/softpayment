@@ -1,8 +1,11 @@
 package app.softnetwork.payment.service
 
-import app.softnetwork.payment.scalatest.PaymentRoutesWithOneOffCookieSessionSpecTestKit
+import app.softnetwork.payment.scalatest.{
+  PaymentRouteSpec,
+  PaymentRoutesWithOneOffCookieSessionSpecTestKit
+}
 import org.softnetwork.session.model.JwtClaims
 
 class PaymentRoutesWithOneOffCookieSessionSpec
-    extends PaymentServiceSpec[JwtClaims]
+    extends PaymentRouteSpec[JwtClaims]
     with PaymentRoutesWithOneOffCookieSessionSpecTestKit
