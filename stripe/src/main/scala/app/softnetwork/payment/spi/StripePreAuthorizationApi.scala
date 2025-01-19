@@ -250,7 +250,7 @@ trait StripePreAuthorizationApi extends PreAuthorizationApi { _: StripeContext =
       }
     } else {
       mlog.error(s"Unsupported payment type: $paymentType")
-      return None
+      None
     }
   }
 
@@ -347,13 +347,24 @@ trait StripePreAuthorizationApi extends PreAuthorizationApi { _: StripeContext =
     preAuthorizedTransactionId: String
   ): Boolean = {
     Try {
-      PaymentIntent
+      val payment = PaymentIntent
         .retrieve(preAuthorizedTransactionId, StripeApi().requestOptions)
-        .cancel(PaymentIntentCancelParams.builder().build(), StripeApi().requestOptions)
+      payment.getStatus match {
+        case "requires_payment_method" | "requires_capture" | "requires_confirmation" |
+            "requires_action" | "processing" =>
+          payment.cancel(
+            PaymentIntentCancelParams.builder().build(),
+            StripeApi().requestOptions
+          )
+        case _ => payment
+      }
     } match {
-      case Success(_) =>
-        mlog.info(s"Pre authorization canceled for order -> $orderUuid")
-        true
+      case Success(payment) =>
+        val canceled = payment.getStatus == "canceled"
+        mlog.info(
+          s"Pre authorization ${payment.getId} with status ${payment.getStatus} ${if (!canceled) { "not " }}canceled for order -> $orderUuid"
+        )
+        canceled
       case Failure(f) =>
         mlog.error(f.getMessage, f)
         false
