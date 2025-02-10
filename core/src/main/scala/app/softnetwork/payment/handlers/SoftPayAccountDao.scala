@@ -56,7 +56,10 @@ trait SoftPayAccountDao extends AccountDao with SoftPayAccountHandler {
     implicit val ec: ExecutionContext = system.executionContext
     ??(token, AccountMessages.OAuthClient(token)) map {
       case result: AccountMessages.OAuthClientSucceededResult => Some(result.client)
-      case _                                                  => None
+      case error: AccountErrorMessage =>
+        log.error(s"oauth2 failed with token [$token] -> ${error.message}")
+        None
+      case _ => None
     }
   }
 

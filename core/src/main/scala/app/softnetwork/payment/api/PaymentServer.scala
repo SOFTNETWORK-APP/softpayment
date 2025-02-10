@@ -278,7 +278,9 @@ trait PaymentServer extends PaymentServiceApi with PaymentDao {
           Some(bankAccount.ownerAddress),
           None
         )
-      case _ => LoadLegalUserResponse()
+      case _ =>
+        log.warn(s"legal user not found for externalUuid: $externalUuid")
+        LoadLegalUserResponse()
     }
   }
 

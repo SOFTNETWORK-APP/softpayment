@@ -18,7 +18,7 @@ class PaymentGrpcService(server: PaymentServer, softPayAccountDao: SoftPayAccoun
   override def grpcService: ActorSystem[_] => PartialFunction[HttpRequest, Future[HttpResponse]] =
     system => PaymentServiceApiHandler.partial(server)(system)
 
-  override def route: ActorSystem[_] => Route = system =>
+  /* FIXME override def route: ActorSystem[_] => Route = system =>
     authenticateOAuth2Async(
       AccountSettings.Realm,
       {
@@ -44,6 +44,6 @@ class PaymentGrpcService(server: PaymentServer, softPayAccountDao: SoftPayAccoun
             HttpChallenges.oAuth2(AccountSettings.Realm)
           )
         )
-    }
+    }*/
 
 }
