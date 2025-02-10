@@ -45,7 +45,7 @@ object SoftPayClientSettings {
   lazy val SP_SECRETS: String = sys.env.getOrElse("SP_SECRETS", SP_ROOT + "/secrets")
 
   def apply(system: ActorSystem[_]): SoftPayClientSettings = {
-    val clientConfigFile: Path = Paths.get(s"$SP_ROOT/config/application.conf")
+    val clientConfigFile: Path = Paths.get(s"$SP_CONFIG/application.conf")
     val systemConfig = system.settings.config.getConfig("payment")
     val clientConfig: Config = {
       if (
