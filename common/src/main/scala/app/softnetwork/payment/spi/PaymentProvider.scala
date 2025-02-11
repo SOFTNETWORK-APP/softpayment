@@ -16,7 +16,8 @@ private[payment] trait PaymentProvider
     with PayOutApi
     with TransferApi
     with RefundApi
-    with RecurringPaymentApi {
+    with RecurringPaymentApi
+    with BalanceApi {
 
   protected lazy val mlog: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
 

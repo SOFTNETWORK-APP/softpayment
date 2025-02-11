@@ -3,16 +3,15 @@ package app.softnetwork.payment.spi
 import app.softnetwork.payment.config.StripeApi
 import app.softnetwork.payment.model.{PayOutTransaction, Transaction, TransferTransaction}
 import app.softnetwork.serialization.asJson
-import com.stripe.model.Balance
 //import com.stripe.param.PaymentIntentCaptureParams
-import com.google.gson.Gson
 import com.stripe.model.{PaymentIntent, Payout, Transfer}
 import com.stripe.param.PayoutCreateParams
 
 import scala.util.{Failure, Success, Try}
 import collection.JavaConverters._
 
-trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferApi =>
+trait StripePayOutApi extends PayOutApi {
+  _: StripeContext with StripeTransferApi with StripeBalanceApi =>
 
   /** @param maybePayOutTransaction
     *   - pay out transaction
@@ -172,23 +171,9 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
                 requestOptions = requestOptions.setStripeAccount(payOutTransaction.creditedUserId)
 
                 // load balance
-                val balances: Seq[Balance.Available] =
-                  Balance
-                    .retrieve(requestOptions.build())
-                    .getAvailable
-                    .asScala
-                    .toSeq
-
                 val availableAmount =
-                  balances.find(
-                    _.getCurrency.toLowerCase() == payOutTransaction.currency.toLowerCase
-                  ) match {
-                    case Some(balance) =>
-                      balance.getAmount.intValue()
-                    case None =>
-                      mlog.info(s"balances -> ${new Gson().toJson(balances)}")
-                      0
-                  }
+                  loadBalance(payOutTransaction.currency, Option(payOutTransaction.creditedUserId))
+                    .getOrElse(0)
 
                 mlog.info(
                   s"balance available amount for ${payOutTransaction.creditedUserId} is $availableAmount"
@@ -207,23 +192,7 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
               } else {
                 // we receive funds from Stripe
                 // load balance
-                val balances: Seq[Balance.Available] =
-                  Balance
-                    .retrieve(requestOptions.build())
-                    .getAvailable
-                    .asScala
-                    .toSeq
-
-                val availableAmount =
-                  balances.find(
-                    _.getCurrency.toLowerCase() == payOutTransaction.currency.toLowerCase
-                  ) match {
-                    case Some(balance) =>
-                      balance.getAmount.intValue()
-                    case None =>
-                      mlog.info(s"balances -> ${new Gson().toJson(balances)}")
-                      0
-                  }
+                val availableAmount = loadBalance(payOutTransaction.currency, None).getOrElse(0)
 
                 mlog.info(s"balance available amount for our stripe account is $availableAmount")
 

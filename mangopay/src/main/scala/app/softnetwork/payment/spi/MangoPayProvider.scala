@@ -2650,6 +2650,15 @@ trait MangoPayProvider extends PaymentProvider {
     }
   }
 
+  /** @param currency
+   *   - currency
+   * @param creditedUserId
+   *   - optional credited user id
+   * @return
+   *   balance
+   */
+  override def loadBalance(currency: String, creditedUserId: Option[String]): Option[Int] =
+    clientFees().map(fees => (fees * 100).toInt)
 }
 
 class MangoPayProviderFactory extends PaymentProviderSpi {

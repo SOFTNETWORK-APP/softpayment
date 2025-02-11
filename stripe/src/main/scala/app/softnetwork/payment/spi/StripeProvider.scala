@@ -36,7 +36,8 @@ trait StripeProvider
     with StripePayOutApi
     with StripeRecurringPaymentApi
     with StripeRefundApi
-    with StripeTransferApi {
+    with StripeTransferApi
+    with StripeBalanceApi {
 
   /** @return
     *   client
