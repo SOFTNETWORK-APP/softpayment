@@ -152,14 +152,14 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
               // either receive funds from Stripe or
               // send funds to the bank account of the connected Stripe account
 
-              val requestOptions =
-                StripeApi().requestOptionsBuilder
+              var requestOptions = StripeApi().requestOptionsBuilder
 
               val params =
                 PayoutCreateParams
                   .builder()
                   .setCurrency(payOutTransaction.currency)
                   .setMethod(PayoutCreateParams.Method.STANDARD)
+                  .setSourceType(PayoutCreateParams.SourceType.FPX)
                   .putMetadata("order_uuid", payOutTransaction.orderUuid)
                   .putMetadata("debited_amount", payOutTransaction.debitedAmount.toString)
                   .putMetadata("fees_amount", payOutTransaction.feesAmount.toString)
@@ -169,7 +169,7 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
               if (payOutTransaction.bankAccountId.trim.nonEmpty) {
                 // we send funds to the specified bank account of a connected Stripe account
 
-                requestOptions.setStripeAccount(payOutTransaction.creditedUserId)
+                requestOptions = requestOptions.setStripeAccount(payOutTransaction.creditedUserId)
 
                 // load balance
                 val availableAmount =
@@ -184,7 +184,15 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
                       0
                   }
 
+                mlog.info(
+                  s"balance available amount for ${payOutTransaction.creditedUserId} is $availableAmount"
+                )
+
                 amountToTransfer = Math.min(amountToTransfer, availableAmount)
+
+                mlog.info(
+                  s"amount to transfer to ${payOutTransaction.bankAccountId} is $amountToTransfer"
+                )
 
                 params
                   .setAmount(amountToTransfer)
@@ -205,7 +213,11 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
                       0
                   }
 
+                mlog.info(s"balance available amount for our stripe account is $availableAmount")
+
                 amountToTransfer = Math.min(amountToTransfer, availableAmount)
+
+                mlog.info(s"amount to transfer to our stripe account is $amountToTransfer")
 
                 params
                   .setAmount(amountToTransfer)
