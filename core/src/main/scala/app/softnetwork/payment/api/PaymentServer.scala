@@ -321,6 +321,16 @@ trait PaymentServer extends PaymentServiceApi with PaymentDao {
         )
     }
   }
+
+  override def loadBalance(in: LoadBalanceRequest): Future[LoadBalanceResponse] = {
+    import in._
+    loadBalance(externalUuid.getOrElse(ALL_KEY), currency, Some(clientId)) map {
+      case Right(r) =>
+        LoadBalanceResponse(Some(r.balance))
+      case Left(_) =>
+        LoadBalanceResponse()
+    }
+  }
 }
 
 object PaymentServer {

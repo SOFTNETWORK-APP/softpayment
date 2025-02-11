@@ -516,6 +516,18 @@ trait PaymentDao extends PaymentHandler {
         )
     }
   }
+
+  @InternalApi
+  private[payment] def loadBalance(account: String, currency: String, clientId: Option[String])(
+    implicit system: ActorSystem[_]
+  ): Future[Either[String, BalanceLoaded]] = {
+    implicit val ec: ExecutionContextExecutor = system.executionContext
+    !?(LoadBalance(account, currency, clientId)) map {
+      case result: BalanceLoaded => Right(result)
+      case error: PaymentError   => Left(error.message)
+      case _                     => Left("unknown")
+    }
+  }
 }
 
 object PaymentDao extends PaymentDao {

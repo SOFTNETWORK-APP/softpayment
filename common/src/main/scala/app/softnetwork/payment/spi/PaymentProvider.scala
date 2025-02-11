@@ -26,9 +26,4 @@ private[payment] trait PaymentProvider
     */
   def client: Option[SoftPayAccount.Client]
 
-  /** @return
-    *   client fees
-    */
-  def clientFees(): Option[Double]
-
 }

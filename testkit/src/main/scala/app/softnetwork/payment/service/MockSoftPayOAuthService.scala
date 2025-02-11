@@ -3,7 +3,12 @@ package app.softnetwork.payment.service
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import app.softnetwork.account.config.AccountSettings
-import app.softnetwork.account.message.{AccessTokenGenerated, AccountErrorMessage, GenerateAccessToken, Tokens}
+import app.softnetwork.account.message.{
+  AccessTokenGenerated,
+  AccountErrorMessage,
+  GenerateAccessToken,
+  Tokens
+}
 import app.softnetwork.account.spi.OAuth2Service
 import app.softnetwork.payment.handlers.MockSoftPayAccountTypeKey
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -58,7 +63,7 @@ trait MockSoftPayOAuthService[SD <: SessionData with SessionDataDecorator[SD]]
           complete(
             StatusCodes.BadRequest,
             Map(
-              "error" -> "access_denied",
+              "error"             -> "access_denied",
               "error_description" -> error.message
             )
           )

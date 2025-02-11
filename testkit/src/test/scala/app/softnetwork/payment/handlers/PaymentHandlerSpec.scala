@@ -865,10 +865,11 @@ class PaymentHandlerSpec
               assert(result.error.getOrElse("") == "DebitedAmountAbovePreAuthorizationAmount")
             case Failure(f) => fail(f.getMessage)
           }
+          val debitedAmount = 90
           paymentClient.payInWithPreAuthorization(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-            Some(90)
+            Some(debitedAmount)
           ) complete () match {
             case Success(result) =>
               assert(result.transactionId.isDefined)
@@ -885,6 +886,15 @@ class PaymentHandlerSpec
                       .getOrElse(false)
                   )
                 case other => fail(other.getClass.toString)
+              }
+              paymentClient.loadBalance(
+                "EUR",
+                Option(computeExternalUuidWithProfile(sellerUuid, Some("seller"))),
+                None
+              ) complete () match {
+                case Success(balance) =>
+                  assert(balance.getOrElse(0) == debitedAmount)
+                case Failure(f) => fail(f.getMessage)
               }
               paymentClient.payOut(
                 orderUuid,

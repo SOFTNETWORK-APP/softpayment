@@ -2039,6 +2039,24 @@ trait PaymentBehavior
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
 
+      case cmd: LoadBalance =>
+        val currency = cmd.currency
+        val walletId = state.flatMap(_.walletId)
+        val clientId = state
+          .flatMap(_.clientId)
+          .orElse(cmd.clientId)
+          .orElse(
+            internalClientId
+          )
+        val paymentProvider = loadPaymentProvider(clientId)
+        import paymentProvider._
+        loadBalance(currency, walletId) match {
+          case Some(balance) =>
+            Effect.none.thenRun(_ => BalanceLoaded(balance) ~> replyTo)
+          case _ =>
+            Effect.none.thenRun(_ => BalanceNotLoaded ~> replyTo)
+        }
+
       case _ => super.handleCommand(entityId, state, command, replyTo, timers)
     }
   }

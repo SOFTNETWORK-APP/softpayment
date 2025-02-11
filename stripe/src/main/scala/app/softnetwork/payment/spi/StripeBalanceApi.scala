@@ -9,15 +9,15 @@ trait StripeBalanceApi extends BalanceApi { self: StripeContext =>
 
   /** @param currency
     *   - currency
-    * @param creditedUserId
-    *   - optional credited user id
+    * @param walletId
+    *   - optional wallet id
     * @return
     *   balance
     */
-  override def loadBalance(currency: String, creditedUserId: Option[String]): Option[Int] = {
+  override def loadBalance(currency: String, walletId: Option[String]): Option[Int] = {
     var requestOptions = StripeApi().requestOptionsBuilder
 
-    creditedUserId match {
+    walletId match {
       case Some(value) =>
         requestOptions = requestOptions.setStripeAccount(value)
       case _ =>
@@ -38,13 +38,13 @@ trait StripeBalanceApi extends BalanceApi { self: StripeContext =>
           balance.getAmount.intValue()
         case None =>
           mlog.info(
-            s"balances for ${creditedUserId.getOrElse(self.config.clientId)} -> ${new Gson().toJson(balances)}"
+            s"balances for ${walletId.getOrElse(self.config.clientId)} -> ${new Gson().toJson(balances)}"
           )
           0
       }
 
     mlog.info(
-      s"balance available amount for ${creditedUserId.getOrElse(self.config.clientId)} is $availableAmount"
+      s"balance available amount for ${walletId.getOrElse(self.config.clientId)} is $availableAmount"
     )
 
     Option(availableAmount)

@@ -11,13 +11,9 @@ import app.softnetwork.payment.service.{
   StripeHooksDirectives,
   StripeHooksEndpoints
 }
-import com.stripe.model.Balance
 import com.typesafe.config.Config
 import org.json4s.Formats
 import org.slf4j.Logger
-
-import collection.JavaConverters._
-import scala.util.{Failure, Success, Try}
 
 trait StripeContext extends PaymentContext {
 
@@ -48,25 +44,6 @@ trait StripeProvider
       .withClientId(provider.clientId)
   )
 
-  /** @return
-    *   client fees
-    */
-  override def clientFees(): Option[Double] = {
-    Try(
-      Balance
-        .retrieve(StripeApi().requestOptions)
-        .getAvailable
-        .asScala
-        .head
-        .getAmount
-        .toDouble / 100
-    ) match {
-      case Success(value) => Some(value)
-      case Failure(f) =>
-        mlog.error(s"Error while retrieving client fees: ${f.getMessage}")
-        None
-    }
-  }
 }
 
 class StripeProviderFactory extends PaymentProviderSpi {

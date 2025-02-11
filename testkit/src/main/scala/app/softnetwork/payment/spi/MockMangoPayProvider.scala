@@ -17,6 +17,7 @@ import app.softnetwork.payment.service.{
   MangoPayHooksEndpoints
 }
 import app.softnetwork.persistence._
+import app.softnetwork.persistence.model.Entity
 import app.softnetwork.time.DateExtensions
 import com.mangopay.core.enumerations.{TransactionStatus => MangoPayTransactionStatus, _}
 import com.mangopay.core.{Address => MangoPayAddress, _}
@@ -39,7 +40,7 @@ import java.util.{Calendar, Date, TimeZone}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
-trait MockMangoPayProvider extends MangoPayProvider {
+trait MockMangoPayProvider extends MangoPayProvider with Entity {
 
   import MockMangoPayProvider._
 
@@ -225,6 +226,7 @@ trait MockMangoPayProvider extends MangoPayProvider {
         payOut.setResultCode(OK)
         payOut.setResultMessage(SUCCEEDED)
         PayOuts = PayOuts.updated(payOut.getId, payOut)
+        ClientFees += feesAmount.toDouble / 100
         Some(
           Transaction()
             .copy(
@@ -814,6 +816,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
         payIn.setResultCode(OK)
         payIn.setResultMessage(SUCCEEDED)
         PayIns = PayIns.updated(payIn.getId, payIn)
+        Balances = Balances.updated(
+          creditedWalletId,
+          Balances.getOrElse(creditedWalletId, 0) + debitedAmount - feesAmount.getOrElse(0)
+        )
         Some(
           Transaction()
             .copy(
@@ -933,6 +939,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
           s"${executionDetails.getSecureModeReturnUrl}&transactionId=${payIn.getId}"
         )
         PayIns = PayIns.updated(payIn.getId, payIn)
+        Balances = Balances.updated(
+          creditedWalletId,
+          Balances.getOrElse(creditedWalletId, 0) + debitedAmount - feesAmount
+        )
 
         Some(
           Transaction().copy(
@@ -997,6 +1007,10 @@ trait MockMangoPayProvider extends MangoPayProvider {
           s"${executionDetails.getReturnUrl}&transactionId=${payIn.getId}"
         )
         PayIns = PayIns.updated(payIn.getId, payIn)
+        Balances = Balances.updated(
+          creditedWalletId,
+          Balances.getOrElse(creditedWalletId, 0) + debitedAmount - feesAmount
+        )
 
         Some(
           Transaction().copy(
@@ -1330,10 +1344,12 @@ trait MockMangoPayProvider extends MangoPayProvider {
         .withClientId(provider.clientId)
     )
 
-  /** @return
+  /** @param currency
+    *   - optional currency
+    * @return
     *   client fees
     */
-  override def clientFees(): Option[Double] = Some(ClientFees)
+  override def clientFees(currency: Option[String] = None): Option[Double] = Some(ClientFees)
 
   /** @param userId
     *   - Provider user id
@@ -1763,6 +1779,16 @@ trait MockMangoPayProvider extends MangoPayProvider {
       case _ => None
     }
   }
+
+  /** @param currency
+    *   - currency
+    * @param walletId
+    *   - optional wallet id
+    * @return
+    *   balance
+    */
+  override def loadBalance(currency: String, walletId: Option[String]): Option[Int] =
+    Balances.get(walletId.getOrElse(ALL_KEY))
 }
 
 object MockMangoPayProvider {
@@ -1798,6 +1824,7 @@ object MockMangoPayProvider {
 
   var ClientFees: Double = 0d
 
+  var Balances: Map[String, Int] = Map.empty
 }
 
 case class RecurringCardPaymentRegistration(

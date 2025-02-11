@@ -2,7 +2,6 @@ package app.softnetwork.payment.api
 
 import akka.actor.typed.ActorSystem
 import akka.grpc.GrpcClientSettings
-import akka.grpc.scaladsl.SingleResponseRequestBuilder
 import app.softnetwork.api.server.client.{GrpcClient, GrpcClientFactory}
 import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.api.serialization._
@@ -12,6 +11,7 @@ import app.softnetwork.payment.model.{
   PaymentAccount,
   RecurringPayment
 }
+import org.softnetwork.session.model.JwtClaims
 
 import java.util.Date
 import scala.concurrent.Future
@@ -26,24 +26,19 @@ trait PaymentClient extends GrpcClient {
 
   private lazy val generatedToken: String = settings.generateToken()
 
-  private def withAuthorization[Req, Res](
-    single: SingleResponseRequestBuilder[Req, Res],
-    token: Option[String]
-  ): SingleResponseRequestBuilder[Req, Res] = {
-    oauth2(single, token.getOrElse(generatedToken))
-  }
-
   def createOrUpdatePaymentAccount(
     paymentAccount: PaymentAccount,
     token: Option[String] = None
   ): Future[Boolean] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.createOrUpdatePaymentAccount(),
-      token
+      t
     )
       .invoke(
         CreateOrUpdatePaymentAccountRequest(
-          Some(paymentAccount.withClientId(settings.clientId))
+          Some(paymentAccount.withClientId(clientId.getOrElse(settings.clientId)))
         )
       ) map (_.succeeded)
   }
@@ -55,9 +50,11 @@ trait PaymentClient extends GrpcClient {
     feesAmount: Option[Int] = None,
     token: Option[String] = None
   ): Future[TransactionResponse] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.payInWithPreAuthorization(),
-      token
+      t
     )
       .invoke(
         PayInWithPreAuthorizationRequest(
@@ -65,7 +62,7 @@ trait PaymentClient extends GrpcClient {
           creditedAccount,
           debitedAmount,
           feesAmount,
-          settings.clientId
+          clientId.getOrElse(settings.clientId)
         )
       )
   }
@@ -75,12 +72,18 @@ trait PaymentClient extends GrpcClient {
     payInTransactionId: String,
     token: Option[String] = None
   ): Future[TransactionResponse] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.loadPayInTransaction(),
-      token
+      t
     )
       .invoke(
-        LoadPayInTransactionRequest(orderUuid, payInTransactionId, settings.clientId)
+        LoadPayInTransactionRequest(
+          orderUuid,
+          payInTransactionId,
+          clientId.getOrElse(settings.clientId)
+        )
       )
   }
 
@@ -89,12 +92,18 @@ trait PaymentClient extends GrpcClient {
     cardPreAuthorizedTransactionId: String,
     token: Option[String] = None
   ): Future[Option[Boolean]] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.cancelPreAuthorization(),
-      token
+      t
     )
       .invoke(
-        CancelPreAuthorizationRequest(orderUuid, cardPreAuthorizedTransactionId, settings.clientId)
+        CancelPreAuthorizationRequest(
+          orderUuid,
+          cardPreAuthorizedTransactionId,
+          clientId.getOrElse(settings.clientId)
+        )
       ) map (_.preAuthorizationCanceled)
   }
 
@@ -108,9 +117,11 @@ trait PaymentClient extends GrpcClient {
     initializedByClient: Boolean,
     token: Option[String] = None
   ): Future[TransactionResponse] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.refund(),
-      token
+      t
     )
       .invoke(
         RefundRequest(
@@ -121,7 +132,7 @@ trait PaymentClient extends GrpcClient {
           currency,
           reasonMessage,
           initializedByClient,
-          settings.clientId
+          clientId.getOrElse(settings.clientId)
         )
       )
   }
@@ -136,9 +147,11 @@ trait PaymentClient extends GrpcClient {
     payInTransactionId: Option[String],
     token: Option[String] = None
   ): Future[TransactionResponse] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.payOut(),
-      token
+      t
     )
       .invoke(
         PayOutRequest(
@@ -148,7 +161,7 @@ trait PaymentClient extends GrpcClient {
           feesAmount,
           currency,
           externalReference,
-          settings.clientId,
+          clientId.getOrElse(settings.clientId),
           payInTransactionId
         )
       )
@@ -159,12 +172,18 @@ trait PaymentClient extends GrpcClient {
     payOutTransactionId: String,
     token: Option[String] = None
   ): Future[TransactionResponse] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.loadPayOutTransaction(),
-      token
+      t
     )
       .invoke(
-        LoadPayOutTransactionRequest(orderUuid, payOutTransactionId, settings.clientId)
+        LoadPayOutTransactionRequest(
+          orderUuid,
+          payOutTransactionId,
+          clientId.getOrElse(settings.clientId)
+        )
       )
   }
 
@@ -179,9 +198,11 @@ trait PaymentClient extends GrpcClient {
     externalReference: Option[String],
     token: Option[String] = None
   ): Future[TransferResponse] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.transfer(),
-      token
+      t
     )
       .invoke(
         TransferRequest(
@@ -193,7 +214,7 @@ trait PaymentClient extends GrpcClient {
           currency,
           payOutRequired,
           externalReference,
-          settings.clientId
+          clientId.getOrElse(settings.clientId)
         )
       )
   }
@@ -207,9 +228,11 @@ trait PaymentClient extends GrpcClient {
     externalReference: Option[String],
     token: Option[String] = None
   ): Future[TransactionResponse] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.directDebit(),
-      token
+      t
     )
       .invoke(
         DirectDebitRequest(
@@ -219,7 +242,7 @@ trait PaymentClient extends GrpcClient {
           currency,
           statementDescriptor,
           externalReference,
-          settings.clientId
+          clientId.getOrElse(settings.clientId)
         )
       )
   }
@@ -228,12 +251,17 @@ trait PaymentClient extends GrpcClient {
     directDebitTransactionId: String,
     token: Option[String] = None
   ): Future[TransactionResponse] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.loadDirectDebitTransaction(),
-      token
+      t
     )
       .invoke(
-        LoadDirectDebitTransactionRequest(directDebitTransactionId, settings.clientId)
+        LoadDirectDebitTransactionRequest(
+          directDebitTransactionId,
+          clientId.getOrElse(settings.clientId)
+        )
       )
   }
 
@@ -253,9 +281,11 @@ trait PaymentClient extends GrpcClient {
     externalReference: Option[String],
     token: Option[String] = None
   ): Future[Option[String]] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.registerRecurringPayment(),
-      token
+      t
     )
       .invoke(
         RegisterRecurringPaymentRequest(
@@ -276,51 +306,79 @@ trait PaymentClient extends GrpcClient {
           nextFeesAmount,
           statementDescriptor,
           externalReference,
-          settings.clientId
+          clientId.getOrElse(settings.clientId)
         )
       ) map (_.recurringPaymentRegistrationId)
   }
 
   def cancelMandate(externalUuid: String, token: Option[String] = None): Future[Boolean] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.cancelMandate(),
-      token
+      t
     )
-      .invoke(CancelMandateRequest(externalUuid)) map (_.succeeded)
+      .invoke(
+        CancelMandateRequest(externalUuid, clientId.getOrElse(settings.clientId))
+      ) map (_.succeeded)
   }
 
   def loadBankAccountOwner(
     externalUuid: String,
     token: Option[String] = None
   ): Future[BankAccountOwner] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.loadBankAccountOwner(),
-      token
+      t
     )
-      .invoke(LoadBankAccountOwnerRequest(externalUuid, settings.clientId)) map (response =>
-      BankAccountOwner(response.ownerName, response.ownerAddress)
-    )
+      .invoke(
+        LoadBankAccountOwnerRequest(externalUuid, clientId.getOrElse(settings.clientId))
+      ) map (response => BankAccountOwner(response.ownerName, response.ownerAddress))
   }
 
   def loadLegalUserDetails(
     externalUuid: String,
     token: Option[String] = None
   ): Future[LegalUserDetails] = {
-    withAuthorization(
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
       grpcClient.loadLegalUser(),
-      token
+      t
     )
-      .invoke(LoadLegalUserRequest(externalUuid, settings.clientId)) map (response =>
-      LegalUserDetails(
-        response.legalUserType,
-        response.legalName,
-        response.siret,
-        response.legalRepresentativeAddress,
-        response.headQuartersAddress
-      )
+      .invoke(LoadLegalUserRequest(externalUuid, clientId.getOrElse(settings.clientId))) map (
+      response =>
+        LegalUserDetails(
+          response.legalUserType,
+          response.legalName,
+          response.siret,
+          response.legalRepresentativeAddress,
+          response.headQuartersAddress
+        )
     )
   }
 
+  def loadBalance(
+    currency: String,
+    externalUuid: Option[String],
+    token: Option[String] = None
+  ): Future[Option[Int]] = {
+    val t = token.getOrElse(generatedToken)
+    val clientId = JwtClaims(t).clientId
+    oauth2(
+      grpcClient.loadBalance(),
+      t
+    )
+      .invoke(
+        LoadBalanceRequest(
+          currency,
+          externalUuid,
+          clientId.getOrElse(settings.clientId)
+        )
+      ) map (_.balance)
+  }
 }
 
 object PaymentClient extends GrpcClientFactory[PaymentClient] {

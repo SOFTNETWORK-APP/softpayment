@@ -28,6 +28,7 @@ service PaymentServiceApi {
     rpc LoadLegalUser(LoadLegalUserRequest) returns (LoadLegalUserResponse) {}
     rpc LoadPayInTransaction(LoadPayInTransactionRequest) returns (TransactionResponse) {}
     rpc LoadPayOutTransaction (LoadPayOutTransactionRequest) returns (TransactionResponse) {}
+    rpc LoadBalance (LoadBalanceRequest) returns (LoadBalanceResponse) {}
 }
 
 message CreateOrUpdatePaymentAccountRequest {
@@ -213,4 +214,14 @@ message LoadPayOutTransactionRequest {
     string orderUuid = 1;
     string payOutTransactionId = 2;
     string clientId = 3;
+}
+
+message LoadBalanceRequest {
+    string currency = 1;
+    google.protobuf.StringValue externalUuid = 2;
+    string clientId = 3;
+}
+
+message LoadBalanceResponse {
+    google.protobuf.Int32Value balance = 1;
 }

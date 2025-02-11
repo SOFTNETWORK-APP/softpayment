@@ -2177,18 +2177,6 @@ trait MangoPayProvider extends PaymentProvider {
     }
   }
 
-  /** @return
-    *   client fees
-    */
-  override def clientFees(): Option[Double] = {
-    Try(MangoPay().getClientApi.getWallet(FundsType.FEES, CurrencyIso.EUR)) match {
-      case Success(wallet) => Some(wallet.getBalance.getAmount.toDouble / 100)
-      case Failure(f) =>
-        mlog.error(f.getMessage, f)
-        None
-    }
-  }
-
   /** @param userId
     *   - Provider user id
     * @return
@@ -2651,14 +2639,36 @@ trait MangoPayProvider extends PaymentProvider {
   }
 
   /** @param currency
-   *   - currency
-   * @param creditedUserId
-   *   - optional credited user id
-   * @return
-   *   balance
-   */
-  override def loadBalance(currency: String, creditedUserId: Option[String]): Option[Int] =
-    clientFees().map(fees => (fees * 100).toInt)
+    *   - currency
+    * @param walletId
+    *   - optional wallet id
+    * @return
+    *   balance
+    */
+  override def loadBalance(currency: String, walletId: Option[String]): Option[Int] =
+    walletId match {
+      case Some(value) =>
+        Try(MangoPay().getWalletApi.get(value)) match {
+          case Success(wallet) =>
+            if (wallet.getCurrency == CurrencyIso.valueOf(currency)) {
+              Some(wallet.getBalance.getAmount)
+            } else {
+              None
+            }
+          case Failure(f) =>
+            mlog.error(f.getMessage, f)
+            None
+        }
+      case None =>
+        Try(
+          MangoPay().getClientApi.getWallet(FundsType.FEES, CurrencyIso.valueOf(currency))
+        ) match {
+          case Success(wallet) => Some(wallet.getBalance.getAmount)
+          case Failure(f) =>
+            mlog.error(f.getMessage, f)
+            None
+        }
+    }
 }
 
 class MangoPayProviderFactory extends PaymentProviderSpi {

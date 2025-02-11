@@ -74,7 +74,7 @@ trait SoftPayOAuthService[SD <: SessionData with SessionDataDecorator[SD]]
           complete(
             StatusCodes.BadRequest,
             Map(
-              "error" -> "access_denied",
+              "error"             -> "access_denied",
               "error_description" -> error.message
             )
           )
@@ -104,7 +104,7 @@ trait SoftPayOAuthService[SD <: SessionData with SessionDataDecorator[SD]]
           complete(
             StatusCodes.BadRequest,
             Map(
-              "error" -> "access_denied",
+              "error"             -> "access_denied",
               "error_description" -> error.message
             )
           )

@@ -918,6 +918,23 @@ object PaymentMessages {
     lazy val key: String = paymentAccount.externalUuidWithProfile
   }
 
+  /** @param account
+    *   - account for whom the balance would be loaded
+    * @param currency
+    *   - currency of the balance
+    * @param clientId
+    *   - optional client id
+    */
+  @InternalApi
+  private[payment] case class LoadBalance(
+    account: String,
+    currency: String,
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey
+      with PaymentAccountCommand {
+    val key: String = account
+  }
+
   trait PaymentResult extends CommandResult
 
   case class PaymentMethodPreRegistered(preRegistration: PreRegistration) extends PaymentResult
@@ -1053,6 +1070,8 @@ object PaymentMessages {
     transactionStatus: Transaction.TransactionStatus,
     error: Option[String]
   ) extends PaymentResult
+
+  case class BalanceLoaded(balance: Int) extends PaymentResult
 
   class PaymentError(override val message: String) extends ErrorMessage(message) with PaymentResult
 
@@ -1195,6 +1214,8 @@ object PaymentMessages {
   case object Schedule4PaymentNotTriggered extends PaymentError("Schedule4PaymentNotTriggered")
 
   case class PayInWithCardPreAuthorizedFailed(error: String) extends PaymentError(error)
+
+  case object BalanceNotLoaded extends PaymentError("BalanceNotLoaded")
 
   trait ExternalEntityToPaymentEventDecorator extends PaymentEventWithCommand {
     _: ExternalEntityToPaymentEvent =>
