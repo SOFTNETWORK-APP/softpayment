@@ -159,7 +159,7 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
                   .builder()
                   .setCurrency(payOutTransaction.currency)
                   .setMethod(PayoutCreateParams.Method.STANDARD)
-                  .setSourceType(PayoutCreateParams.SourceType.FPX)
+//                  .setSourceType(PayoutCreateParams.SourceType.CARD)
                   .putMetadata("order_uuid", payOutTransaction.orderUuid)
                   .putMetadata("debited_amount", payOutTransaction.debitedAmount.toString)
                   .putMetadata("fees_amount", payOutTransaction.feesAmount.toString)
@@ -180,7 +180,9 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
                     .toSeq
 
                 val availableAmount =
-                    balances.find(_.getCurrency.toLowerCase() == payOutTransaction.currency.toLowerCase) match {
+                  balances.find(
+                    _.getCurrency.toLowerCase() == payOutTransaction.currency.toLowerCase
+                  ) match {
                     case Some(balance) =>
                       balance.getAmount.intValue()
                     case None =>
@@ -213,7 +215,9 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
                     .toSeq
 
                 val availableAmount =
-                  balances.find(_.getCurrency.toLowerCase() == payOutTransaction.currency.toLowerCase) match {
+                  balances.find(
+                    _.getCurrency.toLowerCase() == payOutTransaction.currency.toLowerCase
+                  ) match {
                     case Some(balance) =>
                       balance.getAmount.intValue()
                     case None =>
