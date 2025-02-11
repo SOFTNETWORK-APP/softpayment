@@ -172,15 +172,19 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
                 requestOptions = requestOptions.setStripeAccount(payOutTransaction.creditedUserId)
 
                 // load balance
-                val availableAmount =
+                val balances: Seq[Balance.Available] =
                   Balance
                     .retrieve(requestOptions.build())
                     .getAvailable
                     .asScala
-                    .find(_.getCurrency == payOutTransaction.currency) match {
+                    .toSeq
+
+                val availableAmount =
+                    balances.find(_.getCurrency.toLowerCase() == payOutTransaction.currency.toLowerCase) match {
                     case Some(balance) =>
                       balance.getAmount.intValue()
                     case None =>
+                      mlog.info(s"balances -> ${new Gson().toJson(balances)}")
                       0
                   }
 
@@ -201,15 +205,19 @@ trait StripePayOutApi extends PayOutApi { _: StripeContext with StripeTransferAp
               } else {
                 // we receive funds from Stripe
                 // load balance
-                val availableAmount =
+                val balances: Seq[Balance.Available] =
                   Balance
                     .retrieve(requestOptions.build())
                     .getAvailable
                     .asScala
-                    .find(_.getCurrency == payOutTransaction.currency) match {
+                    .toSeq
+
+                val availableAmount =
+                  balances.find(_.getCurrency.toLowerCase() == payOutTransaction.currency.toLowerCase) match {
                     case Some(balance) =>
                       balance.getAmount.intValue()
                     case None =>
+                      mlog.info(s"balances -> ${new Gson().toJson(balances)}")
                       0
                   }
 
