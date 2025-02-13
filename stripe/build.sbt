@@ -4,5 +4,5 @@ name := "stripe-core"
 
 libraryDependencies ++= Seq(
   // stripe
-  "com.stripe" % "stripe-java" % "26.2.0"
+  "com.stripe" % "stripe-java" % "28.3.1"
 )
