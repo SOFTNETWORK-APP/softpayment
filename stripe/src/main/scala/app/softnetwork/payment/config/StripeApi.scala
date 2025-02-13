@@ -18,12 +18,27 @@ import java.nio.file.Paths
 import scala.util.{Failure, Success, Try}
 
 case class StripeApi(
-  private val request: RequestOptionsBuilder,
+  private val baseUrl: String,
+  private val clientId: String,
+  private val apiKey: String,
   hash: String
 ) {
-  lazy val requestOptionsBuilder: RequestOptionsBuilder = request.clearStripeAccount()
+  private def requestOptionsBuilder(stripeAccount: Option[String]): RequestOptionsBuilder = {
+    val options = RequestOptions
+      .builder()
+      .setBaseUrl(baseUrl)
+      .setClientId(clientId)
+      .setApiKey(apiKey)
+    stripeAccount match {
+      case Some(value) =>
+        options.setStripeAccount(value)
+      case _ =>
+        options
+    }
+  }
 
-  lazy val requestOptions: RequestOptions = requestOptionsBuilder.build()
+  def requestOptions(stripeAccount: Option[String] = None): RequestOptions =
+    requestOptionsBuilder(stripeAccount).build()
 
   lazy val secret: Option[String] = StripeApi.loadSecret(hash)
 }
@@ -96,15 +111,17 @@ object StripeApi {
       case Some(stripeApi) => stripeApi
       case _               =>
         // init Stripe request options
-        val requestOptions = RequestOptions
-          .builder()
-          .setBaseUrl(config.baseUrl)
-          .setClientId(provider.providerId)
-          .setApiKey(provider.providerApiKey)
+        val baseUrl = config.baseUrl
+        val clientId = provider.providerId
+        val apiKey = provider.providerApiKey
 
         // create / update stripe webhook endpoint
 
         val hash = sha256(provider.clientId)
+
+        val stripeApi = StripeApi(baseUrl, clientId, apiKey, hash)
+
+        val requestOptions = stripeApi.requestOptions()
 
         val url = s"${config.hooksBaseUrl}?hash=$hash"
 
@@ -115,7 +132,7 @@ object StripeApi {
             WebhookEndpoint
               .list(
                 WebhookEndpointListParams.builder().setLimit(3L).build(),
-                requestOptions.build()
+                requestOptions
               )
               .getData
           ) match {
@@ -128,7 +145,7 @@ object StripeApi {
               Console.println(s"Webhook endpoint found: ${webhookEndpoint.getId}")
               loadSecret(hash) match {
                 case None =>
-                  Try(webhookEndpoint.delete(requestOptions.build()))
+                  Try(webhookEndpoint.delete(requestOptions))
                   None
                 case value =>
                   val url = s"${config.hooksBaseUrl}?hash=$hash"
@@ -144,7 +161,7 @@ object StripeApi {
                         )
                         .setUrl(url)
                         .build(),
-                      requestOptions.build()
+                      requestOptions
                     )
                   )
                   value
@@ -166,17 +183,16 @@ object StripeApi {
                   .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)
                   .setConnect(true)
                   .build(),
-                requestOptions.build()
+                requestOptions
               )
               .getSecret
           }
 
         } match {
           case Success(secret) =>
-            val ret = StripeApi(requestOptions, hash)
-            stripeApis = stripeApis.updated(provider.providerId, ret)
+            stripeApis = stripeApis.updated(provider.providerId, stripeApi)
             addSecret(hash, secret)
-            ret
+            stripeApi
           case Failure(f) =>
             Console.err.println(s"Error creating stripe webhook endpoint: ${f.getMessage}")
             throw f

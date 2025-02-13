@@ -3,6 +3,7 @@ package app.softnetwork.payment.spi
 import app.softnetwork.payment.config.StripeApi
 import app.softnetwork.payment.model.{PayOutTransaction, Transaction, TransferTransaction}
 import app.softnetwork.serialization.asJson
+import com.google.gson.Gson
 //import com.stripe.param.PaymentIntentCaptureParams
 import com.stripe.model.{PaymentIntent, Payout, Transfer}
 import com.stripe.param.PayoutCreateParams
@@ -57,7 +58,7 @@ trait StripePayOutApi extends PayOutApi {
 
               transfer(Some(transferTransaction))
 
-            /*val requestOptions = StripeApi().requestOptions
+            /*val requestOptions = StripeApi().requestOptions()
 
               val resource =
                 PaymentIntent.retrieve(payInTransactionId, requestOptions)
@@ -151,7 +152,7 @@ trait StripePayOutApi extends PayOutApi {
               // either receive funds from Stripe or
               // send funds to the bank account of the connected Stripe account
 
-              var requestOptions = StripeApi().requestOptionsBuilder
+              var stripeAccount: Option[String] = None
 
               val params =
                 PayoutCreateParams
@@ -163,23 +164,23 @@ trait StripePayOutApi extends PayOutApi {
                   .putMetadata("debited_amount", payOutTransaction.debitedAmount.toString)
                   .putMetadata("fees_amount", payOutTransaction.feesAmount.toString)
 
-              var amountToTransfer = debitedAmount - feesAmount
+              val amountToTransfer = debitedAmount - feesAmount
+
+              var availableAmount = 0
 
               if (payOutTransaction.bankAccountId.trim.nonEmpty) {
                 // we send funds to the specified bank account of a connected Stripe account
 
-                requestOptions = requestOptions.setStripeAccount(payOutTransaction.creditedUserId)
+                stripeAccount = Option(payOutTransaction.creditedUserId)
 
                 // load balance
-                val availableAmount =
+                availableAmount =
                   loadBalance(payOutTransaction.currency, Option(payOutTransaction.creditedUserId))
                     .getOrElse(0)
 
                 mlog.info(
                   s"balance available amount for ${payOutTransaction.creditedUserId} is $availableAmount"
                 )
-
-                amountToTransfer = Math.min(amountToTransfer, availableAmount)
 
                 mlog.info(
                   s"amount to transfer to ${payOutTransaction.bankAccountId} is $amountToTransfer"
@@ -192,11 +193,9 @@ trait StripePayOutApi extends PayOutApi {
               } else {
                 // we receive funds from Stripe
                 // load balance
-                val availableAmount = loadBalance(payOutTransaction.currency, None).getOrElse(0)
+                availableAmount = loadBalance(payOutTransaction.currency, None).getOrElse(0)
 
                 mlog.info(s"balance available amount for our stripe account is $availableAmount")
-
-                amountToTransfer = Math.min(amountToTransfer, availableAmount)
 
                 mlog.info(s"amount to transfer to our stripe account is $amountToTransfer")
 
@@ -217,8 +216,10 @@ trait StripePayOutApi extends PayOutApi {
                 case _ =>
               }
 
-              if (amountToTransfer > 0) {
-                Payout.create(params.build(), requestOptions.build())
+              if (amountToTransfer <= availableAmount) {
+                val payout = params.build()
+                mlog.info(s"payout: ${new Gson().toJson(payout)}")
+                Payout.create(payout, StripeApi().requestOptions(stripeAccount))
               } else {
                 throw new Exception("Insufficient funds")
               }
@@ -372,7 +373,7 @@ trait StripePayOutApi extends PayOutApi {
     transactionId: String
   ): Option[Transaction] = {
     Try {
-      val requestOptions = StripeApi().requestOptions
+      val requestOptions = StripeApi().requestOptions()
       if (transactionId.startsWith("tr_")) {
         Transfer.retrieve(transactionId, requestOptions)
       } else if (transactionId.startsWith("po_")) {

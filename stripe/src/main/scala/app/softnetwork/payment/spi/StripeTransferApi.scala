@@ -35,7 +35,7 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
         var feesAmount = transferTransaction.feesAmount
 
         Try {
-          val requestOptions = StripeApi().requestOptions
+          val requestOptions = StripeApi().requestOptions()
 
           transferTransaction.payInTransactionId match {
             // case of a payment intent
@@ -265,9 +265,9 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
   override def loadTransfer(transactionId: String): Option[Transaction] = {
     Try {
       if (transactionId.startsWith("pi_")) {
-        PaymentIntent.retrieve(transactionId, StripeApi().requestOptions)
+        PaymentIntent.retrieve(transactionId, StripeApi().requestOptions())
       } else {
-        Transfer.retrieve(transactionId, StripeApi().requestOptions)
+        Transfer.retrieve(transactionId, StripeApi().requestOptions())
       }
     } match {
       case Success(payment: PaymentIntent) =>

@@ -43,7 +43,7 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
         )
 
         Try {
-          val requestOptions = StripeApi().requestOptions
+          val requestOptions = StripeApi().requestOptions()
 
           val transactionId = refundTransaction.payInTransactionId // TODO rename this field
 
@@ -363,7 +363,7 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
     transactionId: String
   ): Option[Transaction] = {
     Try {
-      Refund.retrieve(transactionId, StripeApi().requestOptions)
+      Refund.retrieve(transactionId, StripeApi().requestOptions())
     } match {
       case Success(refund: Refund) =>
         val status = refund.getStatus

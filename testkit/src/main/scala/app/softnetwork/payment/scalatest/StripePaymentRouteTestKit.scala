@@ -44,7 +44,7 @@ trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     paymentAccount.userId match {
       case Some(accountId) =>
         Try {
-          Account.retrieve(accountId, StripeApi().requestOptions)
+          Account.retrieve(accountId, StripeApi().requestOptions())
         } match {
           case Success(account) =>
             val accountPayload = new Gson().toJson(account)

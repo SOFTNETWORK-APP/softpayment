@@ -39,7 +39,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             s"Capturing payment intent for order: ${payInWithPreAuthorization.orderUuid}"
           )
 
-          val requestOptions = StripeApi().requestOptions
+          val requestOptions = StripeApi().requestOptions()
 
           var resource = PaymentIntent
             .retrieve(
@@ -170,7 +170,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
     maybePayInTransaction match {
       case Some(payInTransaction) =>
         Try {
-          val requestOptions = StripeApi().requestOptions
+          val requestOptions = StripeApi().requestOptions()
 
           val params =
             PaymentIntentCreateParams
@@ -371,7 +371,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
     payInWithPayPalTransaction match {
       case Some(payInTransaction) =>
         Try {
-          val requestOptions = StripeApi().requestOptions
+          val requestOptions = StripeApi().requestOptions()
 
           val params =
             PaymentIntentCreateParams
@@ -598,7 +598,7 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
     recurringPayInRegistrationId: Option[String]
   ): Option[Transaction] = {
     Try {
-      PaymentIntent.retrieve(transactionId, StripeApi().requestOptions)
+      PaymentIntent.retrieve(transactionId, StripeApi().requestOptions())
     } match {
       case Success(payment) =>
         val status = payment.getStatus

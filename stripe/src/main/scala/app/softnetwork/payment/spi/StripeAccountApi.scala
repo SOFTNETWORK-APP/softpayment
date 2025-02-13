@@ -94,7 +94,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     })
     Try(
       filesCreateParams.map(fileCreateParams =>
-        File.create(fileCreateParams, StripeApi().requestOptions)
+        File.create(fileCreateParams, StripeApi().requestOptions())
       )
     )
   }
@@ -132,7 +132,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
               Try(
                 (naturalUser.userId match {
                   case Some(userId) if userId.startsWith("acct_") =>
-                    Option(Account.retrieve(userId, StripeApi().requestOptions))
+                    Option(Account.retrieve(userId, StripeApi().requestOptions()))
                   case _ =>
                     Account
                       .list(
@@ -140,7 +140,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                           .builder()
                           .setLimit(100)
                           .build(),
-                        StripeApi().requestOptions
+                        StripeApi().requestOptions()
                       )
                       .getData
                       .asScala
@@ -194,7 +194,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             .build
                         )
                         .build(),
-                      StripeApi().requestOptions
+                      StripeApi().requestOptions()
                     )
                     val params =
                       AccountUpdateParams
@@ -287,7 +287,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     }
                     account.update(
                       params.build(),
-                      StripeApi().requestOptions
+                      StripeApi().requestOptions()
                     )
 
                   case _ =>
@@ -336,7 +336,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             .build()
                         )
                         .build(),
-                      StripeApi().requestOptions
+                      StripeApi().requestOptions()
                     )
                     val params =
                       AccountCreateParams
@@ -460,7 +460,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
                     Account.create(
                       params.build(),
-                      StripeApi().requestOptions
+                      StripeApi().requestOptions()
                     )
                 }
               ) match {
@@ -482,7 +482,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     Try(
                       account.update(
                         params,
-                        StripeApi().requestOptions
+                        StripeApi().requestOptions()
                       )
                     )
                   }
@@ -529,7 +529,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
             Try(
               (legalUser.legalRepresentative.userId match {
                 case Some(userId) if userId.startsWith("acct_") =>
-                  Option(Account.retrieve(userId, StripeApi().requestOptions))
+                  Option(Account.retrieve(userId, StripeApi().requestOptions()))
                 case _ =>
                   Account
                     .list(
@@ -537,7 +537,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                         .builder()
                         .setLimit(100)
                         .build(),
-                      StripeApi().requestOptions
+                      StripeApi().requestOptions()
                     )
                     .getData
                     .asScala
@@ -549,9 +549,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                 case Some(account) =>
                   // update account legal representative
 
-                  val requestOptions = StripeApi().requestOptionsBuilder
-                    .setStripeAccount(account.getId)
-                    .build()
+                  val requestOptions = StripeApi().requestOptions(Option(account.getId))
 
                   mlog.info(s"options -> ${new Gson().toJson(requestOptions)}")
 
@@ -863,7 +861,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
                   val token = Token.create(
                     TokenCreateParams.builder.setAccount(accountParams.build()).build(),
-                    StripeApi().requestOptions
+                    StripeApi().requestOptions()
                   )
 
                   val params =
@@ -1004,12 +1002,10 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
                   val account = Account.create(
                     params.build(),
-                    StripeApi().requestOptions
+                    StripeApi().requestOptions()
                   )
 
-                  val requestOptions = StripeApi().requestOptionsBuilder
-                    .setStripeAccount(account.getId)
-                    .build()
+                  val requestOptions = StripeApi().requestOptions(Option(account.getId))
 
                   mlog.info(s"options -> ${new Gson().toJson(requestOptions)}")
 
@@ -1045,7 +1041,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                   Try(
                     account.update(
                       params,
-                      StripeApi().requestOptions
+                      StripeApi().requestOptions()
                     )
                   )
                 }
@@ -1090,7 +1086,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     uboDeclarationId: String,
     ultimateBeneficialOwner: UboDeclaration.UltimateBeneficialOwner
   ): Option[UboDeclaration.UltimateBeneficialOwner] = {
-    Try(Account.retrieve(userId, StripeApi().requestOptions)) match {
+    Try(Account.retrieve(userId, StripeApi().requestOptions())) match {
       case Success(account) =>
         createOrUpdateOwner(account, ultimateBeneficialOwner) match {
           case Some(ownerId) =>
@@ -1112,7 +1108,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     *   declaration with Ultimate Beneficial Owner(s)
     */
   override def getDeclaration(userId: String, uboDeclarationId: String): Option[UboDeclaration] = {
-    Try(Account.retrieve(userId, StripeApi().requestOptions)) match {
+    Try(Account.retrieve(userId, StripeApi().requestOptions())) match {
       case Success(account) =>
         account
           .persons()
@@ -1126,7 +1122,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                   .build()
               )
               .build(),
-            StripeApi().requestOptions
+            StripeApi().requestOptions()
           )
           .getData
           .asScala match {
@@ -1167,7 +1163,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     userAgent: String
   ): Option[UboDeclaration] = {
     Try {
-      val account = Account.retrieve(userId, StripeApi().requestOptions)
+      val account = Account.retrieve(userId, StripeApi().requestOptions())
       val persons =
         account
           .persons()
@@ -1181,7 +1177,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                   .build()
               )
               .build(),
-            StripeApi().requestOptions
+            StripeApi().requestOptions()
           )
           .getData
           .asScala
@@ -1216,7 +1212,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
               .build()
           )
           .build(),
-        StripeApi().requestOptions
+        StripeApi().requestOptions()
       )
 
       account.update(
@@ -1224,7 +1220,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
           .builder()
           .setAccountToken(token.getId)
           .build(),
-        StripeApi().requestOptions
+        StripeApi().requestOptions()
       )
 
       Some(
@@ -1266,7 +1262,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     maybeUserId match {
       case Some(userId) if userId.startsWith("acct") => // account
         Try {
-          val account = Account.retrieve(userId, StripeApi().requestOptions)
+          val account = Account.retrieve(userId, StripeApi().requestOptions())
           // the wallet id is the connected account id if not provided
           val walletId = maybeWalletId.getOrElse(userId)
           account
@@ -1277,7 +1273,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                 .putMetadata("external_uuid", externalUuid)
                 .putMetadata("wallet_id", walletId)
                 .build(),
-              StripeApi().requestOptions
+              StripeApi().requestOptions()
             )
           walletId
         } match {
@@ -1288,7 +1284,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
         }
       case Some(userId) if userId.startsWith("cus") => // customer
         Try {
-          val customer = Customer.retrieve(userId, StripeApi().requestOptions)
+          val customer = Customer.retrieve(userId, StripeApi().requestOptions())
           val walletId = maybeWalletId.getOrElse(java.util.UUID.randomUUID().toString)
           customer
             .update(
@@ -1297,7 +1293,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                 .putMetadata("external_uuid", externalUuid)
                 .putMetadata("wallet_id", walletId)
                 .build(),
-              StripeApi().requestOptions
+              StripeApi().requestOptions()
             )
           walletId
         } match {
@@ -1328,7 +1324,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     pages: Seq[Array[Byte]],
     documentType: KycDocument.KycDocumentType
   ): Option[String] = {
-    Try(Account.retrieve(userId, StripeApi().requestOptions)) match {
+    Try(Account.retrieve(userId, StripeApi().requestOptions())) match {
       case Success(account) =>
         pagesToFiles(pages, documentType) match {
           case Success(files) =>
@@ -1377,7 +1373,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             .build()
                         )
                         .build(),
-                      StripeApi().requestOptions
+                      StripeApi().requestOptions()
                     )
                   Some(documentId)
                 case "company" =>
@@ -1394,7 +1390,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                               .build()
                           )
                           .build(),
-                        StripeApi().requestOptions
+                        StripeApi().requestOptions()
                       )
                       .getData
                       .asScala
@@ -1405,7 +1401,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             .builder()
                             .setVerification(verification)
                             .build(),
-                          StripeApi().requestOptions
+                          StripeApi().requestOptions()
                         )
                       case _ =>
                         throw new Exception("Representative not found")
@@ -1453,7 +1449,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                       val document = documentBuilder.build()
                       account.update(
                         AccountUpdateParams.builder().setDocuments(document).build(),
-                        StripeApi().requestOptions
+                        StripeApi().requestOptions()
                       )
                       Some(documentId)
                     case _ =>
@@ -1480,7 +1476,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                                 .build()
                             )
                             .build(),
-                          StripeApi().requestOptions
+                          StripeApi().requestOptions()
                         )
                       Some(documentId)
                   }
@@ -1524,7 +1520,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
               .builder()
               .setType(VerificationReportListParams.Type.DOCUMENT)
               .build(),
-            StripeApi().requestOptions
+            StripeApi().requestOptions()
           )
         ) match {
           case Success(reports) =>
@@ -1558,7 +1554,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
           .withType(documentType)
           .withStatus(KycDocument.KycDocumentStatus.KYC_DOCUMENT_NOT_SPECIFIED)
     }*/
-    Try(Account.retrieve(userId, StripeApi().requestOptions)) match {
+    Try(Account.retrieve(userId, StripeApi().requestOptions())) match {
       case Success(account) =>
         /*account.getRequirements.getErrors.asScala.find(_.getRequirement == documentId /*FIXME*/) match {
           case Some(error) =>
@@ -1597,7 +1593,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                           .build()
                       )
                       .build(),
-                    StripeApi().requestOptions
+                    StripeApi().requestOptions()
                   )
                   .getData
                   .asScala
@@ -1665,7 +1661,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
   override def createOrUpdateBankAccount(maybeBankAccount: Option[BankAccount]): Option[String] = {
     maybeBankAccount match {
       case Some(bankAccount) =>
-        val requestOptions = StripeApi().requestOptions
+        val requestOptions = StripeApi().requestOptions()
         Try(Account.retrieve(bankAccount.userId, requestOptions)) match {
           case Success(account) =>
             Try {
@@ -1722,7 +1718,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                         .filter(_.getId != externalAccount.getId)
                         .map(
                           _.delete(
-                            StripeApi().requestOptions
+                            StripeApi().requestOptions()
                           )
                         )
                     ) match {
@@ -1785,7 +1781,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     *   the first active bank account
     */
   override def getActiveBankAccount(userId: String, currency: String): Option[String] = {
-    Try(Account.retrieve(userId, StripeApi().requestOptions)) match {
+    Try(Account.retrieve(userId, StripeApi().requestOptions())) match {
       case Success(account) =>
         account.getExternalAccounts
           .list(
@@ -1888,7 +1884,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
         Try(
           (owner.id match {
             case Some(id) =>
-              Option(account.persons().retrieve(id, StripeApi().requestOptions))
+              Option(account.persons().retrieve(id, StripeApi().requestOptions()))
             case _ =>
               account
                 .persons()
@@ -1902,7 +1898,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                         .build()
                     )
                     .build(),
-                  StripeApi().requestOptions
+                  StripeApi().requestOptions()
                 )
                 .getData
                 .asScala
@@ -1965,7 +1961,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
               mlog.info(s"owner -> ${new Gson().toJson(params.build())}")
 
-              person.update(params.build(), StripeApi().requestOptions)
+              person.update(params.build(), StripeApi().requestOptions())
             case _ =>
               // create owner
               val params =
@@ -2022,7 +2018,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
               account
                 .persons()
-                .create(params.build(), StripeApi().requestOptions)
+                .create(params.build(), StripeApi().requestOptions())
           }
         ) match {
           case Success(person) =>
@@ -2042,12 +2038,12 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     Try {
       (naturalUser.userId match {
         case Some(userId) if userId.startsWith("cus_") =>
-          Option(Customer.retrieve(userId, StripeApi().requestOptions))
+          Option(Customer.retrieve(userId, StripeApi().requestOptions()))
         case _ =>
           Customer
             .list(
               CustomerListParams.builder().setEmail(naturalUser.email).build(),
-              StripeApi().requestOptions
+              StripeApi().requestOptions()
             )
             .getData
             .asScala
@@ -2087,7 +2083,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
           mlog.info(s"customer -> ${new Gson().toJson(params.build())}")
 
-          customer.update(params.build(), StripeApi().requestOptions)
+          customer.update(params.build(), StripeApi().requestOptions())
 
         case _ =>
           val params = CustomerCreateParams
@@ -2122,7 +2118,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
           mlog.info(s"customer -> ${new Gson().toJson(params.build())}")
 
-          Customer.create(params.build(), StripeApi().requestOptions)
+          Customer.create(params.build(), StripeApi().requestOptions())
       }
     } match {
       case Success(customer) => Some(customer.getId)

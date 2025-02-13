@@ -15,18 +15,10 @@ trait StripeBalanceApi extends BalanceApi { self: StripeContext =>
     *   balance
     */
   override def loadBalance(currency: String, walletId: Option[String]): Option[Int] = {
-    var requestOptions = StripeApi().requestOptionsBuilder
-
-    walletId match {
-      case Some(value) =>
-        requestOptions = requestOptions.setStripeAccount(value)
-      case _ =>
-    }
-
     // load balance
     val balances: Seq[Balance.Available] =
       Balance
-        .retrieve(requestOptions.build())
+        .retrieve(StripeApi().requestOptions(walletId))
         .getAvailable
         .asScala
 

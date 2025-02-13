@@ -28,7 +28,7 @@ trait StripePreAuthorizationApi extends PreAuthorizationApi { _: StripeContext =
   ): Option[Transaction] = {
     val paymentType = preAuthorizationTransaction.paymentType
     if (paymentType.isCard || paymentType.isPaypal) {
-      val requestOptions = StripeApi().requestOptions
+      val requestOptions = StripeApi().requestOptions()
       val registerMeansOfPayment =
         preAuthorizationTransaction.registerMeansOfPayment.getOrElse(false)
       val printReceipt = preAuthorizationTransaction.printReceipt.getOrElse(false)
@@ -266,7 +266,7 @@ trait StripePreAuthorizationApi extends PreAuthorizationApi { _: StripeContext =
     preAuthorizedTransactionId: String
   ): Option[Transaction] = {
     Try {
-      PaymentIntent.retrieve(preAuthorizedTransactionId, StripeApi().requestOptions)
+      PaymentIntent.retrieve(preAuthorizedTransactionId, StripeApi().requestOptions())
     } match {
       case Success(payment) =>
         val status = payment.getStatus
@@ -348,13 +348,13 @@ trait StripePreAuthorizationApi extends PreAuthorizationApi { _: StripeContext =
   ): Boolean = {
     Try {
       val payment = PaymentIntent
-        .retrieve(preAuthorizedTransactionId, StripeApi().requestOptions)
+        .retrieve(preAuthorizedTransactionId, StripeApi().requestOptions())
       payment.getStatus match {
         case "requires_payment_method" | "requires_capture" | "requires_confirmation" |
             "requires_action" | "processing" =>
           payment.cancel(
             PaymentIntentCancelParams.builder().build(),
-            StripeApi().requestOptions
+            StripeApi().requestOptions()
           )
         case _ => payment
       }
@@ -385,12 +385,12 @@ trait StripePreAuthorizationApi extends PreAuthorizationApi { _: StripeContext =
     Try {
       val resource =
         PaymentIntent
-          .retrieve(preAuthorizedTransactionId, StripeApi().requestOptions)
+          .retrieve(preAuthorizedTransactionId, StripeApi().requestOptions())
       resource.getStatus match {
         case "requires_confirmation" =>
           resource.confirm(
             PaymentIntentConfirmParams.builder().build(),
-            StripeApi().requestOptions
+            StripeApi().requestOptions()
           )
         case _ => resource
       }

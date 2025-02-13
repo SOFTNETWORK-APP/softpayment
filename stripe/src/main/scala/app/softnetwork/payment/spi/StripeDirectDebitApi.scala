@@ -55,7 +55,7 @@ trait StripeDirectDebitApi extends DirectDebitApi {
     idempotencyKey: Option[String]
   ): Option[MandateResult] = {
     Try {
-      val requestOptions = StripeApi().requestOptionsBuilder /*.setStripeAccount(userId)*/.build()
+      val requestOptions = StripeApi().requestOptions(/*Option(userId)*/)
 
       val params =
         SetupIntentCreateParams
@@ -317,7 +317,7 @@ trait StripeDirectDebitApi extends DirectDebitApi {
     maybeMandateId match {
       case Some(mandateId) =>
         Try {
-          val requestOptions = StripeApi().requestOptions
+          val requestOptions = StripeApi().requestOptions()
           val seti = """seti_.*""".r
           mandateId match {
             case seti() =>
@@ -362,7 +362,7 @@ trait StripeDirectDebitApi extends DirectDebitApi {
     */
   override def cancelMandate(mandateId: String): Option[MandateResult] = {
     Try {
-      val requestOptions = StripeApi().requestOptions
+      val requestOptions = StripeApi().requestOptions()
       Option(StripeMandate.retrieve(mandateId, requestOptions)) match {
         case Some(mandate) =>
           PaymentMethod.retrieve(mandate.getPaymentMethod, requestOptions).detach(requestOptions)
@@ -398,7 +398,7 @@ trait StripeDirectDebitApi extends DirectDebitApi {
           s"Creating direct debit transaction -> ${asJson(directDebitTransaction)}"
         )
         Try {
-          val requestOptions = StripeApi().requestOptions
+          val requestOptions = StripeApi().requestOptions()
           Option(StripeMandate.retrieve(directDebitTransaction.mandateId, requestOptions)) match {
             case Some(mandate) =>
               val payment = PaymentMethod.retrieve(mandate.getPaymentMethod, requestOptions)
@@ -502,7 +502,7 @@ trait StripeDirectDebitApi extends DirectDebitApi {
     transactionDate: Date
   ): Option[Transaction] = {
     Try {
-      PaymentIntent.retrieve(transactionId, StripeApi().requestOptions)
+      PaymentIntent.retrieve(transactionId, StripeApi().requestOptions())
     } match {
       case Success(payment) =>
         val metadata = payment.getMetadata.asScala

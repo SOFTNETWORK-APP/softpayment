@@ -35,7 +35,7 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
       case Some(userId) if paymentType.isCard || paymentType.isPaypal =>
         Try {
           val customer =
-            Customer.retrieve(userId, StripeApi().requestOptions)
+            Customer.retrieve(userId, StripeApi().requestOptions())
 
           val params =
             SetupIntentCreateParams
@@ -68,7 +68,7 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
             case _ =>
           }
 
-          SetupIntent.create(params.build(), StripeApi().requestOptions)
+          SetupIntent.create(params.build(), StripeApi().requestOptions())
         } match {
           case Success(setupIntent) =>
             mlog.info(s"Card pre registered for user $userId -> ${new Gson().toJson(setupIntent)}")
@@ -102,7 +102,7 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
     Try {
       // retrieve setup intent
       val setupIntent =
-        SetupIntent.retrieve(registrationId, StripeApi().requestOptions)
+        SetupIntent.retrieve(registrationId, StripeApi().requestOptions())
       // attach payment method to customer
       attachPaymentMethod(setupIntent.getPaymentMethod, setupIntent.getCustomer)
     } match {
@@ -124,7 +124,7 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
     */
   override def loadPaymentMethod(paymentMethodId: String): Option[PaymentMethod] = {
     Try {
-      StripePaymentMethod.retrieve(paymentMethodId, StripeApi().requestOptions)
+      StripePaymentMethod.retrieve(paymentMethodId, StripeApi().requestOptions())
     } match {
       case Success(paymentMethod) =>
         paymentMethod.getType match {
@@ -183,7 +183,7 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
     userId: String
   ): Option[PaymentMethod] = {
     Try {
-      val requestOptions = StripeApi().requestOptions
+      val requestOptions = StripeApi().requestOptions()
       StripePaymentMethod
         .retrieve(paymentMethodId, requestOptions)
         .attach(
@@ -247,7 +247,7 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
     */
   override def disablePaymentMethod(paymentMethodId: String): Option[PaymentMethod] = {
     Try {
-      val requestOptions = StripeApi().requestOptions
+      val requestOptions = StripeApi().requestOptions()
       StripePaymentMethod
         .retrieve(paymentMethodId, requestOptions)
         .detach(PaymentMethodDetachParams.builder().build(), requestOptions)
