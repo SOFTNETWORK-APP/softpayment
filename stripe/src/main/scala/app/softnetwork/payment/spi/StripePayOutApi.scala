@@ -4,7 +4,6 @@ import app.softnetwork.payment.config.StripeApi
 import app.softnetwork.payment.model.{PayOutTransaction, Transaction, TransferTransaction}
 import app.softnetwork.serialization.asJson
 import com.google.gson.Gson
-//import com.stripe.param.PaymentIntentCaptureParams
 import com.stripe.model.{PaymentIntent, Payout, Transfer}
 import com.stripe.param.PayoutCreateParams
 
@@ -58,96 +57,6 @@ trait StripePayOutApi extends PayOutApi {
 
               transfer(Some(transferTransaction))
 
-            /*val requestOptions = StripeApi().requestOptions()
-
-              val resource =
-                PaymentIntent.retrieve(payInTransactionId, requestOptions)
-
-              val payment =
-                resource.getStatus match {
-                  case "requires_capture" =>
-                    val params =
-                      PaymentIntentCaptureParams
-                        .builder()
-                        .setAmountToCapture(resource.getAmountCapturable)
-                    resource.capture(
-                      params.build(),
-                      requestOptions
-                    )
-                  case _ => resource
-                }
-
-              Option(payment.getTransferData).flatMap(td => Option(td.getDestination)) match {
-                case Some(destination) if payOutTransaction.bankAccountId.trim.nonEmpty =>
-                  // send funds to the bank account of the connected Stripe account
-                  val requestOptions = StripeApi().requestOptionsBuilder
-
-                  requestOptions
-                    .setStripeAccount(destination)
-
-                  val amountToTransfer = debitedAmount - feesAmount
-
-                  // load balance
-                  val availableAmount =
-                    Balance
-                      .retrieve(requestOptions.build())
-                      .getAvailable
-                      .asScala
-                      .find(_.getCurrency == payOutTransaction.currency) match {
-                      case Some(balance) =>
-                        balance.getAmount.intValue()
-                      case None =>
-                        0
-                    }
-
-                  val params =
-                    PayoutCreateParams
-                      .builder()
-                      .setCurrency(payOutTransaction.currency)
-                      .setAmount(Math.min(amountToTransfer, availableAmount))
-                      .setMethod(PayoutCreateParams.Method.STANDARD)
-                      //.setDestination(payOutTransaction.bankAccountId)
-                      .putMetadata("order_uuid", payOutTransaction.orderUuid)
-                      .putMetadata("debited_amount", payOutTransaction.debitedAmount.toString)
-                      .putMetadata("fees_amount", payOutTransaction.feesAmount.toString)
-
-                  payOutTransaction.statementDescriptor match {
-                    case Some(statementDescriptor) =>
-                      params.setStatementDescriptor(statementDescriptor)
-                    case _ =>
-                  }
-
-                  payOutTransaction.externalReference match {
-                    case Some(externalReference) =>
-                      params.putMetadata("external_reference", externalReference)
-                    case _ =>
-                  }
-
-                  Payout.create(params.build(), requestOptions.build())
-
-                case _ =>
-                  // transfer funds from this payment intent to the connected stripe account
-                  val transferTransaction =
-                    TransferTransaction.defaultInstance
-                      .withOrderUuid(payOutTransaction.orderUuid)
-                      .withPayInTransactionId(payInTransactionId)
-                      .withDebitedAmount(debitedAmount)
-                      .withFeesAmount(feesAmount)
-                      .withCurrency(payOutTransaction.currency)
-                      .withAuthorId(payOutTransaction.authorId)
-                      .withCreditedUserId(
-                        payOutTransaction.creditedUserId
-                      ) // the connected stripe account
-                      .withDebitedWalletId(payOutTransaction.debitedWalletId)
-                      .copy(
-                        externalReference = payOutTransaction.externalReference,
-                        statementDescriptor = payOutTransaction.statementDescriptor
-                      )
-
-                  transfer(Some(transferTransaction))
-
-              }*/
-
             case None =>
               // either receive funds from Stripe or
               // send funds to the bank account of the connected Stripe account
@@ -160,7 +69,11 @@ trait StripePayOutApi extends PayOutApi {
                   .setCurrency(payOutTransaction.currency)
                   .setMethod(PayoutCreateParams.Method.STANDARD)
 //                  .setSourceType(PayoutCreateParams.SourceType.CARD)
-                  .putMetadata("order_uuid", payOutTransaction.orderUuid)
+                  .putMetadata("order_uuid", payOutTransaction.orderUuid.take(500))
+                  .putMetadata(
+                    "external_reference",
+                    payOutTransaction.externalReference.getOrElse("")
+                  )
                   .putMetadata("debited_amount", payOutTransaction.debitedAmount.toString)
                   .putMetadata("fees_amount", payOutTransaction.feesAmount.toString)
 
@@ -279,79 +192,6 @@ trait StripePayOutApi extends PayOutApi {
             )
 
             Some(transaction)
-
-          /*case Success(payment: PaymentIntent) =>
-            val status = payment.getStatus
-
-            val creditedUserId = Option(payOutTransaction.creditedUserId)
-            // Option(payment.getTransferData).map(_.getDestination)
-
-            var transaction =
-              Transaction()
-                .withId(payment.getId)
-                .withOrderUuid(payOutTransaction.orderUuid)
-                .withNature(Transaction.TransactionNature.REGULAR)
-                .withType(Transaction.TransactionType.PAYOUT)
-                .withPaymentType(Transaction.PaymentType.BANK_WIRE)
-                .withAmount(debitedAmount)
-                .withFees(feesAmount)
-                .withCurrency(payment.getCurrency)
-                .withAuthorId(
-                  Option(payment.getCustomer).getOrElse(payOutTransaction.authorId)
-                )
-                .withDebitedWalletId(payOutTransaction.debitedWalletId)
-                .copy(
-                  creditedUserId = creditedUserId,
-                  sourceTransactionId = payOutTransaction.payInTransactionId,
-                  externalReference = payOutTransaction.externalReference
-                )
-
-            if (status == "succeeded") {
-              transaction = transaction.copy(
-                status = Transaction.TransactionStatus.TRANSACTION_SUCCEEDED
-              )
-            } else if (status == "processing") {
-              transaction =
-                transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_CREATED)
-            } else { //canceled, requires_action, requires_capture, requires_confirmation, requires_payment_method
-              transaction =
-                transaction.copy(status = Transaction.TransactionStatus.TRANSACTION_FAILED)
-            }
-
-            mlog.info(
-              s"Pay out executed for order ${transaction.orderUuid} -> ${asJson(transaction)}"
-            )
-
-            Some(transaction)
-
-          case Success(transfer: Transfer) =>
-            val transaction =
-              Transaction()
-                .withId(transfer.getId)
-                .withOrderUuid(payOutTransaction.orderUuid)
-                .withNature(Transaction.TransactionNature.REGULAR)
-                .withType(Transaction.TransactionType.TRANSFER)
-                .withPaymentType(Transaction.PaymentType.BANK_WIRE)
-                .withAmount(debitedAmount)
-                .withFees(feesAmount)
-                .withTransferAmount(
-                  transfer.getAmount.intValue()
-                ) // should be equal to debitedAmount - feesAmount
-                .withCurrency(transfer.getCurrency)
-                .withAuthorId(payOutTransaction.authorId)
-                .withCreditedUserId(transfer.getDestination)
-                .withDebitedWalletId(payOutTransaction.debitedWalletId)
-                .withStatus(Transaction.TransactionStatus.TRANSACTION_SUCCEEDED)
-                .copy(
-                  sourceTransactionId = payOutTransaction.payInTransactionId,
-                  externalReference = payOutTransaction.externalReference
-                )
-
-            mlog.info(
-              s"Transfer transaction created for order ${transaction.orderUuid} -> ${asJson(transaction)}"
-            )
-
-            Some(transaction)*/
 
           case Failure(f) =>
             mlog.error(s"Error while processing pay out transaction: ${f.getMessage}", f)

@@ -73,6 +73,14 @@ trait PaymentBehavior
     */
   override protected def tagEvent(entityId: String, event: ExternalSchedulerEvent): Set[String] =
     event match {
+      case _: TransactionUpdatedEvent =>
+        Set(
+          s"transaction-to-jdbc"
+        )
+      case _: PaymentAccountUpsertedEvent =>
+        Set(
+          s"paymentaccount-to-jdbc"
+        )
       case _: BroadcastEvent => Set(s"${persistenceId.toLowerCase}-to-external")
       case _: CrudEvent      => Set(s"${persistenceId.toLowerCase}-to-elastic")
       case _: SchedulerEventWithCommand =>
@@ -333,15 +341,15 @@ trait PaymentBehavior
                     case Some(transaction) =>
                       keyValueDao.addKeyValue(transaction.id, entityId)
                       val lastUpdated = now()
-                      val updatedPaymentAccount = paymentAccount
-                        .withTransactions(
-                          paymentAccount.transactions.filterNot(_.id == transaction.id)
-                          :+ transaction.copy(clientId = clientId)
-                        )
-                        .withLastUpdated(lastUpdated)
-                      val paymentAccountUpsertedEvent =
-                        PaymentAccountUpsertedEvent.defaultInstance
-                          .withDocument(updatedPaymentAccount)
+                      val transactionUpdatedEvent =
+                        TransactionUpdatedEvent.defaultInstance
+                          .withDocument(
+                            transaction.copy(
+                              clientId = clientId,
+                              payInId = Some(payInTransactionId),
+                              creditedUserId = paymentAccount.userId
+                            )
+                          )
                           .withLastUpdated(lastUpdated)
                       transaction.status match {
                         case Transaction.TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON =>
@@ -358,7 +366,7 @@ trait PaymentBehavior
                                   .withOrderUuid(orderUuid)
                                   .withResultMessage(transaction.resultMessage)
                                   .withTransaction(transaction)
-                              ) :+ paymentAccountUpsertedEvent
+                              ) :+ transactionUpdatedEvent
                             )
                             .thenRun(_ =>
                               RefundFailed(
@@ -392,7 +400,7 @@ trait PaymentBehavior
                                     .withReasonMessage(reasonMessage)
                                     .withInitializedByClient(initializedByClient)
                                     .withPaymentType(transaction.paymentType)
-                                ) :+ paymentAccountUpsertedEvent
+                                ) :+ transactionUpdatedEvent
                               )
                               .thenRun(_ => Refunded(transaction.id, transaction.status) ~> replyTo)
                           } else {
@@ -409,7 +417,7 @@ trait PaymentBehavior
                                     .withOrderUuid(orderUuid)
                                     .withResultMessage(transaction.resultMessage)
                                     .withTransaction(transaction)
-                                ) :+ paymentAccountUpsertedEvent
+                                ) :+ transactionUpdatedEvent
                               )
                               .thenRun(_ =>
                                 RefundFailed(
@@ -502,12 +510,15 @@ trait PaymentBehavior
               case Some(transaction) =>
                 keyValueDao.addKeyValue(transaction.id, entityId)
                 val lastUpdated = now()
-                val updatedPaymentAccount = paymentAccount
-                  .withTransactions(
-                    paymentAccount.transactions.filterNot(_.id == transaction.id)
-                    :+ transaction.copy(clientId = clientId)
-                  )
-                  .withLastUpdated(lastUpdated)
+                val transactionUpdatedEvent =
+                  TransactionUpdatedEvent.defaultInstance
+                    .withDocument(
+                      transaction.copy(
+                        clientId = clientId,
+                        debitedUserId = paymentAccount.userId
+                      )
+                    )
+                    .withLastUpdated(lastUpdated)
                 if (
                   transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated
                 ) {
@@ -553,10 +564,7 @@ trait PaymentBehavior
                             orderUuid = orderUuid,
                             externalReference = externalReference
                           )
-                      ) :+
-                      PaymentAccountUpsertedEvent.defaultInstance
-                        .withDocument(updatedPaymentAccount)
-                        .withLastUpdated(lastUpdated)
+                      ) :+ transactionUpdatedEvent
                     )
                     .thenRun(_ =>
                       {
@@ -572,10 +580,7 @@ trait PaymentBehavior
                           .withResultMessage(transaction.resultMessage)
                           .withTransaction(transaction)
                           .copy(externalReference = externalReference)
-                      ) :+
-                      PaymentAccountUpsertedEvent.defaultInstance
-                        .withDocument(updatedPaymentAccount)
-                        .withLastUpdated(lastUpdated)
+                      ) :+ transactionUpdatedEvent
                     )
                     .thenRun(_ =>
                       TransferFailed(
@@ -781,12 +786,15 @@ trait PaymentBehavior
                             case Some(transaction) =>
                               keyValueDao.addKeyValue(transaction.id, entityId)
                               val lastUpdated = now()
-                              val updatedPaymentAccount = paymentAccount
-                                .withTransactions(
-                                  paymentAccount.transactions.filterNot(_.id == transaction.id)
-                                  :+ transaction.copy(clientId = clientId)
-                                )
-                                .withLastUpdated(lastUpdated)
+                              val transactionUpdatedEvent =
+                                TransactionUpdatedEvent.defaultInstance
+                                  .withDocument(
+                                    transaction.copy(
+                                      clientId = clientId,
+                                      creditedUserId = Some(creditedUserId)
+                                    )
+                                  )
+                                  .withLastUpdated(lastUpdated)
                               if (
                                 transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated
                               ) {
@@ -802,10 +810,7 @@ trait PaymentBehavior
                                         .withTransactionId(transaction.id)
                                         .withTransactionStatus(transaction.status)
                                         .copy(externalReference = externalReference)
-                                    ) :+
-                                    PaymentAccountUpsertedEvent.defaultInstance
-                                      .withLastUpdated(lastUpdated)
-                                      .withDocument(updatedPaymentAccount)
+                                    ) :+ transactionUpdatedEvent
                                   )
                                   .thenRun(_ =>
                                     DirectDebited(transaction.id, transaction.status) ~> replyTo
@@ -819,10 +824,7 @@ trait PaymentBehavior
                                         .withResultMessage(transaction.resultMessage)
                                         .withTransaction(transaction)
                                         .copy(externalReference = externalReference)
-                                    ) :+
-                                    PaymentAccountUpsertedEvent.defaultInstance
-                                      .withLastUpdated(lastUpdated)
-                                      .withDocument(updatedPaymentAccount)
+                                    ) :+ transactionUpdatedEvent
                                   )
                                   .thenRun(_ =>
                                     DirectDebitFailed(
@@ -874,12 +876,15 @@ trait PaymentBehavior
                           .withLastUpdated(lastUpdated)
                           .withResultCode(t.resultCode)
                           .withResultMessage(t.resultMessage)
-                        val updatedPaymentAccount = paymentAccount
-                          .withTransactions(
-                            paymentAccount.transactions.filterNot(_.id == t.id)
-                            :+ updatedTransaction.copy(clientId = clientId)
-                          )
-                          .withLastUpdated(lastUpdated)
+                        val transactionUpdatedEvent =
+                          TransactionUpdatedEvent.defaultInstance
+                            .withDocument(
+                              updatedTransaction.copy(
+                                clientId = clientId,
+                                creditedUserId = paymentAccount.userId
+                              )
+                            )
+                            .withLastUpdated(lastUpdated)
                         if (t.status.isTransactionSucceeded || t.status.isTransactionCreated) {
                           Effect
                             .persist(
@@ -893,10 +898,7 @@ trait PaymentBehavior
                                   .withTransactionId(updatedTransaction.id)
                                   .withTransactionStatus(updatedTransaction.status)
                                   .copy(externalReference = updatedTransaction.externalReference)
-                              ) :+
-                              PaymentAccountUpsertedEvent.defaultInstance
-                                .withLastUpdated(lastUpdated)
-                                .withDocument(updatedPaymentAccount)
+                              ) :+ transactionUpdatedEvent
                             )
                             .thenRun(_ =>
                               DirectDebited(transaction.id, transaction.status) ~> replyTo
@@ -910,10 +912,7 @@ trait PaymentBehavior
                                   .withResultMessage(updatedTransaction.resultMessage)
                                   .withTransaction(updatedTransaction)
                                   .copy(externalReference = transaction.externalReference)
-                              ) :+
-                              PaymentAccountUpsertedEvent.defaultInstance
-                                .withLastUpdated(lastUpdated)
-                                .withDocument(updatedPaymentAccount)
+                              ) :+ transactionUpdatedEvent
                             )
                             .thenRun(_ =>
                               DirectDebitFailed(
@@ -2155,6 +2154,12 @@ trait PaymentBehavior
     context: ActorContext[_]
   ): Option[PaymentAccount] =
     event match {
+      case evt: TransactionUpdatedEvent =>
+        state.map(state =>
+          state.withTransactions(
+            state.transactions.filterNot(_.id == evt.document.id) :+ evt.document
+          )
+        )
       case _ => super.handleEvent(state, event)
     }
 

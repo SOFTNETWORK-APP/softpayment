@@ -28,7 +28,11 @@ import app.softnetwork.payment.message.PaymentMessages.{
   PaymentResult,
   TransactionNotFound
 }
-import app.softnetwork.payment.message.TransactionEvents.{PaidInEvent, PayInFailedEvent}
+import app.softnetwork.payment.message.TransactionEvents.{
+  PaidInEvent,
+  PayInFailedEvent,
+  TransactionUpdatedEvent
+}
 import app.softnetwork.payment.model.{Card, PayInTransaction, PaymentAccount, Paypal, Transaction}
 import app.softnetwork.persistence.now
 import app.softnetwork.persistence.typed._
@@ -364,12 +368,15 @@ trait PayInCommandHandler
                       .copy(
                         paymentMethodId = paymentMethodId
                       )
-                    val updatedPaymentAccount = paymentAccount
-                      .withTransactions(
-                        paymentAccount.transactions.filterNot(_.id == t.id)
-                        :+ updatedTransaction.copy(clientId = clientId)
-                      )
-                      .withLastUpdated(lastUpdated)
+                    val transactionUpdatedEvent =
+                      TransactionUpdatedEvent.defaultInstance
+                        .withDocument(
+                          transaction.copy(
+                            clientId = clientId,
+                            debitedUserId = paymentAccount.userId
+                          )
+                        )
+                        .withLastUpdated(lastUpdated)
                     if (t.status.isTransactionSucceeded || t.status.isTransactionCreated) {
                       Effect
                         .persist(
@@ -382,10 +389,7 @@ trait PayInCommandHandler
                               .withLastUpdated(lastUpdated)
                               .withPaymentMethodId(paymentMethodId.getOrElse(""))
                               .withPaymentType(t.paymentType)
-                          ) :+
-                          PaymentAccountUpsertedEvent.defaultInstance
-                            .withLastUpdated(lastUpdated)
-                            .withDocument(updatedPaymentAccount)
+                          ) :+ transactionUpdatedEvent
                         )
                         .thenRun(_ =>
                           PayInTransactionLoaded(
@@ -402,10 +406,7 @@ trait PayInCommandHandler
                               .withOrderUuid(orderUuid)
                               .withResultMessage(t.resultMessage)
                               .withTransaction(updatedTransaction)
-                          ) :+
-                          PaymentAccountUpsertedEvent.defaultInstance
-                            .withLastUpdated(lastUpdated)
-                            .withDocument(updatedPaymentAccount)
+                          ) :+ transactionUpdatedEvent
                         )
                         .thenRun(_ =>
                           PayInTransactionLoaded(
@@ -591,13 +592,18 @@ trait PayInCommandHandler
       entityId
     ) // add transaction id as a key for this payment account
     val lastUpdated = now()
-    var updatedPaymentAccount =
-      paymentAccount
-        .withTransactions(
-          paymentAccount.transactions
-            .filterNot(_.id == transaction.id) :+ transaction
-        )
-        .withLastUpdated(lastUpdated)
+    var updatedPaymentAccount = paymentAccount.withLastUpdated(lastUpdated)
+    var transactionUpdatedEvents = {
+      List(
+        TransactionUpdatedEvent.defaultInstance
+          .withDocument(
+            transaction.copy(
+              clientId = paymentAccount.clientId,
+              debitedUserId = paymentAccount.userId)
+          )
+          .withLastUpdated(lastUpdated)
+      )
+    }
     val walletEvents: List[ExternalSchedulerEvent] =
       if (registerWallet) {
         List(
@@ -618,9 +624,9 @@ trait PayInCommandHandler
           if transaction.paymentClientReturnUrl.isDefined =>
         Effect
           .persist(
-            PaymentAccountUpsertedEvent.defaultInstance
+            (PaymentAccountUpsertedEvent.defaultInstance
               .withDocument(updatedPaymentAccount)
-              .withLastUpdated(lastUpdated) +: walletEvents
+              .withLastUpdated(lastUpdated) +: walletEvents) ++ transactionUpdatedEvents
           )
           .thenRun(_ =>
             PaymentRequired(
@@ -634,9 +640,9 @@ trait PayInCommandHandler
           if transaction.redirectUrl.isDefined => // 3ds | PayPal
         Effect
           .persist(
-            PaymentAccountUpsertedEvent.defaultInstance
+            (PaymentAccountUpsertedEvent.defaultInstance
               .withDocument(updatedPaymentAccount)
-              .withLastUpdated(lastUpdated) +: walletEvents
+              .withLastUpdated(lastUpdated) +: walletEvents) ++ transactionUpdatedEvents
           )
           .thenRun(_ => PaymentRedirection(transaction.redirectUrl.get) ~> replyTo)
       case _ =>
@@ -695,7 +701,7 @@ trait PayInCommandHandler
             } else {
               List.empty
             }
-          updatedPaymentAccount = transaction.preAuthorizationId match {
+          transaction.preAuthorizationId match {
             case Some(preAuthorizationId) =>
               transaction.preAuthorizationDebitedAmount match {
                 case Some(preAuthorizationDebitedAmount)
@@ -714,14 +720,22 @@ trait PayInCommandHandler
                         clientId = clientId
                       )
                     )
-                  updatedPaymentAccount.withTransactions(
-                    updatedPaymentAccount.transactions.filterNot(_.id == preAuthorizationId) ++ Seq(
-                      updatedTransaction
-                    ).flatten
-                  )
-                case _ => updatedPaymentAccount
+                  updatedTransaction match {
+                    case Some(transaction) =>
+                      transactionUpdatedEvents =
+                        transactionUpdatedEvents :+ TransactionUpdatedEvent.defaultInstance
+                          .withDocument(
+                            transaction.copy(
+                              clientId = paymentAccount.clientId,
+                              debitedUserId = paymentAccount.userId
+                            )
+                          )
+                          .withLastUpdated(lastUpdated)
+                    case _ =>
+                  }
+                case _ =>
               }
-            case _ => updatedPaymentAccount
+            case _ =>
           }
           Effect
             .persist(
@@ -739,7 +753,7 @@ trait PayInCommandHandler
               ) ++
               (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated) +: walletEvents)
+                .withLastUpdated(lastUpdated) +: walletEvents) ++ transactionUpdatedEvents
             )
             .thenRun(_ => PaidIn(transaction.id, transaction.status) ~> replyTo)
         } else {
@@ -759,7 +773,7 @@ trait PayInCommandHandler
               ) ++
               (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated) +: walletEvents)
+                .withLastUpdated(lastUpdated) +: walletEvents) ++ transactionUpdatedEvents
             )
             .thenRun(_ =>
               PayInFailed(transaction.id, transaction.status, transaction.resultMessage) ~> replyTo

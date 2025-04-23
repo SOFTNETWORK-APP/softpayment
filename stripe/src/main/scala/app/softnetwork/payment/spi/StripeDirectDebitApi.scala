@@ -55,7 +55,7 @@ trait StripeDirectDebitApi extends DirectDebitApi {
     idempotencyKey: Option[String]
   ): Option[MandateResult] = {
     Try {
-      val requestOptions = StripeApi().requestOptions(/*Option(userId)*/)
+      val requestOptions = StripeApi().requestOptions( /*Option(userId)*/ )
 
       val params =
         SetupIntentCreateParams

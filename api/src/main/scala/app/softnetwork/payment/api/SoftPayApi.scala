@@ -8,8 +8,10 @@ import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.{PaymentHandler, SoftPayAccountTypeKey}
 import app.softnetwork.payment.launch.SoftPayApplication
 import app.softnetwork.payment.persistence.query.{
+  PaymentAccountToJdbcProcessStream,
   PaymentCommandProcessorStream,
-  Scheduler2PaymentProcessorStream
+  Scheduler2PaymentProcessorStream,
+  TransactionToJdbcProcessorStream
 }
 import app.softnetwork.payment.persistence.typed.{PaymentBehavior, SoftPayAccountBehavior}
 import app.softnetwork.payment.service.{
@@ -18,6 +20,7 @@ import app.softnetwork.payment.service.{
   SoftPayOAuthServiceEndpoints
 }
 import app.softnetwork.persistence.jdbc.query.{JdbcJournalProvider, JdbcOffsetProvider}
+import app.softnetwork.persistence.query.EventProcessorStream
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.scheduler.config.SchedulerSettings
 import app.softnetwork.session.CsrfCheck
@@ -66,6 +69,15 @@ trait SoftPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends SoftPa
       override val tag: String = SchedulerSettings.tag(PaymentBehavior.persistenceId)
       override implicit def system: ActorSystem[_] = sys
     }
+
+  def paymentAccountToJdbcProcessorStream: ActorSystem[_] => PaymentAccountToJdbcProcessStream
+
+  def transactionToJdbcProcessorStream: ActorSystem[_] => TransactionToJdbcProcessorStream
+
+  override def paymentEventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
+    super.paymentEventProcessorStreams(sys) :+ paymentAccountToJdbcProcessorStream(
+      sys
+    ) :+ transactionToJdbcProcessorStream(sys)
 
   implicit def sessionConfig: SessionConfig = Settings.Session.DefaultSessionConfig
 

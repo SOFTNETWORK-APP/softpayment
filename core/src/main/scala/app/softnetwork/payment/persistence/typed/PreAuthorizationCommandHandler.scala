@@ -14,7 +14,8 @@ import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.message.TransactionEvents.{
   PreAuthorizationCanceledEvent,
   PreAuthorizationFailedEvent,
-  PreAuthorizedEvent
+  PreAuthorizedEvent,
+  TransactionUpdatedEvent
 }
 import app.softnetwork.payment.model.{
   Card,
@@ -165,6 +166,11 @@ trait PreAuthorizationCommandHandler
             import paymentProvider._
             loadPreAuthorization(orderUuid, preAuthorizationId) match {
               case Some(transaction) =>
+                val preRegistrationId =
+                  paymentAccount.transactions.find(_.id == preAuthorizationId) match {
+                    case Some(t) => t.preRegistrationId
+                    case _       => None
+                  }
                 handlePreAuthorization(
                   entityId,
                   orderUuid,
@@ -172,7 +178,10 @@ trait PreAuthorizationCommandHandler
                   paymentAccount,
                   registerMeansOfPayment,
                   printReceipt,
-                  transaction
+                  transaction.copy(
+                    preRegistrationId = preRegistrationId,
+                    preAuthorizationId = Some(preAuthorizationId)
+                  )
                 )
               case _ => Effect.none.thenRun(_ => PaymentNotPreAuthorized ~> replyTo)
             }
@@ -194,26 +203,28 @@ trait PreAuthorizationCommandHandler
               case Some(preAuthorizationTransaction) =>
                 val preAuthorizationCanceled =
                   cancelPreAuthorization(orderUuid, preAuthorizationId)
-                val updatedPaymentAccount = paymentAccount.withTransactions(
-                  paymentAccount.transactions.filterNot(_.id == preAuthorizationId) :+
-                  preAuthorizationTransaction
-                    .withPreAuthorizationCanceled(preAuthorizationCanceled)
-                    .copy(clientId = clientId)
-                )
                 val lastUpdated = now()
+                val transactionUpdatedEvent =
+                  TransactionUpdatedEvent.defaultInstance
+                    .withDocument(
+                      preAuthorizationTransaction
+                        .withPreAuthorizationCanceled(preAuthorizationCanceled)
+                        .copy(
+                          clientId = clientId,
+                          debitedUserId = paymentAccount.userId
+                        )
+                    )
+                    .withLastUpdated(lastUpdated)
                 Effect
                   .persist(
                     List(
-                      PaymentAccountUpsertedEvent.defaultInstance
-                        .withDocument(updatedPaymentAccount)
-                        .withLastUpdated(lastUpdated),
                       PreAuthorizationCanceledEvent.defaultInstance
                         .withLastUpdated(lastUpdated)
                         .withOrderUuid(orderUuid)
                         .withDebitedAccount(paymentAccount.externalUuid)
                         .withPreAuthorizedTransactionId(preAuthorizationId)
                         .withPreAuthorizationCanceled(preAuthorizationCanceled)
-                    )
+                    ) :+ transactionUpdatedEvent
                   )
                   .thenRun(_ => PreAuthorizationCanceled(preAuthorizationCanceled) ~> replyTo)
               case _ => // should never be the case
@@ -244,12 +255,14 @@ trait PreAuthorizationCommandHandler
       entityId
     ) // add transaction id as a key for this payment account
     val lastUpdated = now()
-    var updatedPaymentAccount =
-      paymentAccount
-        .withTransactions(
-          paymentAccount.transactions
-            .filterNot(_.id == transaction.id) :+ transaction
-            .copy(clientId = paymentAccount.clientId)
+    var updatedPaymentAccount = paymentAccount.withLastUpdated(lastUpdated)
+    val transactionUpdatedEvent =
+      TransactionUpdatedEvent.defaultInstance
+        .withDocument(
+          transaction.copy(
+            clientId = paymentAccount.clientId,
+            debitedUserId = paymentAccount.userId
+          )
         )
         .withLastUpdated(lastUpdated)
     val walletEvents: List[ExternalSchedulerEvent] =
@@ -271,11 +284,7 @@ trait PreAuthorizationCommandHandler
       case Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT
           if transaction.paymentClientReturnUrl.isDefined =>
         Effect
-          .persist(
-            PaymentAccountUpsertedEvent.defaultInstance
-              .withDocument(updatedPaymentAccount)
-              .withLastUpdated(lastUpdated) +: walletEvents
-          )
+          .persist(walletEvents :+ transactionUpdatedEvent)
           .thenRun(_ =>
             PaymentRequired(
               transaction.id,
@@ -287,11 +296,7 @@ trait PreAuthorizationCommandHandler
       case Transaction.TransactionStatus.TRANSACTION_CREATED
           if transaction.redirectUrl.isDefined => // 3ds
         Effect
-          .persist(
-            PaymentAccountUpsertedEvent.defaultInstance
-              .withDocument(updatedPaymentAccount)
-              .withLastUpdated(lastUpdated)
-          )
+          .persist(walletEvents :+ transactionUpdatedEvent)
           .thenRun(_ =>
             PaymentRedirection(
               transaction.redirectUrl.get
@@ -375,10 +380,10 @@ trait PreAuthorizationCommandHandler
                   .withLastUpdated(lastUpdated)
                   .withPrintReceipt(printReceipt)
                   .withPaymentType(transaction.paymentType)
-              ) :+
-              PaymentAccountUpsertedEvent.defaultInstance
+              ) ++
+              (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated)
+                .withLastUpdated(lastUpdated) +: walletEvents) :+ transactionUpdatedEvent
             )
             .thenRun(_ => PaymentPreAuthorized(transaction.id) ~> replyTo)
         } else {
@@ -395,10 +400,10 @@ trait PreAuthorizationCommandHandler
                   .withOrderUuid(orderUuid)
                   .withResultMessage(transaction.resultMessage)
                   .withTransaction(transaction)
-              ) :+
-              PaymentAccountUpsertedEvent.defaultInstance
+              ) ++
+              (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated)
+                .withLastUpdated(lastUpdated) +: walletEvents) :+ transactionUpdatedEvent
             )
             .thenRun(_ => PreAuthorizationFailed(transaction.resultMessage) ~> replyTo)
         }

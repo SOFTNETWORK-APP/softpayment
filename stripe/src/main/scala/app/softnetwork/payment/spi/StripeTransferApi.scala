@@ -107,7 +107,7 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
                   transferTransaction.orderUuid match {
                     case Some(orderUuid) =>
                       params.setTransferGroup(orderUuid)
-                      params.putMetadata("order_uuid", orderUuid)
+                      params.putMetadata("order_uuid", orderUuid.take(500))
                     case _ =>
                       Option(payment.getTransferGroup).foreach { transferGroup =>
                         params.setTransferGroup(transferGroup)
@@ -158,7 +158,13 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
               transferTransaction.orderUuid match {
                 case Some(orderUuid) =>
                   params.setTransferGroup(orderUuid)
-                  params.putMetadata("order_uuid", orderUuid)
+                  params.putMetadata("order_uuid", orderUuid.take(500))
+                case _ =>
+              }
+
+              transferTransaction.externalReference match {
+                case Some(externalReference) =>
+                  params.putMetadata("external_reference", externalReference)
                 case _ =>
               }
 

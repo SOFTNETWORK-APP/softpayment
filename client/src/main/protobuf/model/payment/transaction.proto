@@ -94,6 +94,8 @@ message Transaction {
     optional int32 transferAmount = 38;
     optional string preRegistrationId = 39;
     optional string payPalPayerId = 40;
+    optional string payInId = 41;
+    optional string debitedUserId = 42;
 }
 
 message BrowserInfo {

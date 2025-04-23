@@ -7,7 +7,11 @@ import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.message.PaymentEvents.PaymentAccountUpsertedEvent
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.message.TransactionEvents.{PaidOutEvent, PayOutFailedEvent}
+import app.softnetwork.payment.message.TransactionEvents.{
+  PaidOutEvent,
+  PayOutFailedEvent,
+  TransactionUpdatedEvent
+}
 import app.softnetwork.payment.model.{PayOutTransaction, PaymentAccount, Transaction}
 import app.softnetwork.persistence.now
 import app.softnetwork.persistence.typed._
@@ -86,12 +90,17 @@ trait PayOutCommandHandler
                           case Some(transaction) =>
                             keyValueDao.addKeyValue(transaction.id, entityId)
                             val lastUpdated = now()
-                            val updatedPaymentAccount = paymentAccount
-                              .withTransactions(
-                                paymentAccount.transactions.filterNot(_.id == transaction.id)
-                                :+ transaction.copy(clientId = clientId)
-                              )
-                              .withLastUpdated(lastUpdated)
+                            val transactionUpdatedEvent =
+                              TransactionUpdatedEvent.defaultInstance
+                                .withDocument(
+                                  transaction
+                                    .copy(
+                                      clientId = clientId,
+                                      payInId = payInTransactionId,
+                                      creditedUserId = Some(userId)
+                                    )
+                                )
+                                .withLastUpdated(lastUpdated)
                             if (transaction.status.isTransactionFailedForTechnicalReason) {
                               log.error(
                                 "Order-{} could not be paid out: {} -> {}",
@@ -107,10 +116,7 @@ trait PayOutCommandHandler
                                       .withResultMessage(transaction.resultMessage)
                                       .withTransaction(transaction)
                                       .copy(externalReference = externalReference)
-                                  ) :+
-                                  PaymentAccountUpsertedEvent.defaultInstance
-                                    .withDocument(updatedPaymentAccount)
-                                    .withLastUpdated(lastUpdated)
+                                  ) :+ transactionUpdatedEvent
                                 )
                                 .thenRun(_ =>
                                   PayOutFailed(
@@ -141,10 +147,7 @@ trait PayOutCommandHandler
                                       .withTransactionId(transaction.id)
                                       .withPaymentType(transaction.paymentType)
                                       .copy(externalReference = externalReference)
-                                  ) :+
-                                  PaymentAccountUpsertedEvent.defaultInstance
-                                    .withDocument(updatedPaymentAccount)
-                                    .withLastUpdated(lastUpdated)
+                                  ) :+ transactionUpdatedEvent
                                 )
                                 .thenRun(_ =>
                                   PaidOut(transaction.id, transaction.status) ~> replyTo
@@ -164,10 +167,7 @@ trait PayOutCommandHandler
                                       .withResultMessage(transaction.resultMessage)
                                       .withTransaction(transaction)
                                       .copy(externalReference = externalReference)
-                                  ) :+
-                                  PaymentAccountUpsertedEvent.defaultInstance
-                                    .withDocument(updatedPaymentAccount)
-                                    .withLastUpdated(lastUpdated)
+                                  ) :+ transactionUpdatedEvent
                                 )
                                 .thenRun(_ =>
                                   PayOutFailed(
@@ -286,12 +286,15 @@ trait PayOutCommandHandler
                       .withLastUpdated(lastUpdated)
                       .withResultCode(t.resultCode)
                       .withResultMessage(t.resultMessage)
-                    val updatedPaymentAccount = paymentAccount
-                      .withTransactions(
-                        paymentAccount.transactions.filterNot(_.id == t.id)
-                        :+ updatedTransaction.copy(clientId = clientId)
-                      )
-                      .withLastUpdated(lastUpdated)
+                    val transactionUpdatedEvent =
+                      TransactionUpdatedEvent.defaultInstance
+                        .withDocument(
+                          updatedTransaction.copy(
+                            clientId = clientId,
+                            creditedUserId = paymentAccount.userId
+                          )
+                        )
+                        .withLastUpdated(lastUpdated)
                     if (t.status.isTransactionSucceeded || t.status.isTransactionCreated) {
                       Effect
                         .persist(
@@ -306,10 +309,7 @@ trait PayOutCommandHandler
                               .withTransactionId(t.id)
                               .withPaymentType(t.paymentType)
                               .copy(externalReference = transaction.externalReference)
-                          ) :+
-                          PaymentAccountUpsertedEvent.defaultInstance
-                            .withLastUpdated(lastUpdated)
-                            .withDocument(updatedPaymentAccount)
+                          ) :+ transactionUpdatedEvent
                         )
                         .thenRun(_ =>
                           PayOutTransactionLoaded(
@@ -327,10 +327,7 @@ trait PayOutCommandHandler
                               .withResultMessage(updatedTransaction.resultMessage)
                               .withTransaction(updatedTransaction)
                               .copy(externalReference = transaction.externalReference)
-                          ) :+
-                          PaymentAccountUpsertedEvent.defaultInstance
-                            .withLastUpdated(lastUpdated)
-                            .withDocument(updatedPaymentAccount)
+                          ) :+ transactionUpdatedEvent
                         )
                         .thenRun(_ =>
                           PayOutTransactionLoaded(

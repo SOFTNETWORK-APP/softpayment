@@ -41,7 +41,8 @@ import app.softnetwork.payment.message.TransactionEvents.{
   FirstRecurringCardPaymentFailedEvent,
   FirstRecurringPaidInEvent,
   NextRecurringPaidEvent,
-  NextRecurringPaymentFailedEvent
+  NextRecurringPaymentFailedEvent,
+  TransactionUpdatedEvent
 }
 import app.softnetwork.payment.model.{
   DirectDebitTransaction,
@@ -616,22 +617,21 @@ trait RecurringPaymentCommandHandler
       entityId
     ) // add transaction id as a key for this payment account
     val lastUpdated = now()
-    var updatedPaymentAccount =
-      paymentAccount
-        .withTransactions(
-          paymentAccount.transactions
-            .filterNot(_.id == transaction.id) :+ transaction
+    var updatedPaymentAccount = paymentAccount.withLastUpdated(lastUpdated)
+    val transactionUpdatedEvent =
+      TransactionUpdatedEvent.defaultInstance
+        .withDocument(
+          transaction.copy(
+            clientId = paymentAccount.clientId,
+            debitedUserId = paymentAccount.userId
+          )
         )
         .withLastUpdated(lastUpdated)
     transaction.status match {
       case Transaction.TransactionStatus.TRANSACTION_CREATED
           if transaction.redirectUrl.isDefined => // 3ds
         Effect
-          .persist(
-            PaymentAccountUpsertedEvent.defaultInstance
-              .withDocument(updatedPaymentAccount)
-              .withLastUpdated(lastUpdated)
-          )
+          .persist(transactionUpdatedEvent)
           .thenRun(_ => PaymentRedirection(transaction.redirectUrl.get) ~> replyTo)
       case _ =>
         val first =
@@ -733,7 +733,7 @@ trait RecurringPaymentCommandHandler
               } :+
               PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated)
+                .withLastUpdated(lastUpdated) :+ transactionUpdatedEvent
             )
             .thenRun(_ =>
               (if (first) FirstRecurringPaidIn(transaction.id, transaction.status)
@@ -802,10 +802,7 @@ trait RecurringPaymentCommandHandler
                       )
                     )
                 }
-              } :+
-              PaymentAccountUpsertedEvent.defaultInstance
-                .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated)
+              } :+ transactionUpdatedEvent
             )
             .thenRun(_ =>
               (

@@ -233,3 +233,11 @@ message PreAuthorizationCanceledEvent {
     required string preAuthorizedTransactionId = 4;
     required bool preAuthorizationCanceled = 5;
 }
+
+message TransactionUpdatedEvent {
+    option (scalapb.message).extends = "ProtobufEvent";
+    option (scalapb.message).extends = "Updated[Transaction]";
+    option (scalapb.message).extends = "TransactionEvent";
+    required app.softnetwork.payment.model.Transaction document = 1;
+    required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
+}

@@ -6,7 +6,7 @@ import app.softnetwork.payment.data._
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.PaymentAccount.User
 import app.softnetwork.payment.model._
-import app.softnetwork.payment.scalatest.PaymentTestKit
+import app.softnetwork.payment.scalatest.PostgresPaymentTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
 import app.softnetwork.session.config.Settings
@@ -21,10 +21,10 @@ import scala.util.{Failure, Success}
 class PaymentHandlerSpec
     extends MockPaymentHandler
     with AnyWordSpecLike
-    with PaymentTestKit
+    with PostgresPaymentTestKit
     with PaymentGrpcServerTestKit {
 
-  lazy val log: Logger = LoggerFactory getLogger getClass.getName
+  override lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
   implicit lazy val ts: ActorSystem[_] = typedSystem()
 
@@ -32,6 +32,8 @@ class PaymentHandlerSpec
     Settings.Session.SessionContinuityAndTransport
 
   lazy val paymentClient: PaymentClient = PaymentClient(ts)
+
+  val currency = "EUR"
 
   "Payment handler" must {
     "pre register card" in {
@@ -73,7 +75,7 @@ class PaymentHandlerSpec
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           5100,
-          "EUR",
+          currency,
           Some(preRegistration.id),
           Some(preRegistration.registrationData),
           registerCard = true,
@@ -89,6 +91,19 @@ class PaymentHandlerSpec
             .map(a => (a(0), a(1)))
             .toMap
           preAuthorizationId = params.getOrElse("preAuthorizationId", "")
+          transactionProbe.receiveMessage()
+          jdbcTransactionProvider.load(preAuthorizationId) match {
+            case Some(transaction) =>
+              transaction.orderUuid shouldBe orderUuid
+              transaction.preRegistrationId.getOrElse("") shouldBe preRegistration.id
+              transaction.`type` shouldBe Transaction.TransactionType.PRE_AUTHORIZATION
+              transaction.paymentType shouldBe Transaction.PaymentType.CARD
+              transaction.currency shouldBe currency
+              transaction.amount shouldBe 5100
+              transaction.fees shouldBe 0
+              transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_CREATED
+            case _ => fail()
+          }
         case other => fail(other.toString)
       }
     }
@@ -102,6 +117,20 @@ class PaymentHandlerSpec
       ) await {
         case cardPreAuthorized: PaymentPreAuthorized =>
           val transactionId = cardPreAuthorized.transactionId
+          transactionProbe.receiveMessage()
+          jdbcTransactionProvider.load(transactionId) match {
+            case Some(transaction) =>
+              transaction.orderUuid shouldBe orderUuid
+              transaction.preRegistrationId.getOrElse("") shouldBe preRegistration.id
+              transaction.`type` shouldBe Transaction.TransactionType.PRE_AUTHORIZATION
+              transaction.paymentType shouldBe Transaction.PaymentType.CARD
+              transaction.preAuthorizationId.getOrElse("") shouldBe preAuthorizationId
+              transaction.currency shouldBe currency
+              transaction.amount shouldBe 5100
+              transaction.fees shouldBe 0
+              transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_CREATED
+            case _ => fail()
+          }
           !?(
             LoadPaymentAccount(computeExternalUuidWithProfile(customerUuid, Some("customer")))
           ) await {
@@ -820,7 +849,7 @@ class PaymentHandlerSpec
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
-          "EUR",
+          currency,
           Some(preRegistration.id),
           Some(preRegistration.registrationData),
           registerCard = true,
@@ -830,9 +859,36 @@ class PaymentHandlerSpec
         case result: PaymentPreAuthorized =>
           val transactionId = result.transactionId
           preAuthorizationId = transactionId
+          transactionProbe.receiveMessage()
+          jdbcTransactionProvider.load(preAuthorizationId) match {
+            case Some(transaction) =>
+              transaction.orderUuid shouldBe orderUuid
+              transaction.preRegistrationId.getOrElse("") shouldBe preRegistration.id
+              transaction.`type` shouldBe Transaction.TransactionType.PRE_AUTHORIZATION
+              transaction.paymentType shouldBe Transaction.PaymentType.CARD
+              transaction.currency shouldBe currency
+              transaction.amount shouldBe 100
+              transaction.fees shouldBe 0
+              transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_CREATED
+            case _ => fail()
+          }
           !?(CancelPreAuthorization(orderUuid, preAuthorizationId)) await {
             case result: PreAuthorizationCanceled =>
               assert(result.preAuthorizationCanceled)
+              transactionProbe.receiveMessage()
+              jdbcTransactionProvider.load(preAuthorizationId) match {
+                case Some(transaction) =>
+                  transaction.orderUuid shouldBe orderUuid
+                  transaction.preRegistrationId.getOrElse("") shouldBe preRegistration.id
+                  transaction.`type` shouldBe Transaction.TransactionType.PRE_AUTHORIZATION
+                  transaction.paymentType shouldBe Transaction.PaymentType.CARD
+                  transaction.currency shouldBe currency
+                  transaction.amount shouldBe 100
+                  transaction.fees shouldBe 0
+                  transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_CREATED
+                  transaction.preAuthorizationCanceled.getOrElse(false) shouldBe true
+                case _ => fail()
+              }
             case other => fail(other.getClass)
           }
         case other => fail(other.getClass)
@@ -845,7 +901,7 @@ class PaymentHandlerSpec
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
-          "EUR",
+          currency,
           Some(preRegistration.id),
           Some(preRegistration.registrationData),
           registerCard = true,
@@ -853,8 +909,22 @@ class PaymentHandlerSpec
         )
       ) await {
         case result: PaymentPreAuthorized =>
-          val transactionId = result.transactionId
+          var transactionId = result.transactionId
           preAuthorizationId = transactionId
+          log.info(s"$transactionId")
+          transactionProbe.receiveMessage()
+          jdbcTransactionProvider.load(preAuthorizationId) match {
+            case Some(transaction) =>
+              transaction.orderUuid shouldBe orderUuid
+              transaction.preRegistrationId.getOrElse("") shouldBe preRegistration.id
+              transaction.`type` shouldBe Transaction.TransactionType.PRE_AUTHORIZATION
+              transaction.paymentType shouldBe Transaction.PaymentType.CARD
+              transaction.currency shouldBe currency
+              transaction.amount shouldBe 100
+              transaction.fees shouldBe 0
+              transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_CREATED
+            case _ => fail()
+          }
           paymentClient.payInWithPreAuthorization(
             preAuthorizationId,
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
@@ -872,7 +942,8 @@ class PaymentHandlerSpec
             Some(debitedAmount)
           ) complete () match {
             case Success(result) =>
-              assert(result.transactionId.isDefined)
+              transactionId = result.transactionId.getOrElse("")
+              assert(transactionId.nonEmpty)
               assert(result.error.isEmpty)
               !?(
                 LoadPaymentAccount(computeExternalUuidWithProfile(customerUuid, Some("customer")))
@@ -885,10 +956,39 @@ class PaymentHandlerSpec
                       .flatMap(_.preAuthorizationValidated)
                       .getOrElse(false)
                   )
+                  transactionProbe.receiveMessage()
+                  jdbcTransactionProvider.load(transactionId) match {
+                    case Some(transaction) =>
+                      transaction.orderUuid shouldBe orderUuid
+                      transaction.preRegistrationId.getOrElse("") shouldBe preRegistration.id
+                      transaction.`type` shouldBe Transaction.TransactionType.PAYIN
+                      transaction.paymentType shouldBe Transaction.PaymentType.PREAUTHORIZED
+                      transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_SUCCEEDED
+                      transaction.currency shouldBe currency
+                      transaction.amount shouldBe 90
+                      transaction.fees shouldBe 0
+                      transaction.preAuthorizationId.getOrElse("") shouldBe preAuthorizationId
+                      transaction.preAuthorizationDebitedAmount.getOrElse(0) shouldBe 100
+                    case _ => fail()
+                  }
+                  transactionProbe.receiveMessage()
+                  jdbcTransactionProvider.load(preAuthorizationId) match {
+                    case Some(transaction) =>
+                      transaction.orderUuid shouldBe orderUuid
+                      transaction.preRegistrationId.getOrElse("") shouldBe preRegistration.id
+                      transaction.`type` shouldBe Transaction.TransactionType.PRE_AUTHORIZATION
+                      transaction.paymentType shouldBe Transaction.PaymentType.CARD
+                      transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_CREATED
+                      transaction.currency shouldBe currency
+                      transaction.amount shouldBe 100
+                      transaction.fees shouldBe 0
+                      transaction.preAuthorizationValidated.getOrElse(false) shouldBe true
+                    case _ => fail()
+                  }
                 case other => fail(other.getClass.toString)
               }
               paymentClient.loadBalance(
-                "EUR",
+                currency,
                 Option(computeExternalUuidWithProfile(sellerUuid, Some("seller"))),
                 None
               ) complete () match {
@@ -901,13 +1001,27 @@ class PaymentHandlerSpec
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
                 0,
-                "EUR",
+                currency,
                 None,
                 result.transactionId
               ) complete () match {
                 case Success(s) =>
-                  assert(s.transactionId.isDefined)
+                  transactionId = s.transactionId.getOrElse("")
+                  assert(transactionId.nonEmpty)
                   assert(s.error.isEmpty)
+                  transactionProbe.receiveMessage()
+                  jdbcTransactionProvider.load(transactionId) match {
+                    case Some(transaction) =>
+                      transaction.orderUuid shouldBe orderUuid
+                      transaction.`type` shouldBe Transaction.TransactionType.PAYOUT
+                      transaction.paymentType shouldBe Transaction.PaymentType.BANK_WIRE
+                      transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_SUCCEEDED
+                      transaction.currency shouldBe currency
+                      transaction.amount shouldBe 100
+                      transaction.fees shouldBe 0
+                      transaction.payInId shouldBe result.transactionId
+                    case _ => fail()
+                  }
                 case Failure(f) => fail(f.getMessage)
               }
             case Failure(f) => fail(f.getMessage)
@@ -922,7 +1036,7 @@ class PaymentHandlerSpec
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
-          "EUR",
+          currency,
           computeExternalUuidWithProfile(sellerUuid, Some("seller"))
         )
       ) await {
@@ -932,12 +1046,13 @@ class PaymentHandlerSpec
             computeExternalUuidWithProfile(sellerUuid, Some("seller")),
             100,
             0,
-            "EUR",
+            currency,
             None,
             Option(result.transactionId)
           ) complete () match {
             case Success(s) =>
-              assert(s.transactionId.isDefined)
+              val transactionId = s.transactionId
+              assert(transactionId.isDefined)
               assert(s.error.isEmpty)
             case Failure(f) => fail(f.getMessage)
           }
@@ -951,7 +1066,7 @@ class PaymentHandlerSpec
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
-          "EUR",
+          currency,
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           paymentType = Transaction.PaymentType.PAYPAL,
           printReceipt = true
@@ -981,7 +1096,7 @@ class PaymentHandlerSpec
                 computeExternalUuidWithProfile(sellerUuid, Some("seller")),
                 100,
                 0,
-                "EUR",
+                currency,
                 None,
                 Option(result.transactionId)
               ) complete () match {
@@ -1002,7 +1117,7 @@ class PaymentHandlerSpec
           orderUuid,
           computeExternalUuidWithProfile(customerUuid, Some("customer")),
           100,
-          "EUR",
+          currency,
           computeExternalUuidWithProfile(sellerUuid, Some("seller"))
         )
       ) await {
@@ -1013,7 +1128,7 @@ class PaymentHandlerSpec
             payInTransactionId,
             101,
             None,
-            "EUR",
+            currency,
             "change my mind",
             initializedByClient = true
           ) complete () match {
@@ -1025,7 +1140,7 @@ class PaymentHandlerSpec
                 payInTransactionId,
                 50,
                 None,
-                "EUR",
+                currency,
                 "change my mind",
                 initializedByClient = true
               ) complete () match {
@@ -1089,12 +1204,13 @@ class PaymentHandlerSpec
                 computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
                 50,
                 10,
-                "EUR",
+                currency,
                 payOutRequired = true,
                 None
               ) complete () match {
                 case Success(s) =>
-                  assert(s.paidOutTransactionId.isDefined)
+                  val paidOutTransactionId = s.paidOutTransactionId
+                  assert(paidOutTransactionId.isDefined)
                   assert(s.error.isEmpty)
                 case Failure(f) => fail(f.getMessage)
               }
@@ -1124,7 +1240,7 @@ class PaymentHandlerSpec
         computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
         100,
         0,
-        "EUR",
+        currency,
         "Direct Debit",
         None
       ) complete () match {
@@ -1136,7 +1252,7 @@ class PaymentHandlerSpec
             case result: PaymentAccountLoaded =>
               result.paymentAccount.transactions.find(_.id == directDebitTransactionId) match {
                 case Some(transaction) =>
-                  assert(transaction.currency == "EUR")
+                  assert(transaction.currency == currency)
                   assert(transaction.paymentType == Transaction.PaymentType.DIRECT_DEBITED)
                   assert(transaction.amount == 100)
                   assert(transaction.fees == 0)
@@ -1174,9 +1290,6 @@ class PaymentHandlerSpec
         case other => fail(other.toString)
       }
     }
-
-    val probe = createTestProbe[PaymentResult]()
-    subscribeProbe(probe)
 
     "register recurring direct debit payment" in {
       !?(
@@ -1216,6 +1329,9 @@ class PaymentHandlerSpec
     }
 
     "execute direct debit automatically for next recurring payment" in {
+      val probe = createTestProbe[PaymentResult]()
+      subscribeProbe(probe)
+
       !?(CancelMandate(computeExternalUuidWithProfile(vendorUuid, Some("vendor")))) await {
         case MandateNotCanceled =>
         case other              => fail(other.toString)
