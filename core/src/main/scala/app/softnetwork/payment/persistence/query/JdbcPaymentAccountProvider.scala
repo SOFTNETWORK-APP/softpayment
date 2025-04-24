@@ -33,7 +33,7 @@ trait JdbcPaymentAccountProvider
       case Some(state) =>
         super.writeToDb(document.copy(state = Some(state.clearTransactions)), to_update, data)
       case _ =>
-        alogger.warn(s"Cannot write empty payment account to db")
+        log.warn(s"Cannot write empty payment account to db")
         false
     }
   }
