@@ -1,10 +1,11 @@
 package app.softnetwork.payment.scalatest
 
+import akka.actor.testkit.typed.scaladsl.TestProbe
 import akka.actor.typed.ActorSystem
 import app.softnetwork.payment.message.TransactionEvents.TransactionUpdatedEvent
 import app.softnetwork.payment.persistence.query.{
+  JdbcPaymentAccountProvider,
   JdbcTransactionProvider,
-  JdbcTransactionProviderTestKit,
   PaymentAccountToJdbcProcessStream,
   TransactionToJdbcProcessorStream
 }
@@ -12,12 +13,8 @@ import app.softnetwork.persistence.jdbc.scalatest.JdbcPersistenceTestKit
 import app.softnetwork.persistence.query.EventProcessorStream
 import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.Suite
-import slick.jdbc.JdbcProfile
 
-trait JdbcPaymentTestKit
-    extends PaymentTestKit
-    with JdbcPersistenceTestKit
-    with JdbcTransactionProviderTestKit { _: Suite with JdbcProfile =>
+trait JdbcPaymentTestKit extends PaymentTestKit with JdbcPersistenceTestKit { _: Suite =>
 
   override lazy val config: Config = akkaConfig
     .withFallback(ConfigFactory.load("softnetwork-in-memory-persistence.conf"))
@@ -29,7 +26,9 @@ trait JdbcPaymentTestKit
     )
     .withFallback(ConfigFactory.load())
 
-  lazy val jdbcTransactionProvider: JdbcTransactionProvider = this
+  def jdbcPaymentAccountProvider: JdbcPaymentAccountProvider
+
+  def jdbcTransactionProvider: JdbcTransactionProvider
 
   def paymentAccountToJdbcProcessorStream: ActorSystem[_] => PaymentAccountToJdbcProcessStream
 
@@ -40,7 +39,8 @@ trait JdbcPaymentTestKit
       sys
     ) :+ transactionToJdbcProcessorStream(sys)
 
-  lazy val transactionProbe = createTestProbe[TransactionUpdatedEvent]()
+  lazy val transactionProbe: TestProbe[TransactionUpdatedEvent] =
+    createTestProbe[TransactionUpdatedEvent]()
 
   def subscribeJdbPaymentProbes(): Unit = {
     subscribeProbe(transactionProbe)
