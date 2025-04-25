@@ -7,5 +7,5 @@ import scala.concurrent.ExecutionContext
 
 trait JdbcTransactionProviderTestKit extends JdbcTransactionProvider {
   _: JdbcPersistenceTestKit with JdbcProfile =>
-  override implicit def executionContext: ExecutionContext = system.executionContext
+  override implicit def executionContext: ExecutionContext = classicSystem.dispatcher
 }
