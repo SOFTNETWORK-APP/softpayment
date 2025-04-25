@@ -1,6 +1,6 @@
 object Versions {
 
-  val genericPersistence = "0.7.2"
+  val genericPersistence = "0.7.3"
 
   val scheduler = "0.7.1"
 
