@@ -16,15 +16,15 @@ import org.scalatest.Suite
 
 trait JdbcPaymentTestKit extends PaymentTestKit with JdbcPersistenceTestKit { _: Suite =>
 
-  override lazy val config: Config = akkaConfig
-    .withFallback(ConfigFactory.load("softnetwork-in-memory-persistence.conf"))
-    .withFallback(
-      ConfigFactory.parseString(providerSettings)
-    )
-    .withFallback(
-      ConfigFactory.parseString(slick)
-    )
-    .withFallback(ConfigFactory.load())
+  override lazy val config: Config =
+    ConfigFactory
+      .parseString(slick)
+      .withFallback(akkaConfig)
+      .withFallback(ConfigFactory.load("softnetwork-in-memory-persistence.conf"))
+      .withFallback(
+        ConfigFactory.parseString(providerSettings)
+      )
+      .withFallback(ConfigFactory.load())
 
   def jdbcPaymentAccountProvider: JdbcPaymentAccountProvider
 
