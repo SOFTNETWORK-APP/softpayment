@@ -4,6 +4,7 @@ import akka.actor.typed.ActorSystem
 import app.softnetwork.api.server.Endpoint
 import app.softnetwork.payment.handlers.{MockSoftPayAccountDao, SoftPayAccountDao}
 import app.softnetwork.payment.launch.PaymentEndpoints
+import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.payment.service.{MockPaymentServiceEndpoints, PaymentServiceEndpoints}
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.{CsrfCheck, CsrfCheckHeader}
@@ -18,6 +19,7 @@ import app.softnetwork.session.scalatest.{
 }
 import app.softnetwork.session.service.{JwtClaimsSessionMaterials, SessionMaterials}
 import com.softwaremill.session.{RefreshTokenStorage, SessionConfig, SessionManager}
+import org.json4s.Formats
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
 import org.softnetwork.session.model.{JwtClaims, Session}
@@ -32,8 +34,6 @@ trait PaymentEndpointsTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     with SchemaProvider
     with CsrfCheck
     with SessionMaterials[SD] =>
-
-  implicit def sessionConfig: SessionConfig
 
   override def paymentEndpoints: ActorSystem[_] => PaymentServiceEndpoints[SD] = sys =>
     new MockPaymentServiceEndpoints[SD] with SessionMaterials[SD] {
@@ -64,6 +64,8 @@ trait PaymentEndpointsWithOneOffCookieSessionSpecTestKit
     with PaymentEndpointsTestKit[JwtClaims]
     with CsrfCheckHeader
     with JwtClaimsSessionMaterials {
+  override implicit def formats: Formats = paymentFormats
+
   override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }
 
@@ -74,6 +76,8 @@ trait PaymentEndpointsWithOneOffHeaderSessionSpecTestKit
     with PaymentEndpointsTestKit[JwtClaims]
     with CsrfCheckHeader
     with JwtClaimsSessionMaterials {
+  override implicit def formats: Formats = paymentFormats
+
   override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }
 
@@ -84,6 +88,8 @@ trait PaymentEndpointsWithRefreshableCookieSessionSpecTestKit
     with PaymentEndpointsTestKit[JwtClaims]
     with CsrfCheckHeader
     with JwtClaimsSessionMaterials {
+  override implicit def formats: Formats = paymentFormats
+
   override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }
 
@@ -94,5 +100,7 @@ trait PaymentEndpointsWithRefreshableHeaderSessionSpecTestKit
     with PaymentEndpointsTestKit[JwtClaims]
     with CsrfCheckHeader
     with JwtClaimsSessionMaterials {
+  override implicit def formats: Formats = paymentFormats
+
   override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }

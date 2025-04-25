@@ -1,6 +1,6 @@
 package app.softnetwork.payment.scalatest
 
-import app.softnetwork.account.message.{BasicAccountSignUp, SignUp}
+import app.softnetwork.account.message.SignUp
 import app.softnetwork.account.model._
 import app.softnetwork.account.scalatest.AccountRouteSpec
 import app.softnetwork.api.server.ApiRoutes
@@ -26,7 +26,7 @@ trait SoftPayAccountRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
   override protected val manifestWrapper: ManifestW = ManifestW()
 
-  lazy val log: Logger = LoggerFactory getLogger getClass.getName
+  override lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
   override val profile: BasicAccountProfile =
     BasicAccountProfile.defaultInstance

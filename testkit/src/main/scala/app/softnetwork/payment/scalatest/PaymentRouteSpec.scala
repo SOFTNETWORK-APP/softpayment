@@ -27,7 +27,7 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
     with PaymentRouteTestKit[SD] {
   _: ApiRoutes with SessionMaterials[SD] =>
 
-  lazy val log: Logger = LoggerFactory getLogger getClass.getName
+  override lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
   import app.softnetwork.serialization._
 
@@ -593,9 +593,6 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    val probe = createTestProbe[PaymentResult]()
-    subscribeProbe(probe)
-
     "register recurring direct debit payment" in {
       withHeaders(
         Post(
@@ -639,6 +636,8 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "execute direct debit automatically for next recurring payment" in {
+      val probe = createTestProbe[PaymentResult]()
+      subscribeProbe(probe)
       withHeaders(
         Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute")
       ) ~> routes ~> check {

@@ -20,7 +20,7 @@ import java.nio.file.Paths
 
 trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     extends SessionTestKit[SD]
-    with PaymentTestKit
+    with PostgresPaymentTestKit
     with PaymentGrpcServicesTestKit {
   _: Suite with ApiRoutes with SessionMaterials[SD] =>
 
@@ -40,11 +40,13 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   override implicit lazy val ts: ActorSystem[_] = typedSystem()
 
+  /*
   override def beforeAll(): Unit = {
     initAndJoinCluster()
     // pre load routes
     mainRoutes(typedSystem())
   }
+   */
 
   def loadPaymentAccount(): PaymentAccountView = {
     withHeaders(

@@ -4,6 +4,7 @@ import akka.actor.typed.ActorSystem
 import app.softnetwork.api.server.ApiRoute
 import app.softnetwork.payment.handlers.{MockSoftPayAccountDao, SoftPayAccountDao}
 import app.softnetwork.payment.launch.PaymentRoutes
+import app.softnetwork.payment.serialization.paymentFormats
 import app.softnetwork.payment.service.{MockPaymentService, PaymentService}
 import app.softnetwork.persistence.schema.SchemaProvider
 import app.softnetwork.session.model.{SessionData, SessionDataCompanion, SessionDataDecorator}
@@ -17,6 +18,7 @@ import app.softnetwork.session.scalatest.{
 }
 import app.softnetwork.session.service.{JwtClaimsSessionMaterials, SessionMaterials}
 import com.softwaremill.session.{RefreshTokenStorage, SessionConfig, SessionManager}
+import org.json4s.Formats
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
 import org.softnetwork.session.model.{JwtClaims, Session}
@@ -58,6 +60,8 @@ trait PaymentRoutesWithOneOffCookieSessionSpecTestKit
     with OneOffCookieSessionServiceTestKit[JwtClaims]
     with PaymentRoutesTestKit[JwtClaims]
     with JwtClaimsSessionMaterials {
+  override implicit def formats: Formats = paymentFormats
+
   override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }
 
@@ -67,6 +71,8 @@ trait PaymentRoutesWithOneOffHeaderSessionSpecTestKit
     with OneOffHeaderSessionServiceTestKit[JwtClaims]
     with PaymentRoutesTestKit[JwtClaims]
     with JwtClaimsSessionMaterials {
+  override implicit def formats: Formats = paymentFormats
+
   override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }
 
@@ -76,6 +82,8 @@ trait PaymentRoutesWithRefreshableCookieSessionSpecTestKit
     with RefreshableCookieSessionServiceTestKit[JwtClaims]
     with PaymentRoutesTestKit[JwtClaims]
     with JwtClaimsSessionMaterials {
+  override implicit def formats: Formats = paymentFormats
+
   override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }
 
@@ -85,5 +93,7 @@ trait PaymentRoutesWithRefreshableHeaderSessionSpecTestKit
     with RefreshableHeaderSessionServiceTestKit[JwtClaims]
     with PaymentRoutesTestKit[JwtClaims]
     with JwtClaimsSessionMaterials {
+  override implicit def formats: Formats = paymentFormats
+
   override implicit def companion: SessionDataCompanion[JwtClaims] = JwtClaims
 }
