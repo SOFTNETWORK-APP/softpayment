@@ -284,7 +284,13 @@ trait PreAuthorizationCommandHandler
       case Transaction.TransactionStatus.TRANSACTION_PENDING_PAYMENT
           if transaction.paymentClientReturnUrl.isDefined =>
         Effect
-          .persist(walletEvents :+ transactionUpdatedEvent)
+          .persist(
+            List(
+              PaymentAccountUpsertedEvent.defaultInstance
+                .withDocument(updatedPaymentAccount)
+                .withLastUpdated(lastUpdated)
+            ) ++ walletEvents :+ transactionUpdatedEvent
+          )
           .thenRun(_ =>
             PaymentRequired(
               transaction.id,
@@ -296,7 +302,13 @@ trait PreAuthorizationCommandHandler
       case Transaction.TransactionStatus.TRANSACTION_CREATED
           if transaction.redirectUrl.isDefined => // 3ds
         Effect
-          .persist(walletEvents :+ transactionUpdatedEvent)
+          .persist(
+            List(
+              PaymentAccountUpsertedEvent.defaultInstance
+                .withDocument(updatedPaymentAccount)
+                .withLastUpdated(lastUpdated)
+            ) ++ walletEvents :+ transactionUpdatedEvent
+          )
           .thenRun(_ =>
             PaymentRedirection(
               transaction.redirectUrl.get
