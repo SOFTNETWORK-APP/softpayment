@@ -13,6 +13,7 @@ import com.stripe.model.{
   Transfer,
   TransferReversal
 }
+import com.stripe.net.RequestOptions
 import com.stripe.param.{
   FeeRefundCollectionCreateParams,
   PayoutCancelParams,
@@ -42,6 +43,36 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
           s"Processing refund transaction for order: ${refundTransaction.orderUuid} -> ${asJson(refundTransaction)}"
         )
 
+        def refundApplicationFees(
+          charge: Charge,
+          feesRefundAmount: Int,
+          requestOptions: RequestOptions
+        ): Unit = {
+          // retrieve the optional application fees associated with the charge
+          Option(charge.getApplicationFee) match {
+
+            case Some(applicationFeeId) =>
+              val applicationFee = ApplicationFee.retrieve(applicationFeeId, requestOptions)
+
+              val params =
+                FeeRefundCollectionCreateParams
+                  .builder()
+                  .setAmount(Math.min(charge.getApplicationFeeAmount.intValue(), feesRefundAmount))
+                  .putMetadata("order_uuid", refundTransaction.orderUuid)
+                  .putMetadata("author_id", refundTransaction.authorId)
+                  .putMetadata("reason_message", refundTransaction.reasonMessage)
+
+              mlog.info(
+                s"Processing refund fees for order: ${refundTransaction.orderUuid} -> ${new Gson()
+                  .toJson(params)}"
+              )
+
+              applicationFee.getRefunds.create(params.build(), requestOptions)
+
+            case _ =>
+          }
+        }
+
         Try {
           val requestOptions = StripeApi().requestOptions()
 
@@ -57,14 +88,21 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
                      if sourceTransaction
                        .startsWith("pi_") || sourceTransaction.startsWith("ch_") =>
                    false
-                 case _ => true
+                 case _ =>
+                   refundTransaction.feesRefundAmount.getOrElse(
+                     0
+                   ) > 0
+                 //FIXME when application fees to refund are less than
+                 // the application fees charged
                }
 
              val params =
                TransferReversalCollectionCreateParams
                  .builder()
                  .setAmount(Math.min(transfer.getAmount.intValue(), refundTransaction.refundAmount))
-                 .setRefundApplicationFee(refundApplicationFee)
+                 .setRefundApplicationFee(
+                   refundApplicationFee
+                 ) // whether to refund the application fees or not
                  .putMetadata("order_uuid", refundTransaction.orderUuid)
                  .putMetadata("author_id", refundTransaction.authorId)
                  .putMetadata("reason_message", refundTransaction.reasonMessage)
@@ -107,44 +145,13 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
               val transferReversal =
                 Option(payment.getTransferData).flatMap(td => Option(td.getDestination)).isDefined
 
-              val refundFees = transferReversal && payment.getApplicationFeeAmount > 0
-
-              val refundApplicationFee =
-                refundFees && refundTransaction.feesRefundAmount.getOrElse(0) == 0
-
               refundTransaction.feesRefundAmount match {
                 case Some(feesRefundAmount)
-                    if refundFees && feesRefundAmount > 0 => // refund application fees
+                    if transferReversal && payment.getApplicationFeeAmount > 0 && feesRefundAmount > 0 =>
                   // first retrieve the latest charge associated with the payment
-                  val latestCharge = Charge.retrieve(payment.getLatestCharge, requestOptions)
-
-                  // then retrieve the optional application fees associated with the charge
-                  Option(latestCharge.getApplicationFee) match {
-
-                    case Some(applicationFeeId) =>
-                      val applicationFee = ApplicationFee.retrieve(applicationFeeId, requestOptions)
-
-                      val params =
-                        FeeRefundCollectionCreateParams
-                          .builder()
-                          .setAmount(
-                            Math.min(payment.getApplicationFeeAmount.intValue(), feesRefundAmount)
-                          )
-                          .putMetadata("order_uuid", refundTransaction.orderUuid)
-                          .putMetadata("author_id", refundTransaction.authorId)
-                          .putMetadata("reason_message", refundTransaction.reasonMessage)
-
-                      mlog.info(
-                        s"Processing refund fees for order: ${refundTransaction.orderUuid} -> ${new Gson()
-                          .toJson(params)}"
-                      )
-
-                      applicationFee.getRefunds.create(params.build(), requestOptions)
-
-                    case _ =>
-
-                  }
-
+                  val charge = Charge.retrieve(payment.getLatestCharge, requestOptions)
+                  // refund the application fees
+                  refundApplicationFees(charge, feesRefundAmount, requestOptions)
                 case _ =>
               }
 
@@ -156,7 +163,7 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
                   )
                   .setCharge(payment.getLatestCharge)
                   .setReverseTransfer(transferReversal)
-                  .setRefundApplicationFee(refundApplicationFee)
+                  .setRefundApplicationFee(false)
                   .putMetadata("order_uuid", refundTransaction.orderUuid)
                   .putMetadata("author_id", refundTransaction.authorId)
                   .putMetadata("reason_message", refundTransaction.reasonMessage)
@@ -175,35 +182,9 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
             case charge: Charge =>
               refundTransaction.feesRefundAmount match {
                 case Some(feesRefundAmount)
-                    if charge.getApplicationFeeAmount > 0 && feesRefundAmount > 0 => // refund application fees
-
-                  // retrieve the optional application fees associated with the charge
-                  Option(charge.getApplicationFee) match {
-
-                    case Some(applicationFeeId) =>
-                      val applicationFee = ApplicationFee.retrieve(applicationFeeId, requestOptions)
-
-                      val params =
-                        FeeRefundCollectionCreateParams
-                          .builder()
-                          .setAmount(
-                            Math.min(charge.getApplicationFeeAmount.intValue(), feesRefundAmount)
-                          )
-                          .putMetadata("order_uuid", refundTransaction.orderUuid)
-                          .putMetadata("author_id", refundTransaction.authorId)
-                          .putMetadata("reason_message", refundTransaction.reasonMessage)
-
-                      mlog.info(
-                        s"Processing refund fees for order: ${refundTransaction.orderUuid} -> ${new Gson()
-                          .toJson(params)}"
-                      )
-
-                      applicationFee.getRefunds.create(params.build(), requestOptions)
-
-                    case _ =>
-
-                  }
-
+                    if charge.getApplicationFeeAmount > 0 && feesRefundAmount > 0 =>
+                  // refund the application fees
+                  refundApplicationFees(charge, feesRefundAmount, requestOptions)
                 case _ =>
               }
 
