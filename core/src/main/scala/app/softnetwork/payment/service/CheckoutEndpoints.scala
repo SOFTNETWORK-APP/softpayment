@@ -92,7 +92,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               printReceipt,
               creditedAccount.headOption,
               feesAmount,
-              user = user, // required for Pre authorize without pre registered card
+              user = user, // required for Pre authorize without preregistered card
               paymentMethodId = paymentMethodId,
               registerMeansOfPayment = registerMeansOfPayment
             )

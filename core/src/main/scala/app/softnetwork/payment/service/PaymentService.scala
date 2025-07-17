@@ -588,7 +588,9 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                       updatedUser,
                       acceptedTermsOfPSP,
                       Some(ipAddress.value),
-                      userAgent.map(_.name())
+                      userAgent.map(_.name()),
+                      tokenId = tokenId,
+                      bankTokenId = bankTokenId
                     )
                   ) completeWith {
                     case r: BankAccountCreatedOrUpdated =>
@@ -633,16 +635,19 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
           } ~ put {
             optionalHeaderValueByType[UserAgent]((): Unit) { userAgent =>
               extractClientIP { ipAddress =>
-                run(
-                  ValidateUboDeclaration(
-                    externalUuidWithProfile(session),
-                    ipAddress.value,
-                    userAgent.map(_.name())
-                  )
-                ) completeWith {
-                  case _: UboDeclarationAskedForValidation.type =>
-                    complete(HttpResponse(StatusCodes.OK))
-                  case other => error(other)
+                parameter("tokenId".?) { tokenId =>
+                  run(
+                    ValidateUboDeclaration(
+                      externalUuidWithProfile(session),
+                      ipAddress.value,
+                      userAgent.map(_.name()),
+                      tokenId
+                    )
+                  ) completeWith {
+                    case _: UboDeclarationAskedForValidation.type =>
+                      complete(HttpResponse(StatusCodes.OK))
+                    case other => error(other)
+                  }
                 }
               }
             }

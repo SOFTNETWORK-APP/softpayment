@@ -54,6 +54,14 @@ trait MockMangoPayProvider extends MangoPayProvider with Entity {
 
   /** @param maybeNaturalUser
     *   - natural user to create
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   provider user id
     */
@@ -62,7 +70,8 @@ trait MockMangoPayProvider extends MangoPayProvider with Entity {
     maybeNaturalUser: Option[NaturalUser],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String]
   ): Option[String] =
     maybeNaturalUser match {
       case Some(naturalUser) =>
@@ -108,6 +117,14 @@ trait MockMangoPayProvider extends MangoPayProvider with Entity {
 
   /** @param maybeLegalUser
     *   - legal user to create
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   provider user id
     */
@@ -116,7 +133,8 @@ trait MockMangoPayProvider extends MangoPayProvider with Entity {
     maybeLegalUser: Option[LegalUser],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String]
   ): Option[String] = {
     maybeLegalUser match {
       case Some(legalUser) =>
@@ -250,10 +268,15 @@ trait MockMangoPayProvider extends MangoPayProvider with Entity {
 
   /** @param maybeBankAccount
     *   - bank account to create
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   bank account id
     */
-  override def createOrUpdateBankAccount(maybeBankAccount: Option[BankAccount]): Option[String] =
+  override def createOrUpdateBankAccount(
+    maybeBankAccount: Option[BankAccount],
+    tokenId: Option[String]
+  ): Option[String] =
     maybeBankAccount match {
       case Some(mangoPayBankAccount) =>
         import mangoPayBankAccount._
@@ -1417,6 +1440,12 @@ trait MockMangoPayProvider extends MangoPayProvider with Entity {
     *   - Provider user id
     * @param uboDeclarationId
     *   - Provider declaration id
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   Ultimate Beneficial Owner declaration
     */
@@ -1424,7 +1453,8 @@ trait MockMangoPayProvider extends MangoPayProvider with Entity {
     userId: String,
     uboDeclarationId: String,
     ipAddress: String,
-    userAgent: String
+    userAgent: String,
+    tokenId: Option[String]
   ): Option[UboDeclaration] = {
     UboDeclarations.get(uboDeclarationId) match {
       case Some(uboDeclaration) =>

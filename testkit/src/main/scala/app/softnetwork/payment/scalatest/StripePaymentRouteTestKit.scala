@@ -16,8 +16,8 @@ import com.stripe.net.Webhook
 import org.scalatest.Suite
 
 import java.time.Instant
+import scala.sys.process.Process
 import scala.util.{Failure, Success, Try}
-import sys.process._
 
 trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     extends PaymentRouteTestKit[SD]

@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.headers.{`User-Agent`, `X-Forwarded-For`}
 import app.softnetwork.api.server.ApiRoutes
 import app.softnetwork.api.server.config.ServerSettings.RootPath
 import app.softnetwork.payment.config.PaymentSettings.PaymentConfig._
-import app.softnetwork.payment.config.{PaymentSettings, StripeApi, StripeSettings}
+import app.softnetwork.payment.config.{PaymentSettings, StripeApi}
 import app.softnetwork.payment.data.{
   bic,
   birthday,
@@ -47,6 +47,7 @@ import app.softnetwork.payment.model.{
   computeExternalUuidWithProfile,
   BankAccount,
   LegalUser,
+  PaymentAccount,
   PreRegistration,
   RecurringPayment,
   RecurringPaymentView,
@@ -80,8 +81,6 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
   override lazy val log: Logger = LoggerFactory getLogger getClass.getName
 
-  override implicit lazy val providerConfig: StripeApi.Config = StripeSettings.StripeApiConfig
-
   import app.softnetwork.serialization._
 
   var customer: String = _
@@ -96,15 +95,21 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
   "individual account" should {
     "be created or updated" in {
-      externalUserId = "individual"
+      externalUserId = "individual-production"
+      val user = naturalUser.withExternalUuid(externalUserId)
+      val token = createAccountToken(PaymentAccount.defaultInstance.withNaturalUser(user))
+      val bankAccount = BankAccount(None, ownerName, ownerAddress, iban, bic)
+      val bankToken = createBankToken(bankAccount, individual = true)
       createNewSession(sellerSession(externalUserId))
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
           BankAccountCommand(
-            BankAccount(None, ownerName, ownerAddress, iban, bic),
-            naturalUser.withExternalUuid(externalUserId),
-            Some(true)
+            bankAccount,
+            user,
+            Some(true),
+            Some(token.getId),
+            Some(bankToken.getId)
           )
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
@@ -131,9 +136,6 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         assert(paymentAccount.mandate.map(_.status).isDefined)
       }
     }
-
-    val probe = createTestProbe[PaymentResult]()
-    subscribeProbe(probe)
 
     "register recurring direct debit payment" in {
       withHeaders(
@@ -178,6 +180,8 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "execute direct debit automatically for next recurring payment" in {
+      val probe = createTestProbe[PaymentResult]()
+      subscribeProbe(probe)
       withHeaders(
         Delete(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$mandateRoute")
       ) ~> routes ~> check {
@@ -217,19 +221,25 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
   "sole trader account" should {
     "be created or updated" in {
-      externalUserId = "soleTrader"
+      externalUserId = "soleTrader-production"
+      val user = legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId))
+      val token = createAccountToken(PaymentAccount.defaultInstance.withLegalUser(user))
+      val bankAccount = BankAccount(
+        Option(sellerBankAccountId),
+        ownerName,
+        ownerAddress,
+        iban,
+        bic
+      )
+      val bankToken = createBankToken(bankAccount, individual = false)
       createNewSession(sellerSession(externalUserId))
       val command =
         BankAccountCommand(
-          BankAccount(
-            Option(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
-          legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
-          Some(true)
+          bankAccount,
+          user,
+          Some(true),
+          Some(token.getId),
+          Some(bankToken.getId)
         )
       log.info(serialization.write(command))
       withHeaders(
@@ -250,21 +260,28 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
 
   "business account" should {
     "be created or updated" in {
-      externalUserId = "business"
+      externalUserId = "business-production"
+      val user = legalUser
+        .withLegalUserType(LegalUser.LegalUserType.BUSINESS)
+        .withLegalRepresentative(naturalUser.withExternalUuid(externalUserId))
+      val token = createAccountToken(PaymentAccount.defaultInstance.withLegalUser(user))
+      val bankAccount =
+        BankAccount(
+          Option(sellerBankAccountId),
+          ownerName,
+          ownerAddress,
+          iban,
+          bic
+        )
+      val bankToken = createBankToken(bankAccount, individual = false)
       createNewSession(sellerSession(externalUserId))
       val bank =
         BankAccountCommand(
-          BankAccount(
-            Option(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
-          legalUser
-            .withLegalUserType(LegalUser.LegalUserType.BUSINESS)
-            .withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
-          Some(true)
+          bankAccount,
+          user,
+          Some(true),
+          Some(token.getId),
+          Some(bankToken.getId)
         )
       log.info(serialization.write(bank))
       withHeaders(

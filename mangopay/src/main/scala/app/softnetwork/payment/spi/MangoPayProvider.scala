@@ -216,6 +216,14 @@ trait MangoPayProvider extends PaymentProvider {
 
   /** @param maybeNaturalUser
     *   - natural user to create
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   provider user id
     */
@@ -224,7 +232,8 @@ trait MangoPayProvider extends PaymentProvider {
     maybeNaturalUser: Option[NaturalUser],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String]
   ): Option[String] = {
     maybeNaturalUser match {
       case Some(naturalUser) =>
@@ -287,6 +296,14 @@ trait MangoPayProvider extends PaymentProvider {
 
   /** @param maybeLegalUser
     *   - legal user to create
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   provider user id
     */
@@ -295,7 +312,8 @@ trait MangoPayProvider extends PaymentProvider {
     maybeLegalUser: Option[LegalUser],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String]
   ): Option[String] = {
     maybeLegalUser match {
       case Some(legalUser) =>
@@ -441,10 +459,15 @@ trait MangoPayProvider extends PaymentProvider {
 
   /** @param maybeBankAccount
     *   - bank account to create
+    * @param bankTokenId
+    *   - optional bank token id for the bank account
     * @return
     *   bank account id
     */
-  def createOrUpdateBankAccount(maybeBankAccount: Option[BankAccount]): Option[String] = {
+  def createOrUpdateBankAccount(
+    maybeBankAccount: Option[BankAccount],
+    bankTokenId: Option[String]
+  ): Option[String] = {
     maybeBankAccount match {
       case Some(mangoPayBankAccount) =>
         import mangoPayBankAccount._
@@ -2309,6 +2332,12 @@ trait MangoPayProvider extends PaymentProvider {
     *   - Provider user id
     * @param uboDeclarationId
     *   - Provider declaration id
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   Ultimate Beneficial Owner declaration
     */
@@ -2316,7 +2345,8 @@ trait MangoPayProvider extends PaymentProvider {
     userId: String,
     uboDeclarationId: String,
     ipAddress: String,
-    userAgent: String
+    userAgent: String,
+    tokenId: Option[String]
   ): Option[UboDeclaration] = {
     Try(
       MangoPay().getUboDeclarationApi.submitForValidation(userId, uboDeclarationId)

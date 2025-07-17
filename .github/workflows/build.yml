@@ -23,8 +23,8 @@ permissions:
 
 jobs:
   test:
-    runs-on: self-hosted
-#    runs-on: ubuntu-latest
+#    runs-on: self-hosted
+    runs-on: ubuntu-latest
     env:
       # define Java options for both official sbt and sbt-extras
       JAVA_OPTS: -Xms2048M -Xmx2048M -Xss6M -XX:ReservedCodeCacheSize=256M -Dfile.encoding=UTF-8
@@ -38,6 +38,8 @@ jobs:
         java-version: '8'
         distribution: 'temurin'
 #        cache: 'sbt'
+    - name: Setup sbt launcher
+      uses: sbt/setup-sbt@v1
 #    - name: Run tests & Coverage Report
 #      run: sbt coverage test coverageReport
 #    - name: Upload coverage to Codecov
@@ -67,5 +69,7 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
 #          cache: 'sbt'
+      - name: Setup sbt launcher
+        uses: sbt/setup-sbt@v1
       - name: Formatting
         run: sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck

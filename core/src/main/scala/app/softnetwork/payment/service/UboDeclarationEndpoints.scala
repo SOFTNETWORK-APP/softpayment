@@ -63,6 +63,11 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
     requiredSessionEndpoint.put
       .in(clientIp)
       .in(header[Option[String]](HeaderNames.UserAgent))
+      .in(
+        query[Option[String]]("tokenId").description(
+          "The token id of the Ubo declaration to validate"
+        )
+      )
       .in(PaymentSettings.PaymentConfig.declarationRoute)
       .out(
         statusCode(StatusCode.Ok).and(
@@ -71,8 +76,16 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           )
         )
       )
-      .serverLogic(principal => { case (ipAddress, userAgent) =>
-        run(ValidateUboDeclaration(externalUuidWithProfile(principal._2), ipAddress, userAgent))
+      .serverLogic(principal => { case (ipAddress, userAgent, tokenId) =>
+        val session: SD = principal._2
+        run(
+          ValidateUboDeclaration(
+            externalUuidWithProfile(session),
+            ipAddress,
+            userAgent,
+            tokenId
+          )
+        )
           .map {
             case UboDeclarationAskedForValidation => Right(UboDeclarationAskedForValidation)
             case other                            => Left(error(other))
