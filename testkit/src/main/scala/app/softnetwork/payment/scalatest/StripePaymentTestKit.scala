@@ -145,7 +145,4 @@ trait StripePaymentTestKit extends PaymentTestKit { _: Suite =>
     )
   }
 
-  def createValidationOfDeclarationToken(): Token = {
-    ???
-  }
 }

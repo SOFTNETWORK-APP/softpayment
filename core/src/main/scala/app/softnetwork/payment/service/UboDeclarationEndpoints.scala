@@ -77,9 +77,10 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic(principal => { case (ipAddress, userAgent, tokenId) =>
+        val session: SD = principal._2
         run(
           ValidateUboDeclaration(
-            externalUuidWithProfile(principal._2),
+            externalUuidWithProfile(session),
             ipAddress,
             userAgent,
             tokenId
