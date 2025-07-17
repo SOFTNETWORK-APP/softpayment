@@ -597,9 +597,8 @@ trait PayInCommandHandler
       List(
         TransactionUpdatedEvent.defaultInstance
           .withDocument(
-            transaction.copy(
-              clientId = paymentAccount.clientId,
-              debitedUserId = paymentAccount.userId)
+            transaction
+              .copy(clientId = paymentAccount.clientId, debitedUserId = paymentAccount.userId)
           )
           .withLastUpdated(lastUpdated)
       )
