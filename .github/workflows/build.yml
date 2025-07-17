@@ -69,5 +69,7 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
 #          cache: 'sbt'
+      - name: Setup sbt launcher
+        uses: sbt/setup-sbt@v1
       - name: Formatting
         run: sbt scalafmtSbtCheck scalafmtCheck test:scalafmtCheck
