@@ -101,6 +101,14 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
   /** @param maybeNaturalUser
     *   - natural user to create
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   provider user id
     */
@@ -109,7 +117,8 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     maybeNaturalUser: Option[NaturalUser],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String]
   ): Option[String] = {
     maybeNaturalUser match {
       case Some(naturalUser) =>
@@ -147,55 +156,62 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                       .find(acc => acc.getMetadata.get("external_uuid") == naturalUser.externalUuid)
                 }) match {
                   case Some(account) =>
-                    mlog.info(s"account -> ${new Gson().toJson(account)}")
+                    mlog.info(s"individual account to update -> ${new Gson().toJson(account)}")
 
-                    // update account
-                    val individual =
-                      TokenCreateParams.Account.Individual
-                        .builder()
-                        .setFirstName(naturalUser.firstName)
-                        .setLastName(naturalUser.lastName)
-                        .setDob(
-                          TokenCreateParams.Account.Individual.Dob
-                            .builder()
-                            .setDay(c.get(Calendar.DAY_OF_MONTH))
-                            .setMonth(c.get(Calendar.MONTH) + 1)
-                            .setYear(c.get(Calendar.YEAR))
-                            .build()
-                        )
-                        .setEmail(naturalUser.email)
-                    naturalUser.phone match {
-                      case Some(phone) =>
-                        individual.setPhone(phone)
+                    // update individual account
+                    val token = tokenId match {
+                      case Some(t) =>
+                        Token.retrieve(t, StripeApi().requestOptions())
                       case _ =>
-                    }
-                    naturalUser.address match {
-                      case Some(address) =>
-                        individual.setAddress(
-                          TokenCreateParams.Account.Individual.Address
+                        // create account with token
+                        val individual =
+                          TokenCreateParams.Account.Individual
                             .builder()
-                            .setCity(address.city)
-                            .setCountry(address.country)
-                            .setLine1(address.addressLine)
-                            .setPostalCode(address.postalCode)
-                            .build()
+                            .setFirstName(naturalUser.firstName)
+                            .setLastName(naturalUser.lastName)
+                            .setDob(
+                              TokenCreateParams.Account.Individual.Dob
+                                .builder()
+                                .setDay(c.get(Calendar.DAY_OF_MONTH))
+                                .setMonth(c.get(Calendar.MONTH) + 1)
+                                .setYear(c.get(Calendar.YEAR))
+                                .build()
+                            )
+                            .setEmail(naturalUser.email)
+                        naturalUser.phone match {
+                          case Some(phone) =>
+                            individual.setPhone(phone)
+                          case _ =>
+                        }
+                        naturalUser.address match {
+                          case Some(address) =>
+                            individual.setAddress(
+                              TokenCreateParams.Account.Individual.Address
+                                .builder()
+                                .setCity(address.city)
+                                .setCountry(address.country)
+                                .setLine1(address.addressLine)
+                                .setPostalCode(address.postalCode)
+                                .build()
+                            )
+                          case _ =>
+                        }
+                        val params = TokenCreateParams.Account
+                          .builder()
+                          .setBusinessType(TokenCreateParams.Account.BusinessType.INDIVIDUAL)
+                          .setIndividual(individual.build())
+                          .setTosShownAndAccepted(tos_shown_and_accepted)
+                        mlog.info(
+                          s"update individual account token params -> ${new Gson().toJson(params.build())}"
                         )
-                      case _ =>
-                    }
-                    val token = Token.create(
-                      TokenCreateParams
-                        .builder()
-                        .setAccount(
-                          TokenCreateParams.Account
+                        Token.create(
+                          TokenCreateParams
                             .builder()
-                            .setBusinessType(TokenCreateParams.Account.BusinessType.INDIVIDUAL)
-                            .setIndividual(individual.build())
-                            .setTosShownAndAccepted(tos_shown_and_accepted)
-                            .build
+                            .setAccount(params.build())
+                            .build(),
+                          StripeApi().requestOptions()
                         )
-                        .build(),
-                      StripeApi().requestOptions()
-                    )
+                    }
                     val params =
                       AccountUpdateParams
                         .builder()
@@ -285,6 +301,9 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                         params.setBusinessProfile(businessProfile.build())
                       case _ =>
                     }
+                    mlog.info(
+                      s"update individual account params -> ${new Gson().toJson(params.build())}"
+                    )
                     account.update(
                       params.build(),
                       StripeApi().requestOptions()
@@ -292,52 +311,60 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
                   case _ =>
                     // create account
-                    val individual =
-                      TokenCreateParams.Account.Individual
-                        .builder()
-                        .setFirstName(naturalUser.firstName)
-                        .setLastName(naturalUser.lastName)
-                        .setDob(
-                          TokenCreateParams.Account.Individual.Dob
-                            .builder()
-                            .setDay(c.get(Calendar.DAY_OF_MONTH))
-                            .setMonth(c.get(Calendar.MONTH) + 1)
-                            .setYear(c.get(Calendar.YEAR))
-                            .build()
-                        )
-                        .setEmail(naturalUser.email)
-                    naturalUser.phone match {
-                      case Some(phone) =>
-                        individual.setPhone(phone)
-                      case _ =>
-                    }
-                    naturalUser.address match {
-                      case Some(address) =>
-                        individual.setAddress(
-                          TokenCreateParams.Account.Individual.Address
-                            .builder()
-                            .setCity(address.city)
-                            .setCountry(address.country)
-                            .setLine1(address.addressLine)
-                            .setPostalCode(address.postalCode)
-                            .build()
-                        )
-                      case _ =>
-                    }
-                    val token = Token.create(
-                      TokenCreateParams
-                        .builder()
-                        .setAccount(
-                          TokenCreateParams.Account
+                    val token = {
+                      tokenId match {
+                        case Some(t) =>
+                          Token.retrieve(t, StripeApi().requestOptions())
+                        case _ =>
+                          val individual =
+                            TokenCreateParams.Account.Individual
+                              .builder()
+                              .setFirstName(naturalUser.firstName)
+                              .setLastName(naturalUser.lastName)
+                              .setDob(
+                                TokenCreateParams.Account.Individual.Dob
+                                  .builder()
+                                  .setDay(c.get(Calendar.DAY_OF_MONTH))
+                                  .setMonth(c.get(Calendar.MONTH) + 1)
+                                  .setYear(c.get(Calendar.YEAR))
+                                  .build()
+                              )
+                              .setEmail(naturalUser.email)
+                          naturalUser.phone match {
+                            case Some(phone) =>
+                              individual.setPhone(phone)
+                            case _ =>
+                          }
+                          naturalUser.address match {
+                            case Some(address) =>
+                              individual.setAddress(
+                                TokenCreateParams.Account.Individual.Address
+                                  .builder()
+                                  .setCity(address.city)
+                                  .setCountry(address.country)
+                                  .setLine1(address.addressLine)
+                                  .setPostalCode(address.postalCode)
+                                  .build()
+                              )
+                            case _ =>
+                          }
+                          val params = TokenCreateParams.Account
                             .builder()
                             .setBusinessType(TokenCreateParams.Account.BusinessType.INDIVIDUAL)
                             .setIndividual(individual.build())
                             .setTosShownAndAccepted(tos_shown_and_accepted)
-                            .build()
-                        )
-                        .build(),
-                      StripeApi().requestOptions()
-                    )
+                          mlog.info(
+                            s"create individual account token params -> ${new Gson().toJson(params.build())}"
+                          )
+                          Token.create(
+                            TokenCreateParams
+                              .builder()
+                              .setAccount(params.build())
+                              .build(),
+                            StripeApi().requestOptions()
+                          )
+                      }
+                    }
                     val params =
                       AccountCreateParams
                         .builder()
@@ -458,6 +485,10 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                       case _ =>
                     }
 
+                    mlog.info(
+                      s"create individual account params -> ${new Gson().toJson(params.build())}"
+                    )
+
                     Account.create(
                       params.build(),
                       StripeApi().requestOptions()
@@ -502,6 +533,14 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
   /** @param maybeLegalUser
     *   - legal user to create or update
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   legal user created or updated
     */
@@ -510,7 +549,8 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     maybeLegalUser: Option[LegalUser],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String]
   ): Option[String] = {
     maybeLegalUser match {
       case Some(legalUser) =>
@@ -588,58 +628,65 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                         )
                     }
 
-                  // update account company
-                  val company =
-                    TokenCreateParams.Account.Company
-                      .builder()
-                      .setName(legalUser.legalName)
-                      .setAddress(
-                        TokenCreateParams.Account.Company.Address
-                          .builder()
-                          .setCity(legalUser.headQuartersAddress.city)
-                          .setCountry(legalUser.headQuartersAddress.country)
-                          .setLine1(legalUser.headQuartersAddress.addressLine)
-                          .setPostalCode(legalUser.headQuartersAddress.postalCode)
-                          .build()
-                      )
-                      .setTaxId(legalUser.siren)
-                      .setDirectorsProvided(true)
-                      .setExecutivesProvided(true)
+                  val token = {
+                    tokenId match {
+                      case Some(t) =>
+                        Token.retrieve(t, requestOptions)
+                      case _ =>
+                        val company =
+                          TokenCreateParams.Account.Company
+                            .builder()
+                            .setName(legalUser.legalName)
+                            .setAddress(
+                              TokenCreateParams.Account.Company.Address
+                                .builder()
+                                .setCity(legalUser.headQuartersAddress.city)
+                                .setCountry(legalUser.headQuartersAddress.country)
+                                .setLine1(legalUser.headQuartersAddress.addressLine)
+                                .setPostalCode(legalUser.headQuartersAddress.postalCode)
+                                .build()
+                            )
+                            .setTaxId(legalUser.siren)
+                            .setDirectorsProvided(true)
+                            .setExecutivesProvided(true)
 
-                  if (soleTrader) {
-                    company
-                      .setOwnersProvided(true)
-                  }
+                        if (soleTrader) {
+                          company
+                            .setOwnersProvided(true)
+                        }
 
-                  legalUser.vatNumber match {
-                    case Some(vatNumber) =>
-                      company.setVatId(vatNumber)
-                    case _ =>
-                  }
+                        legalUser.vatNumber match {
+                          case Some(vatNumber) =>
+                            company.setVatId(vatNumber)
+                          case _ =>
+                        }
 
-                  legalUser.phone.orElse(legalUser.legalRepresentative.phone) match {
-                    case Some(phone) =>
-                      company.setPhone(phone)
-                    case _ =>
-                  }
+                        legalUser.phone.orElse(legalUser.legalRepresentative.phone) match {
+                          case Some(phone) =>
+                            company.setPhone(phone)
+                          case _ =>
+                        }
 
-                  mlog.info(s"company -> ${new Gson().toJson(company.build())}")
-
-                  val token =
-                    Token.create(
-                      TokenCreateParams
-                        .builder()
-                        .setAccount(
+                        val params =
                           TokenCreateParams.Account
                             .builder()
                             .setBusinessType(TokenCreateParams.Account.BusinessType.COMPANY)
                             .setCompany(company.build())
                             .setTosShownAndAccepted(tos_shown_and_accepted)
-                            .build
+
+                        mlog.info(
+                          s"update business account token params -> ${new Gson().toJson(params.build())}"
                         )
-                        .build(),
-                      requestOptions
-                    )
+
+                        Token.create(
+                          TokenCreateParams
+                            .builder()
+                            .setAccount(params.build())
+                            .build(),
+                          requestOptions
+                        )
+                    }
+                  }
 
                   val params =
                     AccountUpdateParams
@@ -746,123 +793,74 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     case _ =>
                   }
 
+                  mlog.info(
+                    s"update business account params -> ${new Gson().toJson(params.build())}"
+                  )
+
                   account.update(
                     params.build(),
                     requestOptions
                   )
 
-                  /*val person =
-                    TokenCreateParams.Person
-                      .builder()
-                      .setFirstName(legalUser.legalRepresentative.firstName)
-                      .setLastName(legalUser.legalRepresentative.lastName)
-                      .setDob(
-                        TokenCreateParams.Person.Dob
-                          .builder()
-                          .setDay(c.get(Calendar.DAY_OF_MONTH))
-                          .setMonth(c.get(Calendar.MONTH) + 1)
-                          .setYear(c.get(Calendar.YEAR))
-                          .build()
-                      )
-                      .setEmail(legalUser.legalRepresentative.email)
-                      .setNationality(legalUser.legalRepresentative.nationality)
-                      .setRelationship(
-                        TokenCreateParams.Person.Relationship
-                          .builder()
-                          .setRepresentative(true)
-                          .build()
-                      )
-                  if(tos_shown_and_accepted)
-                    person.setAdditionalTosAcceptances(
-                      TokenCreateParams.Person.AdditionalTosAcceptances.builder()
-                        .setAccount(TokenCreateParams.Person.AdditionalTosAcceptances.Account
-                          .builder()
-                          .setIp(ipAddress.get)
-                          .setUserAgent(userAgent.get)
-                          .setDate(persistence.now().getEpochSecond)
-                          .build()
-                        )
-                        .build()
-                    )
-                  legalUser.legalRepresentative.phone match {
-                    case Some(phone) =>
-                      person.setPhone(phone)
-                    case _ =>
-                  }
-
-                  mlog.info(s"person -> ${new Gson().toJson(person.build())}")
-
-                  val token2 =
-                    Token.create(
-                        TokenCreateParams.builder.setPerson(person.build()).build(),
-                        requestOptions
-                    )
-
-                  val params2 =
-                    PersonCollectionCreateParams
-                      .builder()
-                      .setPersonToken(token2.getId)
-
-                  account
-                    .persons()
-                    .create(
-                      params2.build(),
-                      requestOptions
-                    )*/
-
                   account
                 case _ =>
                   // create company account
 
-                  val company =
-                    TokenCreateParams.Account.Company
-                      .builder()
-                      .setName(legalUser.legalName)
-                      .setAddress(
-                        TokenCreateParams.Account.Company.Address
-                          .builder()
-                          .setCity(legalUser.headQuartersAddress.city)
-                          .setCountry(legalUser.headQuartersAddress.country)
-                          .setLine1(legalUser.headQuartersAddress.addressLine)
-                          .setPostalCode(legalUser.headQuartersAddress.postalCode)
-                          .build()
-                      )
-                      .setTaxId(legalUser.siren)
-                      .setDirectorsProvided(true)
-                      .setExecutivesProvided(true)
+                  val token = {
+                    tokenId match {
+                      case Some(t) =>
+                        Token.retrieve(t, StripeApi().requestOptions())
+                      case _ =>
+                        val company =
+                          TokenCreateParams.Account.Company
+                            .builder()
+                            .setName(legalUser.legalName)
+                            .setAddress(
+                              TokenCreateParams.Account.Company.Address
+                                .builder()
+                                .setCity(legalUser.headQuartersAddress.city)
+                                .setCountry(legalUser.headQuartersAddress.country)
+                                .setLine1(legalUser.headQuartersAddress.addressLine)
+                                .setPostalCode(legalUser.headQuartersAddress.postalCode)
+                                .build()
+                            )
+                            .setTaxId(legalUser.siren)
+                            .setDirectorsProvided(true)
+                            .setExecutivesProvided(true)
 
-                  if (soleTrader) {
-                    company
-                      .setOwnersProvided(true)
+                        if (soleTrader) {
+                          company
+                            .setOwnersProvided(true)
+                        }
+
+                        legalUser.vatNumber match {
+                          case Some(vatNumber) =>
+                            company.setVatId(vatNumber)
+                          case _ =>
+                        }
+
+                        legalUser.phone.orElse(legalUser.legalRepresentative.phone) match {
+                          case Some(phone) =>
+                            company.setPhone(phone)
+                          case _ =>
+                        }
+
+                        val accountParams =
+                          TokenCreateParams.Account
+                            .builder()
+                            .setBusinessType(TokenCreateParams.Account.BusinessType.COMPANY)
+                            .setCompany(company.build())
+                            .setTosShownAndAccepted(tos_shown_and_accepted)
+
+                        mlog.info(s"create business account token params -> ${new Gson()
+                          .toJson(accountParams.build())}")
+
+                        Token.create(
+                          TokenCreateParams.builder.setAccount(accountParams.build()).build(),
+                          StripeApi().requestOptions()
+                        )
+                    }
                   }
-
-                  legalUser.vatNumber match {
-                    case Some(vatNumber) =>
-                      company.setVatId(vatNumber)
-                    case _ =>
-                  }
-
-                  legalUser.phone.orElse(legalUser.legalRepresentative.phone) match {
-                    case Some(phone) =>
-                      company.setPhone(phone)
-                    case _ =>
-                  }
-
-                  mlog.info(s"company -> ${new Gson().toJson(company.build())}")
-
-                  val accountParams =
-                    TokenCreateParams.Account
-                      .builder()
-                      .setBusinessType(TokenCreateParams.Account.BusinessType.COMPANY)
-                      .setCompany(company.build())
-                      .setTosShownAndAccepted(tos_shown_and_accepted)
-
-                  mlog.info(s"token -> ${new Gson().toJson(accountParams.build())}")
-
-                  val token = Token.create(
-                    TokenCreateParams.builder.setAccount(accountParams.build()).build(),
-                    StripeApi().requestOptions()
-                  )
 
                   val params =
                     AccountCreateParams
@@ -998,7 +996,9 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                     case _ =>
                   }
 
-                  mlog.info(s"account -> ${new Gson().toJson(params.build())}")
+                  mlog.info(
+                    s"create business account params -> ${new Gson().toJson(params.build())}"
+                  )
 
                   val account = Account.create(
                     params.build(),
@@ -1153,6 +1153,12 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     *   - Provider user id
     * @param uboDeclarationId
     *   - Provider declaration id
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   Ultimate Beneficial Owner declaration
     */
@@ -1160,7 +1166,8 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
     userId: String,
     uboDeclarationId: String,
     ipAddress: String,
-    userAgent: String
+    userAgent: String,
+    tokenId: Option[String]
   ): Option[UboDeclaration] = {
     Try {
       val account = Account.retrieve(userId, StripeApi().requestOptions())
@@ -1185,35 +1192,42 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
       val ownersProvided =
         persons.map(_.getRelationship.getPercentOwnership.doubleValue()).sum == 100.0
 
-      val company =
-        TokenCreateParams.Account.Company
-          .builder()
-          .setOwnershipDeclaration(
-            TokenCreateParams.Account.Company.OwnershipDeclaration
-              .builder()
-              .setDate(persistence.now().getEpochSecond)
-              .setIp(ipAddress)
-              .setUserAgent(userAgent)
-              .build()
-          )
-          .setOwnershipDeclarationShownAndSigned(ownersProvided)
-          .setOwnersProvided(ownersProvided)
+      val token = {
+        tokenId match {
+          case Some(t) =>
+            Token.retrieve(t, StripeApi().requestOptions())
+          case _ =>
+            val company =
+              TokenCreateParams.Account.Company
+                .builder()
+                .setOwnershipDeclaration(
+                  TokenCreateParams.Account.Company.OwnershipDeclaration
+                    .builder()
+                    .setDate(persistence.now().getEpochSecond)
+                    .setIp(ipAddress)
+                    .setUserAgent(userAgent)
+                    .build()
+                )
+                .setOwnershipDeclarationShownAndSigned(ownersProvided)
+                .setOwnersProvided(ownersProvided)
 
-      mlog.info(s"company -> ${new Gson().toJson(company.build())}")
-
-      val token = Token.create(
-        TokenCreateParams.builder
-          .setAccount(
-            TokenCreateParams.Account
+            val params = TokenCreateParams.Account
               .builder()
               .setBusinessType(TokenCreateParams.Account.BusinessType.COMPANY)
               .setCompany(company.build())
               .setTosShownAndAccepted(true)
-              .build()
-          )
-          .build(),
-        StripeApi().requestOptions()
-      )
+
+            mlog.info(s"validate declaration token params -> ${new Gson().toJson(params.build())}")
+
+            // create a token for the account
+            Token.create(
+              TokenCreateParams.builder
+                .setAccount(params.build())
+                .build(),
+              StripeApi().requestOptions()
+            )
+        }
+      }
 
       account.update(
         AccountUpdateParams
@@ -1655,33 +1669,48 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
 
   /** @param maybeBankAccount
     *   - bank account to create
+    * @param bankTokenId
+    *   - optional bank token id for the payment account
     * @return
     *   bank account id
     */
-  override def createOrUpdateBankAccount(maybeBankAccount: Option[BankAccount]): Option[String] = {
+  override def createOrUpdateBankAccount(
+    maybeBankAccount: Option[BankAccount],
+    bankTokenId: Option[String]
+  ): Option[String] = {
     maybeBankAccount match {
       case Some(bankAccount) =>
         val requestOptions = StripeApi().requestOptions()
         Try(Account.retrieve(bankAccount.userId, requestOptions)) match {
           case Success(account) =>
             Try {
-              val bank_account =
-                TokenCreateParams.BankAccount
-                  .builder()
-                  .setAccountNumber(bankAccount.iban)
-                  .setRoutingNumber(bankAccount.bic)
-                  .setCountry(bankAccount.countryCode.getOrElse(bankAccount.ownerAddress.country))
-                  .setCurrency(bankAccount.currency.getOrElse("EUR"))
-                  .setAccountHolderName(bankAccount.ownerName)
-                  .setAccountHolderType(account.getBusinessType match {
-                    case "individual" => TokenCreateParams.BankAccount.AccountHolderType.INDIVIDUAL
-                    case _            => TokenCreateParams.BankAccount.AccountHolderType.COMPANY
-                  })
-                  .build()
-              Token.create(
-                TokenCreateParams.builder().setBankAccount(bank_account).build(),
-                requestOptions
-              )
+              bankTokenId match {
+                case Some(tokenId) =>
+                  Token.retrieve(tokenId, requestOptions)
+                case _ =>
+                  // create a token for the bank account
+                  val bank_account =
+                    TokenCreateParams.BankAccount
+                      .builder()
+                      .setAccountNumber(bankAccount.iban)
+                      .setRoutingNumber(bankAccount.bic)
+                      .setCountry(
+                        bankAccount.countryCode.getOrElse(bankAccount.ownerAddress.country)
+                      )
+                      .setCurrency(bankAccount.currency.getOrElse("EUR"))
+                      .setAccountHolderName(bankAccount.ownerName)
+                      .setAccountHolderType(account.getBusinessType match {
+                        case "individual" =>
+                          TokenCreateParams.BankAccount.AccountHolderType.INDIVIDUAL
+                        case _ => TokenCreateParams.BankAccount.AccountHolderType.COMPANY
+                      })
+                      .build()
+                  mlog.info(s"token bank account params -> ${new Gson().toJson(bank_account)}")
+                  Token.create(
+                    TokenCreateParams.builder().setBankAccount(bank_account).build(),
+                    requestOptions
+                  )
+              }
             } match {
               case Success(token) =>
                 val fingerprint = token.getBankAccount.getFingerprint

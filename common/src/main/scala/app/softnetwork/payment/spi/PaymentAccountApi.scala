@@ -15,6 +15,14 @@ trait PaymentAccountApi { _: PaymentContext =>
 
   /** @param maybePaymentAccount
     *   - payment account to create or update
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   provider user id
     */
@@ -22,15 +30,22 @@ trait PaymentAccountApi { _: PaymentContext =>
     maybePaymentAccount: Option[PaymentAccount],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String] = None
   ): Option[String] = {
     maybePaymentAccount match {
       case Some(paymentAccount) =>
         import paymentAccount._
         if (user.isLegalUser) {
-          createOrUpdateLegalUser(user.legalUser, acceptedTermsOfPSP, ipAddress, userAgent)
+          createOrUpdateLegalUser(user.legalUser, acceptedTermsOfPSP, ipAddress, userAgent, tokenId)
         } else if (user.isNaturalUser) {
-          createOrUpdateNaturalUser(user.naturalUser, acceptedTermsOfPSP, ipAddress, userAgent)
+          createOrUpdateNaturalUser(
+            user.naturalUser,
+            acceptedTermsOfPSP,
+            ipAddress,
+            userAgent,
+            tokenId
+          )
         } else {
           None
         }
@@ -40,6 +55,14 @@ trait PaymentAccountApi { _: PaymentContext =>
 
   /** @param maybeNaturalUser
     *   - natural user to create
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   provider user id
     */
@@ -48,11 +71,20 @@ trait PaymentAccountApi { _: PaymentContext =>
     maybeNaturalUser: Option[NaturalUser],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String]
   ): Option[String]
 
   /** @param maybeLegalUser
     *   - legal user to create or update
+    * @param acceptedTermsOfPSP
+    *   - whether the user has accepted the terms of the PSP
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   provider user id
     */
@@ -61,7 +93,8 @@ trait PaymentAccountApi { _: PaymentContext =>
     maybeLegalUser: Option[LegalUser],
     acceptedTermsOfPSP: Boolean,
     ipAddress: Option[String],
-    userAgent: Option[String]
+    userAgent: Option[String],
+    tokenId: Option[String]
   ): Option[String]
 
   /** @param userId
@@ -99,6 +132,12 @@ trait PaymentAccountApi { _: PaymentContext =>
     *   - Provider user id
     * @param uboDeclarationId
     *   - Provider declaration id
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the payment account
     * @return
     *   Ultimate Beneficial Owner declaration
     */
@@ -106,7 +145,8 @@ trait PaymentAccountApi { _: PaymentContext =>
     userId: String,
     uboDeclarationId: String,
     ipAddress: String,
-    userAgent: String
+    userAgent: String,
+    tokenId: Option[String]
   ): Option[UboDeclaration]
 
   /** @param userId
@@ -144,10 +184,15 @@ trait PaymentAccountApi { _: PaymentContext =>
 
   /** @param maybeBankAccount
     *   - bank account to create
+    * @param bankTokenId
+    *   - optional bank token id for the payment account
     * @return
     *   bank account id
     */
-  def createOrUpdateBankAccount(maybeBankAccount: Option[BankAccount]): Option[String]
+  def createOrUpdateBankAccount(
+    maybeBankAccount: Option[BankAccount],
+    bankTokenId: Option[String]
+  ): Option[String]
 
   /** @param userId
     *   - provider user id

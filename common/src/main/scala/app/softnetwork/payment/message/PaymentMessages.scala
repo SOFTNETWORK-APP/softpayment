@@ -84,7 +84,7 @@ object PaymentMessages {
     * @param paymentMethodId
     *   - optional payment method id
     * @param registerMeansOfPayment
-    *   - optional flag to specify whether or not the means of payment should be registered
+    *   - optional flag to specify whether the means of payment should be registered
     */
   case class Payment(
     orderUuid: String,
@@ -140,7 +140,7 @@ object PaymentMessages {
     * @param paymentMethodId
     *   - optional payment method id
     * @param registerMeansOfPayment
-    *   - optional flag to specify whether or not the means of payment should be registered
+    *   - optional flag to specify whether the means of payment should be registered
     * @param clientId
     *   - optional client id
     */
@@ -644,7 +644,9 @@ object PaymentMessages {
   case class BankAccountCommand(
     bankAccount: BankAccount,
     user: Either[NaturalUser, LegalUser],
-    acceptedTermsOfPSP: Option[Boolean] = None
+    acceptedTermsOfPSP: Option[Boolean] = None,
+    tokenId: Option[String] = None,
+    bankTokenId: Option[String] = None
   )
 
   object BankAccountCommand {
@@ -652,14 +654,20 @@ object PaymentMessages {
     def apply(
       bankAccount: BankAccount,
       naturalUser: NaturalUser,
-      acceptedTermsOfPSP: Option[Boolean]
-    ): BankAccountCommand = BankAccountCommand(bankAccount, Left(naturalUser), acceptedTermsOfPSP)
+      acceptedTermsOfPSP: Option[Boolean],
+      tokenId: Option[String],
+      bankTokenId: Option[String]
+    ): BankAccountCommand =
+      BankAccountCommand(bankAccount, Left(naturalUser), acceptedTermsOfPSP, tokenId, bankTokenId)
 
     def apply(
       bankAccount: BankAccount,
       legalUser: LegalUser,
-      acceptedTermsOfPSP: Option[Boolean]
-    ): BankAccountCommand = BankAccountCommand(bankAccount, Right(legalUser), acceptedTermsOfPSP)
+      acceptedTermsOfPSP: Option[Boolean],
+      tokenId: Option[String],
+      bankTokenId: Option[String]
+    ): BankAccountCommand =
+      BankAccountCommand(bankAccount, Right(legalUser), acceptedTermsOfPSP, tokenId, bankTokenId)
   }
 
   /** @param creditedAccount
@@ -676,6 +684,10 @@ object PaymentMessages {
     *   - user agent
     * @param clientId
     *   - optional client id
+    * @param tokenId
+    *   - optional account token id
+    * @param bankTokenId
+    *   - optional bank token id
     */
   case class CreateOrUpdateBankAccount(
     creditedAccount: String,
@@ -684,7 +696,9 @@ object PaymentMessages {
     acceptedTermsOfPSP: Option[Boolean] = None,
     ipAddress: Option[String] = None,
     userAgent: Option[String],
-    clientId: Option[String] = None
+    clientId: Option[String] = None,
+    tokenId: Option[String] = None,
+    bankTokenId: Option[String] = None
   ) extends PaymentCommandWithKey
       with PaymentAccountCommand {
     val key: String = creditedAccount
@@ -805,9 +819,19 @@ object PaymentMessages {
 
   /** @param creditedAccount
     *   - account which owns the UBO declaration that would be validated
+    * @param ipAddress
+    *   - ip address of the user
+    * @param userAgent
+    *   - user agent of the user
+    * @param tokenId
+    *   - optional token id for the user
     */
-  case class ValidateUboDeclaration(creditedAccount: String, ipAddress: String, userAgent: String)
-      extends PaymentCommandWithKey
+  case class ValidateUboDeclaration(
+    creditedAccount: String,
+    ipAddress: String,
+    userAgent: String,
+    tokenId: Option[String] = None
+  ) extends PaymentCommandWithKey
       with PaymentAccountCommand {
     val key: String = creditedAccount
   }

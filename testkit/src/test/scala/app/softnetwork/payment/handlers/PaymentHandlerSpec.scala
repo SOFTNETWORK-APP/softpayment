@@ -161,6 +161,10 @@ class PaymentHandlerSpec
       }
     }
 
+    "pre authorize without card pre registration" in {
+      // TODO
+    }
+
     "not create bank account with wrong iban" in {
       !?(
         CreateOrUpdateBankAccount(
@@ -799,7 +803,8 @@ class PaymentHandlerSpec
         ValidateUboDeclaration(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           "127.0.0.1",
-          Some("UserAgent")
+          Some("UserAgent"),
+          None
         )
       ) await {
         case UboDeclarationAskedForValidation =>

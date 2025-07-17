@@ -40,6 +40,8 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
           BankAccountCommand(
             BankAccount(None, ownerName, ownerAddress, "", bic),
             naturalUser,
+            None,
+            None,
             None
           )
         )
@@ -56,6 +58,8 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
           BankAccountCommand(
             BankAccount(None, ownerName, ownerAddress, iban, "WRONG"),
             naturalUser,
+            None,
+            None,
             None
           )
         )
@@ -70,7 +74,9 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
         BankAccountCommand(
           BankAccount(None, ownerName, ownerAddress, iban, bic),
           naturalUser.withExternalUuid(externalUserId),
-          Some(true)
+          Some(true),
+          None,
+          None
         )
       log.info(s"create bank account with natural user command: ${serialization.write(command)}")
       withHeaders(
@@ -95,6 +101,8 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
           BankAccountCommand(
             BankAccount(Option(sellerBankAccountId), ownerName, ownerAddress, iban, bic),
             naturalUser.withLastName("anotherLastName").withExternalUuid(externalUserId),
+            None,
+            None,
             None
           )
         )
@@ -120,6 +128,8 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
               bic
             ),
             legalUser.withSiret(""),
+            None,
+            None,
             None
           )
         )
@@ -142,6 +152,8 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
               bic
             ),
             legalUser.withLegalName(""),
+            None,
+            None,
             None
           )
         )
@@ -164,6 +176,8 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
               bic
             ),
             legalUser,
+            None,
+            None,
             None
           )
         )
@@ -185,7 +199,9 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
             bic
           ),
           legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
-          Some(true)
+          Some(true),
+          None,
+          None
         )
       log.info(
         s"update bank account with sole trader legal user command: ${serialization.write(command)}"
@@ -221,7 +237,9 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
           legalUser
             .withLegalUserType(LegalUser.LegalUserType.BUSINESS)
             .withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
-          Some(true)
+          Some(true),
+          None,
+          None
         )
       log.info(
         s"update bank account with business legal user command: ${serialization.write(command)}"

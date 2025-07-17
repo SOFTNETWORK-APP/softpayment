@@ -76,7 +76,8 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               acceptedTermsOfPSP,
               clientId = client.map(_.clientId).orElse(session.clientId),
               ipAddress = ipAddress,
-              userAgent = userAgent
+              userAgent = userAgent,
+              tokenId = tokenId
             )
           ).map {
             case r: BankAccountCreatedOrUpdated => Right(r)

@@ -1181,7 +1181,8 @@ trait PaymentBehavior
                         Some(updatedPaymentAccount),
                         acceptedTermsOfPSP.getOrElse(false),
                         ipAddress,
-                        userAgent
+                        userAgent,
+                        tokenId
                       )
                     case Some(_) if shouldUpdateUser =>
                       if (shouldUpdateUserType) {
@@ -1189,14 +1190,16 @@ trait PaymentBehavior
                           Some(updatedPaymentAccount.resetUserId(None)),
                           acceptedTermsOfPSP.getOrElse(false),
                           ipAddress,
-                          userAgent
+                          userAgent,
+                          tokenId
                         )
                       } else {
                         createOrUpdatePaymentAccount(
                           Some(updatedPaymentAccount),
                           acceptedTermsOfPSP.getOrElse(false),
                           ipAddress,
-                          userAgent
+                          userAgent,
+                          tokenId
                         )
                       }
                     case some => some
@@ -1228,11 +1231,13 @@ trait PaymentBehavior
                           (paymentAccount.bankAccount.flatMap(_.id) match {
                             case None =>
                               createOrUpdateBankAccount(
-                                updatedPaymentAccount.resetBankAccountId().bankAccount
+                                updatedPaymentAccount.resetBankAccountId().bankAccount,
+                                bankTokenId
                               )
                             case Some(_) if shouldCreateOrUpdateBankAccount =>
                               createOrUpdateBankAccount(
-                                updatedPaymentAccount.resetBankAccountId().bankAccount
+                                updatedPaymentAccount.resetBankAccountId().bankAccount,
+                                bankTokenId
                               )
                             case some => some
                           }) match {
@@ -1696,7 +1701,8 @@ trait PaymentBehavior
                   paymentAccount.userId.getOrElse(""),
                   uboDeclaration.id,
                   ipAddress,
-                  userAgent
+                  userAgent,
+                  tokenId
                 ) match {
                   case Some(declaration) =>
                     val updatedUbo = declaration.withUbos(uboDeclaration.ubos)
