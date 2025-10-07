@@ -167,11 +167,19 @@ class PaymentHandlerSpec
 
     "not create bank account with wrong iban" in {
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(None, ownerName, ownerAddress, "", bic),
+          Some(User.NaturalUser(naturalUser.withExternalUuid(sellerUuid).withProfile("seller"))),
           ipAddress = Some("127.0.0.1"),
           userAgent = Some("UserAgent")
+        )
+      ) await { case r: UserPaymentAccountCreatedOrUpdated =>
+        assert(r.userCreated)
+      }
+      !?(
+        CreateOrUpdateBankAccount(
+          computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+          BankAccount(None, ownerName, ownerAddress, "", bic)
         )
       ) await {
         case WrongIban =>
@@ -183,9 +191,7 @@ class PaymentHandlerSpec
       !?(
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(None, ownerName, ownerAddress, iban, "WRONG"),
-          ipAddress = Some("127.0.0.1"),
-          userAgent = Some("UserAgent")
+          BankAccount(None, ownerName, ownerAddress, iban, "WRONG")
         )
       ) await {
         case WrongBic =>
@@ -198,14 +204,11 @@ class PaymentHandlerSpec
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           BankAccount(None, ownerName, ownerAddress, iban, ""),
-          Some(User.NaturalUser(naturalUser.withExternalUuid(sellerUuid).withProfile("seller"))),
-          clientId = Some(clientId),
-          ipAddress = Some("127.0.0.1"),
-          userAgent = Some("UserAgent")
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
-          assert(r.userCreated)
+          assert(r.bankAccountCreated)
           !?(LoadPaymentAccount(computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
             case result: PaymentAccountLoaded =>
               val paymentAccount = result.paymentAccount
@@ -228,18 +231,11 @@ class PaymentHandlerSpec
       }
     }
 
-    "update bank account with natural user" in {
+    "update payment account with natural user" in {
       // update first name
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(
             User.NaturalUser(
               naturalUser
@@ -253,8 +249,25 @@ class PaymentHandlerSpec
           userAgent = Some("UserAgent")
         )
       ) await {
-        case r: BankAccountCreatedOrUpdated =>
+        case r: UserPaymentAccountCreatedOrUpdated =>
           assert(r.kycUpdated && r.userUpdated && r.documentsUpdated)
+          !?(
+            CreateOrUpdateBankAccount(
+              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+              BankAccount(
+                Some(sellerBankAccountId),
+                ownerName,
+                ownerAddress,
+                iban,
+                bic
+              ),
+              clientId = Some(clientId)
+            )
+          ) await {
+            case r: BankAccountCreatedOrUpdated =>
+              assert(r.bankAccountUpdated && !r.bankAccountCreated)
+            case other => fail(other.toString)
+          }
           !?(LoadPaymentAccount(computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
             case result: PaymentAccountLoaded =>
               val paymentAccount = result.paymentAccount
@@ -279,15 +292,8 @@ class PaymentHandlerSpec
       }
       // update last name
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(
             User.NaturalUser(
               naturalUser
@@ -302,21 +308,14 @@ class PaymentHandlerSpec
           userAgent = Some("UserAgent")
         )
       ) await {
-        case r: BankAccountCreatedOrUpdated =>
+        case r: UserPaymentAccountCreatedOrUpdated =>
           assert(r.kycUpdated && r.userUpdated && r.documentsUpdated)
         case other => fail(other.toString)
       }
       // update birthday
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(
             User.NaturalUser(
               naturalUser
@@ -332,24 +331,17 @@ class PaymentHandlerSpec
           userAgent = Some("UserAgent")
         )
       ) await {
-        case r: BankAccountCreatedOrUpdated =>
+        case r: UserPaymentAccountCreatedOrUpdated =>
           assert(r.kycUpdated && r.userUpdated && r.documentsUpdated)
         case other => fail(other.toString)
       }
     }
 
-    "update bank account except kyc information with natural user" in {
+    "update payment account except kyc information with natural user" in {
       // update country of residence
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(
             User.NaturalUser(
               naturalUser
@@ -365,20 +357,13 @@ class PaymentHandlerSpec
           ipAddress = Some("127.0.0.1"),
           userAgent = Some("UserAgent")
         )
-      ) await { case r: BankAccountCreatedOrUpdated =>
+      ) await { case r: UserPaymentAccountCreatedOrUpdated =>
         assert(!r.kycUpdated && !r.documentsUpdated && r.userUpdated)
       }
       // update nationality
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(
             User.NaturalUser(
               naturalUser
@@ -395,22 +380,15 @@ class PaymentHandlerSpec
           ipAddress = Some("127.0.0.1"),
           userAgent = Some("UserAgent")
         )
-      ) await { case r: BankAccountCreatedOrUpdated =>
+      ) await { case r: UserPaymentAccountCreatedOrUpdated =>
         assert(!r.kycUpdated && !r.documentsUpdated && r.userUpdated)
       }
     }
 
-    "not update bank account with wrong siret" in {
+    "not update payment account with wrong siret" in {
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(User.LegalUser(legalUser.withSiret(""))),
           ipAddress = Some("127.0.0.1"),
           userAgent = Some("UserAgent")
@@ -421,17 +399,10 @@ class PaymentHandlerSpec
       }
     }
 
-    "not update bank account with empty legal name" in {
+    "not update payment account with empty legal name" in {
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(User.LegalUser(legalUser.withLegalName(""))),
           ipAddress = Some("127.0.0.1"),
           userAgent = Some("UserAgent")
@@ -442,17 +413,10 @@ class PaymentHandlerSpec
       }
     }
 
-    "not update bank account without accepted terms of PSP" in {
+    "not update payment account without accepted terms of PSP" in {
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(User.LegalUser(legalUser)),
           ipAddress = Some("127.0.0.1"),
           userAgent = Some("UserAgent")
@@ -463,17 +427,10 @@ class PaymentHandlerSpec
       }
     }
 
-    "update bank account with sole trader legal user" in {
+    "update payment account with sole trader legal user" in {
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(
             User.LegalUser(
               legalUser.withLegalRepresentative(legalUser.legalRepresentative.withProfile("seller"))
@@ -485,7 +442,7 @@ class PaymentHandlerSpec
           userAgent = Some("UserAgent")
         )
       ) await {
-        case r: BankAccountCreatedOrUpdated =>
+        case r: UserPaymentAccountCreatedOrUpdated =>
           assert(r.userTypeUpdated && r.kycUpdated && r.documentsUpdated && r.userUpdated)
           !?(LoadPaymentAccount(computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
             case result: PaymentAccountLoaded =>
@@ -511,17 +468,10 @@ class PaymentHandlerSpec
       }
     }
 
-    "update bank account with business legal user" in {
+    "update payment account with business legal user" in {
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          BankAccount(
-            Some(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
           Some(
             User.LegalUser(
               legalUser
@@ -538,7 +488,7 @@ class PaymentHandlerSpec
           userAgent = Some("UserAgent")
         )
       ) await {
-        case r: BankAccountCreatedOrUpdated =>
+        case r: UserPaymentAccountCreatedOrUpdated =>
           assert(r.userTypeUpdated && r.kycUpdated && r.documentsUpdated && r.userUpdated)
           !?(LoadPaymentAccount(computeExternalUuidWithProfile(sellerUuid, Some("seller")))) await {
             case result: PaymentAccountLoaded =>
@@ -588,7 +538,7 @@ class PaymentHandlerSpec
       }
     }
 
-    "update bank account except kyc information with business legal user" in {
+    "update payment account except kyc information with business legal user" in {
       var updatedBankAccount =
         BankAccount(
           Some(sellerBankAccountId),
@@ -607,9 +557,8 @@ class PaymentHandlerSpec
       // update bank account owner name
       updatedBankAccount = updatedBankAccount.withOwnerName("anotherOwnerName")
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
           Some(true),
           clientId = Some(clientId),
@@ -617,10 +566,21 @@ class PaymentHandlerSpec
           userAgent = Some("UserAgent")
         )
       ) await {
-        case r: BankAccountCreatedOrUpdated =>
+        case r: UserPaymentAccountCreatedOrUpdated =>
           assert(
-            !r.userTypeUpdated && !r.kycUpdated && !r.documentsUpdated && !r.userUpdated && r.bankAccountUpdated
+            !r.userTypeUpdated && !r.kycUpdated && !r.documentsUpdated && !r.userUpdated
           )
+          !?(
+            CreateOrUpdateBankAccount(
+              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+              updatedBankAccount,
+              clientId = Some(clientId)
+            )
+          ) await {
+            case r: BankAccountCreatedOrUpdated =>
+              assert(r.bankAccountUpdated && !r.bankAccountCreated)
+            case other => fail(other.toString)
+          }
         case other => fail(other.toString)
       }
       // update bank account owner address
@@ -629,17 +589,11 @@ class PaymentHandlerSpec
       !?(
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          updatedBankAccount,
-          Some(User.LegalUser(updatedLegalUser)),
-          Some(true),
-          ipAddress = Some("127.0.0.1"),
-          userAgent = Some("UserAgent")
+          updatedBankAccount
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
-          assert(
-            !r.userTypeUpdated && !r.kycUpdated && !r.documentsUpdated && !r.userUpdated && r.bankAccountUpdated
-          )
+          assert(r.bankAccountUpdated && !r.bankAccountCreated)
         case other => fail(other.toString)
       }
       // update bank account iban
@@ -647,17 +601,11 @@ class PaymentHandlerSpec
       !?(
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          updatedBankAccount,
-          Some(User.LegalUser(updatedLegalUser)),
-          Some(true),
-          ipAddress = Some("127.0.0.1"),
-          userAgent = Some("UserAgent")
+          updatedBankAccount
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
-          assert(
-            !r.userTypeUpdated && !r.kycUpdated && !r.documentsUpdated && !r.userUpdated && r.bankAccountUpdated
-          )
+          assert(r.bankAccountUpdated && !r.bankAccountCreated)
         case other => fail(other.toString)
       }
       // update bank account bic
@@ -666,17 +614,11 @@ class PaymentHandlerSpec
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount,
-          Some(User.LegalUser(updatedLegalUser)),
-          Some(true),
-          clientId = Some(clientId),
-          ipAddress = Some("127.0.0.1"),
-          userAgent = Some("UserAgent")
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
-          assert(
-            !r.userTypeUpdated && !r.kycUpdated && !r.documentsUpdated && !r.userUpdated && r.bankAccountUpdated
-          )
+          assert(r.bankAccountUpdated && !r.bankAccountCreated)
         case other => fail(other.toString)
       }
       // update bank account with empty bic
@@ -684,28 +626,23 @@ class PaymentHandlerSpec
         CreateOrUpdateBankAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
           updatedBankAccount.withBic(""),
-          Some(User.LegalUser(updatedLegalUser)),
-          Some(true),
-          clientId = Some(clientId),
-          ipAddress = Some("127.0.0.1"),
-          userAgent = Some("UserAgent")
+          clientId = Some(clientId)
         )
       ) await {
         case r: BankAccountCreatedOrUpdated =>
+        /*
+          assert(!r.bankAccountUpdated)
           assert(
-            !r.userTypeUpdated && !r.kycUpdated && !r.documentsUpdated && !r.userUpdated /*&& !r.bankAccountUpdated FIXME*/
-          )
-        /*assert(
-            r.paymentAccount.bankAccount.map(_.bic).getOrElse("").nonEmpty
-          )FIXME*/
+              r.paymentAccount.bankAccount.map(_.bic).getOrElse("").nonEmpty
+            ) FIXME
+         */
         case other => fail(other.toString)
       }
       // update siret
       updatedLegalUser = updatedLegalUser.withSiret("12345678912345")
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          updatedBankAccount,
           Some(User.LegalUser(updatedLegalUser)),
           Some(true),
           clientId = Some(clientId),
@@ -713,9 +650,9 @@ class PaymentHandlerSpec
           userAgent = Some("UserAgent")
         )
       ) await {
-        case r: BankAccountCreatedOrUpdated =>
+        case r: UserPaymentAccountCreatedOrUpdated =>
           assert(
-            !r.userTypeUpdated && !r.documentsUpdated && r.userUpdated /*&& !r.bankAccountUpdated FIXME*/
+            !r.userTypeUpdated && !r.documentsUpdated && r.userUpdated
           )
         case other => fail(other.toString)
       }
@@ -1162,17 +1099,27 @@ class PaymentHandlerSpec
 
     "transfer" in {
       !?(
-        CreateOrUpdateBankAccount(
+        CreateOrUpdateUserPaymentAccount(
           computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
-          BankAccount(None, ownerName, ownerAddress, iban, bic),
           Some(User.NaturalUser(naturalUser.withExternalUuid(vendorUuid).withProfile("vendor"))),
           clientId = Some(clientId),
           ipAddress = Some("127.0.0.1"),
           userAgent = Some("UserAgent")
         )
       ) await {
-        case r: BankAccountCreatedOrUpdated =>
+        case r: UserPaymentAccountCreatedOrUpdated =>
           assert(r.userCreated)
+          !?(
+            CreateOrUpdateBankAccount(
+              computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
+              BankAccount(None, ownerName, ownerAddress, iban, bic),
+              clientId = Some(clientId)
+            )
+          ) await {
+            case r: BankAccountCreatedOrUpdated =>
+              assert(r.bankAccountCreated)
+            case other => fail(other.toString)
+          }
           !?(LoadPaymentAccount(computeExternalUuidWithProfile(vendorUuid, Some("vendor")))) await {
             case result: PaymentAccountLoaded =>
               val paymentAccount = result.paymentAccount

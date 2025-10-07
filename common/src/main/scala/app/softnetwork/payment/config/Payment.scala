@@ -15,6 +15,7 @@ object Payment {
     cardRoute: String,
     paymentMethodRoute: String,
     bankRoute: String,
+    accountRoute: String,
     declarationRoute: String,
     kycRoute: String,
     disableBankAccountDeletion: Boolean,

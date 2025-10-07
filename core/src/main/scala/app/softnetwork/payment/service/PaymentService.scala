@@ -57,6 +57,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
       payInCallback ~
       preAuthorizeCardCallback ~
       firstRecurringPaymentCallback ~
+      account ~
       bank ~
       declaration ~
       kyc ~
@@ -196,20 +197,6 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
       requiredClientSession { (client, session) =>
-        get {
-          pathEnd {
-            run(
-              LoadPaymentAccount(
-                externalUuidWithProfile(session),
-                clientId = client.map(_.clientId).orElse(session.clientId)
-              )
-            ) completeWith {
-              case r: PaymentAccountLoaded =>
-                complete(HttpResponse(StatusCodes.OK, entity = r.paymentAccount.view))
-              case other => error(other)
-            }
-          }
-        } ~
         post {
           optionalHeaderValueByType[AcceptLanguage]((): Unit) { language =>
             optionalHeaderValueByType[Accept]((): Unit) { acceptHeader =>
@@ -516,34 +503,30 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
     concat(hooksRoutes: _*)
   }
 
-  lazy val bank: Route = pathPrefix(bankRoute) {
+  lazy val account: Route = pathPrefix(accountRoute) {
     // check anti CSRF token
     hmacTokenCsrfProtection(checkHeader) {
       // check if a session exists
       requiredClientSession { (client, session) =>
         pathEnd {
           get {
-            run(
-              LoadBankAccount(
-                externalUuidWithProfile(session),
-                clientId = client.map(_.clientId).orElse(session.clientId)
-              )
-            ) completeWith {
-              case r: BankAccountLoaded =>
-                complete(
-                  HttpResponse(
-                    StatusCodes.OK,
-                    entity = r.bankAccount.view
-                  )
+            pathEnd {
+              run(
+                LoadPaymentAccount(
+                  externalUuidWithProfile(session),
+                  clientId = client.map(_.clientId).orElse(session.clientId)
                 )
-              case other => error(other)
+              ) completeWith {
+                case r: PaymentAccountLoaded =>
+                  complete(HttpResponse(StatusCodes.OK, entity = r.paymentAccount.view))
+                case other => error(other)
+              }
             }
-          } ~
-          post {
+          } ~ post {
             optionalHeaderValueByType[UserAgent]((): Unit) { userAgent =>
               extractClientIP { ipAddress =>
-                entity(as[BankAccountCommand]) { bank =>
-                  import bank._
+                entity(as[UserPaymentAccountCommand]) { userAccountCommand =>
+                  import userAccountCommand._
                   var externalUuid: String = ""
                   val updatedUser: Option[PaymentAccount.User] =
                     user match {
@@ -582,22 +565,72 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
                         )
                     }
                   run(
-                    CreateOrUpdateBankAccount(
+                    CreateOrUpdateUserPaymentAccount(
                       externalUuidWithProfile(session),
-                      bankAccount.withExternalUuid(externalUuid),
                       updatedUser,
                       acceptedTermsOfPSP,
                       Some(ipAddress.value),
                       userAgent.map(_.name()),
-                      tokenId = tokenId,
-                      bankTokenId = bankTokenId
+                      clientId = client.map(_.clientId).orElse(session.clientId),
+                      tokenId = tokenId
                     )
                   ) completeWith {
-                    case r: BankAccountCreatedOrUpdated =>
+                    case r: UserPaymentAccountCreatedOrUpdated =>
                       complete(HttpResponse(StatusCodes.OK, entity = r))
                     case other => error(other)
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  lazy val bank: Route = pathPrefix(bankRoute) {
+    // check anti CSRF token
+    hmacTokenCsrfProtection(checkHeader) {
+      // check if a session exists
+      requiredClientSession { (client, session) =>
+        pathEnd {
+          get {
+            run(
+              LoadBankAccount(
+                externalUuidWithProfile(session),
+                clientId = client.map(_.clientId).orElse(session.clientId)
+              )
+            ) completeWith {
+              case r: BankAccountLoaded =>
+                complete(
+                  HttpResponse(
+                    StatusCodes.OK,
+                    entity = r.bankAccount.view
+                  )
+                )
+              case other => error(other)
+            }
+          } ~
+          post {
+            entity(as[BankAccountCommand]) { bank =>
+              import bank._
+              val updatedBankAccount =
+                if (bankAccount.externalUuid.trim().isEmpty) {
+                  bankAccount.withExternalUuid(session.id)
+                } else {
+                  bankAccount
+                }
+              run(
+                CreateOrUpdateBankAccount(
+                  externalUuidWithProfile(session),
+                  updatedBankAccount,
+                  clientId = client.map(_.clientId).orElse(session.clientId),
+                  bankTokenId = bankTokenId
+                )
+              ) completeWith {
+                case r: BankAccountCreatedOrUpdated =>
+                  complete(HttpResponse(StatusCodes.OK, entity = r))
+                case other => error(other)
               }
             }
           } ~

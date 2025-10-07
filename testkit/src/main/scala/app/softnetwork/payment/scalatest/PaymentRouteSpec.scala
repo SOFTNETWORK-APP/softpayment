@@ -36,12 +36,21 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       createNewSession(sellerSession())
       withHeaders(
         Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
+          UserPaymentAccountCommand(
+            naturalUser.withExternalUuid(externalUserId),
+            Some(true),
+            None
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+      }
+      withHeaders(
+        Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
           BankAccountCommand(
             BankAccount(None, ownerName, ownerAddress, "", bic),
-            naturalUser,
-            None,
-            None,
             None
           )
         )
@@ -57,9 +66,6 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
           BankAccountCommand(
             BankAccount(None, ownerName, ownerAddress, iban, "WRONG"),
-            naturalUser,
-            None,
-            None,
             None
           )
         )
@@ -73,9 +79,6 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       val command =
         BankAccountCommand(
           BankAccount(None, ownerName, ownerAddress, iban, bic),
-          naturalUser.withExternalUuid(externalUserId),
-          Some(true),
-          None,
           None
         )
       log.info(s"create bank account with natural user command: ${serialization.write(command)}")
@@ -97,12 +100,21 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
     "update bank account with natural user" in {
       withHeaders(
         Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
+          UserPaymentAccountCommand(
+            naturalUser.withLastName("anotherLastName").withExternalUuid(externalUserId),
+            Some(true),
+            None
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+      }
+      withHeaders(
+        Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
           BankAccountCommand(
             BankAccount(Option(sellerBankAccountId), ownerName, ownerAddress, iban, bic),
-            naturalUser.withLastName("anotherLastName").withExternalUuid(externalUserId),
-            None,
-            None,
             None
           )
         )
@@ -115,20 +127,12 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    "not update bank account with wrong siret" in {
+    "not update payment account with wrong siret" in {
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Option(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
+          UserPaymentAccountCommand(
             legalUser.withSiret(""),
-            None,
             None,
             None
           )
@@ -139,20 +143,12 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    "not update bank account with empty legal name" in {
+    "not update payment account with empty legal name" in {
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Option(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
+          UserPaymentAccountCommand(
             legalUser.withLegalName(""),
-            None,
             None,
             None
           )
@@ -163,20 +159,12 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    "not update bank account without accepted terms of PSP" in {
+    "not update payment account without accepted terms of PSP" in {
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
-          BankAccountCommand(
-            BankAccount(
-              Option(sellerBankAccountId),
-              ownerName,
-              ownerAddress,
-              iban,
-              bic
-            ),
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
+          UserPaymentAccountCommand(
             legalUser,
-            None,
             None,
             None
           )
@@ -187,28 +175,20 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    "update bank account with sole trader legal user" in {
+    "update payment account with sole trader legal user" in {
       externalUserId = "soleTrader"
       val command =
-        BankAccountCommand(
-          BankAccount(
-            Option(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
+        UserPaymentAccountCommand(
           legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
           Some(true),
-          None,
           None
         )
       log.info(
-        s"update bank account with sole trader legal user command: ${serialization.write(command)}"
+        s"update payment account with sole trader legal user command: ${serialization.write(command)}"
       )
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
           command
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
@@ -216,6 +196,17 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
         )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
+        withHeaders(
+          Post(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+            BankAccountCommand(
+              BankAccount(Option(sellerBankAccountId), ownerName, ownerAddress, iban, bic),
+              None
+            )
+          )
+        ) ~> routes ~> check {
+          status shouldEqual StatusCodes.OK
+        }
         val bankAccount = loadBankAccount()
 //        val previousBankAccountId = sellerBankAccountId
         sellerBankAccountId = bankAccount.bankAccountId
@@ -223,31 +214,34 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    "update bank account with business legal user" in {
+    "update payment account with business legal user" in {
       externalUserId = "business"
       val command =
-        BankAccountCommand(
-          BankAccount(
-            Option(sellerBankAccountId),
-            ownerName,
-            ownerAddress,
-            iban,
-            bic
-          ),
+        UserPaymentAccountCommand(
           legalUser
             .withLegalUserType(LegalUser.LegalUserType.BUSINESS)
             .withLegalRepresentative(naturalUser.withExternalUuid(externalUserId)),
           Some(true),
-          None,
           None
         )
       log.info(
-        s"update bank account with business legal user command: ${serialization.write(command)}"
+        s"update payment account with business legal user command: ${serialization.write(command)}"
       )
       withHeaders(
-        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute", command)
+        Post(s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute", command)
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
+        withHeaders(
+          Post(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+            BankAccountCommand(
+              BankAccount(Option(sellerBankAccountId), ownerName, ownerAddress, iban, bic),
+              None
+            )
+          )
+        ) ~> routes ~> check {
+          status shouldEqual StatusCodes.OK
+        }
         val bankAccount = loadBankAccount()
 //        val previousBankAccountId = sellerBankAccountId
         sellerBankAccountId = bankAccount.bankAccountId
