@@ -639,41 +639,33 @@ object PaymentMessages {
     lazy val key: String = transactionId
   }
 
-  /** Commands related to the bank account */
+  /** Commands related to the payment account */
 
-  case class BankAccountCommand(
-    bankAccount: BankAccount,
+  case class UserPaymentAccountCommand(
     user: Either[NaturalUser, LegalUser],
     acceptedTermsOfPSP: Option[Boolean] = None,
-    tokenId: Option[String] = None,
-    bankTokenId: Option[String] = None
+    tokenId: Option[String] = None
   )
 
-  object BankAccountCommand {
+  object UserPaymentAccountCommand {
 
     def apply(
-      bankAccount: BankAccount,
       naturalUser: NaturalUser,
       acceptedTermsOfPSP: Option[Boolean],
-      tokenId: Option[String],
-      bankTokenId: Option[String]
-    ): BankAccountCommand =
-      BankAccountCommand(bankAccount, Left(naturalUser), acceptedTermsOfPSP, tokenId, bankTokenId)
+      tokenId: Option[String]
+    ): UserPaymentAccountCommand =
+      UserPaymentAccountCommand(Left(naturalUser), acceptedTermsOfPSP, tokenId)
 
     def apply(
-      bankAccount: BankAccount,
       legalUser: LegalUser,
       acceptedTermsOfPSP: Option[Boolean],
-      tokenId: Option[String],
-      bankTokenId: Option[String]
-    ): BankAccountCommand =
-      BankAccountCommand(bankAccount, Right(legalUser), acceptedTermsOfPSP, tokenId, bankTokenId)
+      tokenId: Option[String]
+    ): UserPaymentAccountCommand =
+      UserPaymentAccountCommand(Right(legalUser), acceptedTermsOfPSP, tokenId)
   }
 
   /** @param creditedAccount
     *   - account to credit
-    * @param bankAccount
-    *   - bank account
     * @param user
     *   - payment user
     * @param acceptedTermsOfPSP
@@ -686,18 +678,38 @@ object PaymentMessages {
     *   - optional client id
     * @param tokenId
     *   - optional account token id
+    */
+  case class CreateOrUpdateUserPaymentAccount(
+    creditedAccount: String,
+    user: Option[PaymentAccount.User] = None,
+    acceptedTermsOfPSP: Option[Boolean] = None,
+    ipAddress: Option[String] = None,
+    userAgent: Option[String],
+    clientId: Option[String] = None,
+    tokenId: Option[String] = None
+  ) extends PaymentCommandWithKey
+      with PaymentAccountCommand {
+    val key: String = creditedAccount
+  }
+
+  case class BankAccountCommand(
+    bankAccount: BankAccount,
+    bankTokenId: Option[String] = None
+  )
+
+  /** @param creditedAccount
+    *   - account to credit
+    * @param bankAccount
+    *   - bank account
+    * @param clientId
+    *   - optional client id
     * @param bankTokenId
     *   - optional bank token id
     */
   case class CreateOrUpdateBankAccount(
     creditedAccount: String,
     bankAccount: BankAccount,
-    user: Option[PaymentAccount.User] = None,
-    acceptedTermsOfPSP: Option[Boolean] = None,
-    ipAddress: Option[String] = None,
-    userAgent: Option[String],
     clientId: Option[String] = None,
-    tokenId: Option[String] = None,
     bankTokenId: Option[String] = None
   ) extends PaymentCommandWithKey
       with PaymentAccountCommand {
@@ -1029,14 +1041,18 @@ object PaymentMessages {
   case class PaymentAccountLoaded(paymentAccount: PaymentAccount) extends PaymentResult
 
   case class BankAccountCreatedOrUpdated(
+    bankAccountCreated: Boolean,
+    bankAccountUpdated: Boolean,
+    mandateCanceled: Boolean,
+    paymentAccount: PaymentAccountView
+  ) extends PaymentResult
+
+  case class UserPaymentAccountCreatedOrUpdated(
     userCreated: Boolean,
     userTypeUpdated: Boolean,
     kycUpdated: Boolean,
     userUpdated: Boolean,
-    bankAccountCreated: Boolean,
-    bankAccountUpdated: Boolean,
     documentsUpdated: Boolean,
-    mandateCanceled: Boolean,
     uboDeclarationCreated: Boolean,
     paymentAccount: PaymentAccountView
   ) extends PaymentResult
@@ -1176,6 +1192,9 @@ object PaymentMessages {
   case object WrongHeadQuartersAddress extends PaymentError("WrongHeadQuartersAddress")
 
   case object BankAccountNotCreatedOrUpdated extends PaymentError("BankAccountNotCreatedOrUpdated")
+
+  case object UserPaymentAccountNotCreatedOrUpdated
+      extends PaymentError("UserPaymentAccountNotCreatedOrUpdated")
 
   case object KycDocumentNotAdded extends PaymentError("KycDocumentNotAdded")
 

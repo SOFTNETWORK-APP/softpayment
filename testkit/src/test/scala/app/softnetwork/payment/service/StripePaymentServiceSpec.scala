@@ -41,7 +41,8 @@ import app.softnetwork.payment.message.PaymentMessages.{
   PreRegisterPaymentMethod,
   RecurringPaymentRegistered,
   RegisterRecurringPayment,
-  Schedule4PaymentTriggered
+  Schedule4PaymentTriggered,
+  UserPaymentAccountCommand
 }
 import app.softnetwork.payment.model.{
   computeExternalUuidWithProfile,
@@ -98,18 +99,14 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       externalUserId = "individual-production"
       val user = naturalUser.withExternalUuid(externalUserId)
       val token = createAccountToken(PaymentAccount.defaultInstance.withNaturalUser(user))
-      val bankAccount = BankAccount(None, ownerName, ownerAddress, iban, bic)
-      val bankToken = createBankToken(bankAccount, individual = true)
       createNewSession(sellerSession(externalUserId))
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
-          BankAccountCommand(
-            bankAccount,
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
+          UserPaymentAccountCommand(
             user,
             Some(true),
-            Some(token.getId),
-            Some(bankToken.getId)
+            Some(token.getId)
           )
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
@@ -117,6 +114,15 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
+        val bank = BankAccount(None, ownerName, ownerAddress, iban, bic)
+        val bankToken = createBankToken(bank, individual = true)
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          BankAccountCommand(
+            bank,
+            Some(bankToken.getId)
+          )
+        )
         val bankAccount = loadBankAccount()
         sellerBankAccountId = bankAccount.bankAccountId
       }
@@ -224,27 +230,25 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       externalUserId = "soleTrader-production"
       val user = legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId))
       val token = createAccountToken(PaymentAccount.defaultInstance.withLegalUser(user))
-      val bankAccount = BankAccount(
+      /*val bankAccount = BankAccount(
         Option(sellerBankAccountId),
         ownerName,
         ownerAddress,
         iban,
         bic
       )
-      val bankToken = createBankToken(bankAccount, individual = false)
+      val bankToken = createBankToken(bankAccount, individual = false)*/
       createNewSession(sellerSession(externalUserId))
       val command =
-        BankAccountCommand(
-          bankAccount,
+        UserPaymentAccountCommand(
           user,
           Some(true),
-          Some(token.getId),
-          Some(bankToken.getId)
+          Some(token.getId)
         )
       log.info(serialization.write(command))
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
           command
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
@@ -265,7 +269,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         .withLegalUserType(LegalUser.LegalUserType.BUSINESS)
         .withLegalRepresentative(naturalUser.withExternalUuid(externalUserId))
       val token = createAccountToken(PaymentAccount.defaultInstance.withLegalUser(user))
-      val bankAccount =
+      /*val bankAccount =
         BankAccount(
           Option(sellerBankAccountId),
           ownerName,
@@ -273,20 +277,18 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           iban,
           bic
         )
-      val bankToken = createBankToken(bankAccount, individual = false)
+      val bankToken = createBankToken(bankAccount, individual = false)*/
       createNewSession(sellerSession(externalUserId))
       val bank =
-        BankAccountCommand(
-          bankAccount,
+        UserPaymentAccountCommand(
           user,
           Some(true),
-          Some(token.getId),
-          Some(bankToken.getId)
+          Some(token.getId)
         )
       log.info(serialization.write(bank))
       withHeaders(
         Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
           bank
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),

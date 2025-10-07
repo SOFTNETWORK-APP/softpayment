@@ -21,63 +21,26 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val createOrUpdateBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
       .in(PaymentSettings.PaymentConfig.bankRoute)
-      .in(clientIp)
-      .in(header[Option[String]](HeaderNames.UserAgent))
-      .in(jsonBody[BankAccountCommand].description("Legal or natural user bank account"))
+      .in(jsonBody[BankAccountCommand].description("Bank account to create or update"))
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[BankAccountCreatedOrUpdated].description("Bank account created or updated"))
       )
       .serverLogic {
-        case (client, session) => { case (ipAddress, userAgent, bank) =>
-          import bank._
-          var externalUuid: String = ""
-          val updatedUser: Option[PaymentAccount.User] = {
-            user match {
-              case Left(naturalUser) =>
-                var updatedNaturalUser = {
-                  if (naturalUser.externalUuid.trim.isEmpty) {
-                    naturalUser.withExternalUuid(session.id)
-                  } else {
-                    naturalUser
-                  }
-                }
-                session.profile match {
-                  case Some(profile) if updatedNaturalUser.profile.isEmpty =>
-                    updatedNaturalUser = updatedNaturalUser.withProfile(profile)
-                  case _ =>
-                }
-                externalUuid = updatedNaturalUser.externalUuid
-                Some(PaymentAccount.User.NaturalUser(updatedNaturalUser))
-              case Right(legalUser) =>
-                var updatedLegalRepresentative = legalUser.legalRepresentative
-                if (updatedLegalRepresentative.externalUuid.trim.isEmpty) {
-                  updatedLegalRepresentative =
-                    updatedLegalRepresentative.withExternalUuid(session.id)
-                }
-                session.profile match {
-                  case Some(profile) if updatedLegalRepresentative.profile.isEmpty =>
-                    updatedLegalRepresentative = updatedLegalRepresentative.withProfile(profile)
-                  case _ =>
-                }
-                externalUuid = updatedLegalRepresentative.externalUuid
-                Some(
-                  PaymentAccount.User.LegalUser(
-                    legalUser.withLegalRepresentative(updatedLegalRepresentative)
-                  )
-                )
+        case (client, session) => { bankAccountCommand =>
+          import bankAccountCommand._
+          val updatedBankAccount =
+            if (bankAccount.externalUuid.trim().isEmpty) {
+              bankAccount.withExternalUuid(session.id)
+            } else {
+              bankAccount
             }
-          }
           run(
             CreateOrUpdateBankAccount(
               externalUuidWithProfile(session),
-              bankAccount.withExternalUuid(externalUuid),
-              updatedUser,
-              acceptedTermsOfPSP,
+              updatedBankAccount,
               clientId = client.map(_.clientId).orElse(session.clientId),
-              ipAddress = ipAddress,
-              userAgent = userAgent,
-              tokenId = tokenId
+              bankTokenId = bankTokenId
             )
           ).map {
             case r: BankAccountCreatedOrUpdated => Right(r)
@@ -85,7 +48,7 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           }
         }
       }
-      .description("Create or update legal or natural user bank account")
+      .description("Create or update authenticated user bank account")
 
   val loadBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get

@@ -2,7 +2,7 @@ ThisBuild / organization := "app.softnetwork"
 
 name := "payment"
 
-ThisBuild / version := "0.7.4"
+ThisBuild / version := "0.8.0"
 
 ThisBuild / scalaVersion := "2.12.18"
 

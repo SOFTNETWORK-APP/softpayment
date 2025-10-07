@@ -976,83 +976,16 @@ trait PaymentBehavior
         } else if (cmd.bankAccount.wrongBic) {
           Effect.none.thenRun(_ => WrongBic ~> replyTo)
         }
-//        else if(cmd.bankAccount.wrongOwnerName) {
-//          Effect.none.thenRun(_ => WrongOwnerName ~> replyTo)
-//        }
+        //        else if(cmd.bankAccount.wrongOwnerName) {
+        //          Effect.none.thenRun(_ => WrongOwnerName ~> replyTo)
+        //        }
         else if (cmd.bankAccount.wrongOwnerAddress) {
           Effect.none.thenRun(_ => WrongOwnerAddress ~> replyTo)
         } else {
-          (state match {
-            case None =>
-              cmd.user match {
-                case Some(user) =>
-                  loadPaymentAccount(entityId, None, user, cmd.clientId)
-                case _ => None
-              }
-            case some => some
-          }) match {
-            case Some(paymentAccount) =>
+          state match {
+            case Some(paymentAccount)
+                if paymentAccount.userId.isDefined && paymentAccount.walletId.isDefined =>
               import cmd._
-
-              val updatedUser: PaymentAccount.User =
-                user match {
-                  case None => paymentAccount.user
-                  case Some(updatedUser) =>
-                    if (paymentAccount.user.isLegalUser && updatedUser.isLegalUser) {
-                      val previousLegalUser = paymentAccount.getLegalUser
-                      val updatedLegalUser = updatedUser.legalUser.get
-                      PaymentAccount.User.LegalUser(
-                        updatedLegalUser.copy(
-                          legalRepresentative = updatedLegalUser.legalRepresentative
-                            .copy(
-                              userId = previousLegalUser.legalRepresentative.userId,
-                              walletId = previousLegalUser.legalRepresentative.walletId
-                            )
-                            .withNaturalUserType(
-                              updatedLegalUser.legalRepresentative.naturalUserType
-                                .getOrElse(NaturalUserType.COLLECTOR)
-                            ),
-                          uboDeclaration = previousLegalUser.uboDeclaration,
-                          lastAcceptedTermsOfPSP = previousLegalUser.lastAcceptedTermsOfPSP
-                        )
-                      )
-                    } else if (updatedUser.isLegalUser) {
-                      val updatedLegalUser = updatedUser.legalUser.get
-                      PaymentAccount.User.LegalUser(
-                        updatedLegalUser.copy(
-                          legalRepresentative =
-                            updatedLegalUser.legalRepresentative.withNaturalUserType(
-                              updatedLegalUser.legalRepresentative.naturalUserType.getOrElse(
-                                NaturalUserType.COLLECTOR
-                              )
-                            )
-                        )
-                      )
-                    } else if (paymentAccount.user.isNaturalUser && updatedUser.isNaturalUser) {
-                      val previousNaturalUser = paymentAccount.getNaturalUser
-                      val updatedNaturalUser = updatedUser.naturalUser.get
-                      PaymentAccount.User.NaturalUser(
-                        updatedNaturalUser
-                          .copy(
-                            userId = previousNaturalUser.userId,
-                            walletId = previousNaturalUser.walletId
-                          )
-                          .withNaturalUserType(
-                            updatedNaturalUser.naturalUserType.getOrElse(NaturalUserType.COLLECTOR)
-                          )
-                      )
-                    } else if (updatedUser.isNaturalUser) {
-                      val updatedNaturalUser = updatedUser.naturalUser.get
-                      PaymentAccount.User.NaturalUser(
-                        updatedNaturalUser.withNaturalUserType(
-                          updatedNaturalUser.naturalUserType.getOrElse(NaturalUserType.COLLECTOR)
-                        )
-                      )
-                    } else {
-                      updatedUser
-                    }
-                }
-
               val lastUpdated = now()
 
               val shouldUpdateIban =
@@ -1065,11 +998,16 @@ trait PaymentBehavior
                   _.checkIfSameBic(bankAccount.bic)
                 )
 
-              val bic = bankAccount.bic
+              val bic =
+                if (!shouldUpdateBic)
+                  paymentAccount.bankAccount.map(_.bic).getOrElse(bankAccount.bic)
+                else bankAccount.bic
+
+              val shouldCreateBankAccount = paymentAccount.bankAccount.isEmpty ||
+                paymentAccount.bankAccount.flatMap(_.id).isEmpty
 
               var updatedPaymentAccount =
                 paymentAccount
-                  .withUser(updatedUser)
                   .withBankAccount(
                     bankAccount
                       .copy(
@@ -1081,102 +1019,299 @@ trait PaymentBehavior
                   )
                   .withLastUpdated(lastUpdated)
 
-              updatedPaymentAccount.user.legalUser match {
-                case Some(legalUser) if legalUser.wrongSiret =>
-                  Effect.none.thenRun(_ => WrongSiret ~> replyTo)
-                case Some(legalUser) if legalUser.legalName.trim.isEmpty =>
-                  Effect.none.thenRun(_ => LegalNameRequired ~> replyTo)
-                case Some(legalUser) if legalUser.wrongLegalRepresentativeAddress =>
-                  Effect.none.thenRun(_ => WrongLegalRepresentativeAddress ~> replyTo)
-                case Some(legalUser) if legalUser.wrongHeadQuartersAddress =>
-                  Effect.none.thenRun(_ => WrongHeadQuartersAddress ~> replyTo)
-                case Some(legalUser)
-                    if legalUser.lastAcceptedTermsOfPSP.isEmpty && !acceptedTermsOfPSP.getOrElse(
-                      false
-                    ) =>
-                  Effect.none.thenRun(_ => AcceptedTermsOfPSPRequired ~> replyTo)
-                case None if paymentAccount.emptyUser =>
-                  Effect.none.thenRun(_ => UserRequired ~> replyTo)
-                case _ =>
-                  val shouldCreateUser = paymentAccount.userId.isEmpty
+              val shouldUpdateBankAccount = !shouldCreateBankAccount && (
+                paymentAccount.bankAccount
+                  .map(_.ownerName)
+                  .getOrElse("") != bankAccount.ownerName ||
+                !paymentAccount.getBankAccount.ownerAddress.equals(bankAccount.ownerAddress) ||
+                shouldUpdateIban ||
+                shouldUpdateBic /*||
+                    shouldUpdateUser*/
+              )
 
-                  val shouldUpdateUserType = !shouldCreateUser && {
-                    if (paymentAccount.legalUser) { // previous user is a legal user
-                      !updatedPaymentAccount.legalUser || // update to natural user
-                      !paymentAccount.checkIfSameLegalUserType(
-                        updatedPaymentAccount.legalUserType
-                      ) // update legal user type
-                    } else { // previous user is a natural user
-                      updatedPaymentAccount.legalUser // update to legal user
-                    }
+              val shouldCreateOrUpdateBankAccount =
+                shouldCreateBankAccount || shouldUpdateBankAccount
+
+              val shouldCancelMandate = shouldUpdateBankAccount &&
+                paymentAccount.bankAccount.flatMap(_.mandateId).isDefined
+
+              val clientId = paymentAccount.clientId.orElse(
+                internalClientId
+              )
+              val paymentProvider = loadPaymentProvider(clientId)
+              import paymentProvider._
+
+              (paymentAccount.bankAccount.flatMap(_.id) match {
+                case None =>
+                  createOrUpdateBankAccount(
+                    updatedPaymentAccount.resetBankAccountId().bankAccount,
+                    bankTokenId
+                  )
+                case Some(_) if shouldCreateOrUpdateBankAccount =>
+                  createOrUpdateBankAccount(
+                    updatedPaymentAccount.resetBankAccountId().bankAccount,
+                    bankTokenId
+                  )
+                case some => some
+              }) match {
+                case Some(bankAccountId) =>
+                  keyValueDao.addKeyValue(bankAccountId, entityId)
+                  updatedPaymentAccount =
+                    updatedPaymentAccount.resetBankAccountId(Some(bankAccountId))
+                  var events: List[ExternalSchedulerEvent] = List.empty
+
+                  if (shouldCreateBankAccount) {
+                    updatedPaymentAccount = updatedPaymentAccount
+                      .withBankAccount(
+                        updatedPaymentAccount.getBankAccount
+                          .withCreatedDate(lastUpdated)
+                          .withLastUpdated(lastUpdated)
+                      )
+                  } else if (shouldUpdateBankAccount) {
+                    updatedPaymentAccount = updatedPaymentAccount
+                      .withBankAccount(
+                        updatedPaymentAccount.getBankAccount
+                          .withLastUpdated(lastUpdated)
+                      )
                   }
 
-                  val shouldUpdateKYC =
-                    shouldUpdateUserType ||
-                    paymentAccount.maybeUser.map(_.firstName).getOrElse("") !=
-                      updatedPaymentAccount.maybeUser.map(_.firstName).getOrElse("") ||
-                      paymentAccount.maybeUser.map(_.lastName).getOrElse("") !=
-                      updatedPaymentAccount.maybeUser.map(_.lastName).getOrElse("") ||
-                      paymentAccount.maybeUser.map(_.birthday).getOrElse("") !=
-                      updatedPaymentAccount.maybeUser.map(_.birthday).getOrElse("")
+                  // BankAccountUpdatedEvent
+                  events = events ++
+                    List(
+                      BankAccountUpdatedEvent.defaultInstance
+                        .withExternalUuid(updatedPaymentAccount.externalUuid)
+                        .withLastUpdated(lastUpdated)
+                        .withUserId(paymentAccount.userId.get)
+                        .withWalletId(paymentAccount.walletId.get)
+                        .withBankAccountId(bankAccountId)
+                    )
 
-                  val shouldUpdateUser = shouldUpdateKYC ||
-                    (updatedPaymentAccount.legalUser &&
-                    (updatedPaymentAccount.getLegalUser.legalName != paymentAccount.getLegalUser.legalName ||
-                    updatedPaymentAccount.getLegalUser.siret != paymentAccount.getLegalUser.siret ||
-                    !updatedPaymentAccount.getLegalUser.legalRepresentativeAddress.equals(
-                      paymentAccount.getLegalUser.legalRepresentativeAddress
-                    ) ||
-                    !updatedPaymentAccount.getLegalUser.headQuartersAddress.equals(
-                      paymentAccount.getLegalUser.headQuartersAddress
-                    ) ||
-                    updatedPaymentAccount.getLegalUser.legalRepresentative.email
-                      != paymentAccount.getLegalUser.legalRepresentative.email ||
-                      updatedPaymentAccount.getLegalUser.legalRepresentative.nationality
-                      != paymentAccount.getLegalUser.legalRepresentative.nationality ||
-                      updatedPaymentAccount.getLegalUser.legalRepresentative.countryOfResidence
-                      != paymentAccount.getLegalUser.legalRepresentative.countryOfResidence)) ||
-                    (!updatedPaymentAccount.legalUser && (updatedPaymentAccount.getNaturalUser.email != paymentAccount.getNaturalUser.email ||
-                    updatedPaymentAccount.getNaturalUser.nationality != paymentAccount.getNaturalUser.nationality ||
-                    updatedPaymentAccount.getNaturalUser.countryOfResidence
-                      != paymentAccount.getNaturalUser.countryOfResidence))
+                  if (shouldCancelMandate) {
+                    updatedPaymentAccount = updatedPaymentAccount.copy(
+                      bankAccount = updatedPaymentAccount.bankAccount.map(
+                        _.copy(
+                          mandateId = None,
+                          mandateStatus = None
+                        )
+                      )
+                    )
 
-                  //val shouldCreateOrUpdateUser = shouldCreateUser || shouldUpdateUser
+                    // MandateUpdatedEvent
+                    events = events ++
+                      List(
+                        MandateUpdatedEvent.defaultInstance
+                          .withExternalUuid(updatedPaymentAccount.externalUuid)
+                          .withLastUpdated(lastUpdated)
+                          .withBankAccountId(bankAccountId)
+                          .copy(
+                            mandateId = None,
+                            mandateStatus = None
+                          )
+                      )
+                  }
 
-                  val shouldCreateBankAccount = paymentAccount.bankAccount.isEmpty ||
-                    paymentAccount.bankAccount.flatMap(_.id).isEmpty
+                  val encodedPaymentAccount =
+                    updatedPaymentAccount.copy(
+                      bankAccount = updatedPaymentAccount.bankAccount.map(
+                        _.encode(shouldUpdateBic, shouldUpdateIban)
+                      )
+                    )
 
-                  val shouldUpdateBankAccount = !shouldCreateBankAccount && (
-                    paymentAccount.bankAccount
-                      .map(_.ownerName)
-                      .getOrElse("") != bankAccount.ownerName ||
-                    !paymentAccount.getBankAccount.ownerAddress.equals(bankAccount.ownerAddress) ||
-                    shouldUpdateIban ||
-                    shouldUpdateBic /*||
-                      shouldUpdateUser*/
+                  Effect.persist(
+                    events :+
+                    PaymentAccountUpsertedEvent.defaultInstance
+                      .withDocument(encodedPaymentAccount)
+                      .withLastUpdated(lastUpdated)
+                  ) thenRun (_ =>
+                    BankAccountCreatedOrUpdated(
+                      shouldCreateBankAccount,
+                      shouldUpdateBankAccount,
+                      shouldCancelMandate,
+                      encodedPaymentAccount.view
+                    ) ~> replyTo
                   )
 
-                  val shouldCreateOrUpdateBankAccount =
-                    shouldCreateBankAccount || shouldUpdateBankAccount
+                case _ =>
+                  Effect.none.thenRun(_ => BankAccountNotCreatedOrUpdated ~> replyTo)
+              }
 
-                  val documents: List[KycDocument] = initDocuments(updatedPaymentAccount)
+            case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+          }
+        }
 
-                  val shouldUpdateDocuments = shouldUpdateKYC
+      case cmd: CreateOrUpdateUserPaymentAccount =>
+        (state match {
+          case None =>
+            cmd.user match {
+              case Some(user) =>
+                loadPaymentAccount(entityId, None, user, cmd.clientId)
+              case _ => None
+            }
+          case some => some
+        }) match {
+          case Some(paymentAccount) =>
+            import cmd._
 
-                  val shouldCancelMandate = shouldUpdateBankAccount &&
-                    paymentAccount.bankAccount.flatMap(_.mandateId).isDefined
+            val updatedUser: PaymentAccount.User =
+              user match {
+                case None => paymentAccount.user
+                case Some(updatedUser) =>
+                  if (paymentAccount.user.isLegalUser && updatedUser.isLegalUser) {
+                    val previousLegalUser = paymentAccount.getLegalUser
+                    val updatedLegalUser = updatedUser.legalUser.get
+                    PaymentAccount.User.LegalUser(
+                      updatedLegalUser.copy(
+                        legalRepresentative = updatedLegalUser.legalRepresentative
+                          .copy(
+                            userId = previousLegalUser.legalRepresentative.userId,
+                            walletId = previousLegalUser.legalRepresentative.walletId
+                          )
+                          .withNaturalUserType(
+                            updatedLegalUser.legalRepresentative.naturalUserType
+                              .getOrElse(NaturalUserType.COLLECTOR)
+                          ),
+                        uboDeclaration = previousLegalUser.uboDeclaration,
+                        lastAcceptedTermsOfPSP = previousLegalUser.lastAcceptedTermsOfPSP
+                      )
+                    )
+                  } else if (updatedUser.isLegalUser) {
+                    val updatedLegalUser = updatedUser.legalUser.get
+                    PaymentAccount.User.LegalUser(
+                      updatedLegalUser.copy(
+                        legalRepresentative =
+                          updatedLegalUser.legalRepresentative.withNaturalUserType(
+                            updatedLegalUser.legalRepresentative.naturalUserType.getOrElse(
+                              NaturalUserType.COLLECTOR
+                            )
+                          )
+                      )
+                    )
+                  } else if (paymentAccount.user.isNaturalUser && updatedUser.isNaturalUser) {
+                    val previousNaturalUser = paymentAccount.getNaturalUser
+                    val updatedNaturalUser = updatedUser.naturalUser.get
+                    PaymentAccount.User.NaturalUser(
+                      updatedNaturalUser
+                        .copy(
+                          userId = previousNaturalUser.userId,
+                          walletId = previousNaturalUser.walletId
+                        )
+                        .withNaturalUserType(
+                          updatedNaturalUser.naturalUserType.getOrElse(NaturalUserType.COLLECTOR)
+                        )
+                    )
+                  } else if (updatedUser.isNaturalUser) {
+                    val updatedNaturalUser = updatedUser.naturalUser.get
+                    PaymentAccount.User.NaturalUser(
+                      updatedNaturalUser.withNaturalUserType(
+                        updatedNaturalUser.naturalUserType.getOrElse(NaturalUserType.COLLECTOR)
+                      )
+                    )
+                  } else {
+                    updatedUser
+                  }
+              }
 
-                  val shouldCreateUboDeclaration = updatedPaymentAccount.legalUser &&
-                    updatedPaymentAccount.getLegalUser.uboDeclarationRequired &&
-                    updatedPaymentAccount.getLegalUser.uboDeclaration.isEmpty
+            val lastUpdated = now()
 
-                  val clientId = paymentAccount.clientId.orElse(
-                    internalClientId
-                  )
-                  val paymentProvider = loadPaymentProvider(clientId)
-                  import paymentProvider._
-                  (paymentAccount.userId match {
-                    case None =>
+            var updatedPaymentAccount =
+              paymentAccount
+                .withUser(updatedUser)
+                .withLastUpdated(lastUpdated)
+
+            updatedPaymentAccount.user.legalUser match {
+              case Some(legalUser) if legalUser.wrongSiret =>
+                Effect.none.thenRun(_ => WrongSiret ~> replyTo)
+              case Some(legalUser) if legalUser.legalName.trim.isEmpty =>
+                Effect.none.thenRun(_ => LegalNameRequired ~> replyTo)
+              case Some(legalUser) if legalUser.wrongLegalRepresentativeAddress =>
+                Effect.none.thenRun(_ => WrongLegalRepresentativeAddress ~> replyTo)
+              case Some(legalUser) if legalUser.wrongHeadQuartersAddress =>
+                Effect.none.thenRun(_ => WrongHeadQuartersAddress ~> replyTo)
+              case Some(legalUser)
+                  if legalUser.lastAcceptedTermsOfPSP.isEmpty && !acceptedTermsOfPSP.getOrElse(
+                    false
+                  ) =>
+                Effect.none.thenRun(_ => AcceptedTermsOfPSPRequired ~> replyTo)
+              case None if paymentAccount.emptyUser =>
+                Effect.none.thenRun(_ => UserRequired ~> replyTo)
+              case _ =>
+                val shouldCreateUser = paymentAccount.userId.isEmpty
+
+                val shouldUpdateUserType = !shouldCreateUser && {
+                  if (paymentAccount.legalUser) { // previous user is a legal user
+                    !updatedPaymentAccount.legalUser || // update to natural user
+                    !paymentAccount.checkIfSameLegalUserType(
+                      updatedPaymentAccount.legalUserType
+                    ) // update legal user type
+                  } else { // previous user is a natural user
+                    updatedPaymentAccount.legalUser // update to legal user
+                  }
+                }
+
+                val shouldUpdateKYC =
+                  shouldUpdateUserType ||
+                  paymentAccount.maybeUser.map(_.firstName).getOrElse("") !=
+                    updatedPaymentAccount.maybeUser.map(_.firstName).getOrElse("") ||
+                    paymentAccount.maybeUser.map(_.lastName).getOrElse("") !=
+                    updatedPaymentAccount.maybeUser.map(_.lastName).getOrElse("") ||
+                    paymentAccount.maybeUser.map(_.birthday).getOrElse("") !=
+                    updatedPaymentAccount.maybeUser.map(_.birthday).getOrElse("")
+
+                val shouldUpdateUser = shouldUpdateKYC ||
+                  (updatedPaymentAccount.legalUser &&
+                  (updatedPaymentAccount.getLegalUser.legalName != paymentAccount.getLegalUser.legalName ||
+                  updatedPaymentAccount.getLegalUser.siret != paymentAccount.getLegalUser.siret ||
+                  !updatedPaymentAccount.getLegalUser.legalRepresentativeAddress.equals(
+                    paymentAccount.getLegalUser.legalRepresentativeAddress
+                  ) ||
+                  !updatedPaymentAccount.getLegalUser.headQuartersAddress.equals(
+                    paymentAccount.getLegalUser.headQuartersAddress
+                  ) ||
+                  updatedPaymentAccount.getLegalUser.legalRepresentative.email
+                    != paymentAccount.getLegalUser.legalRepresentative.email ||
+                    updatedPaymentAccount.getLegalUser.legalRepresentative.nationality
+                    != paymentAccount.getLegalUser.legalRepresentative.nationality ||
+                    updatedPaymentAccount.getLegalUser.legalRepresentative.countryOfResidence
+                    != paymentAccount.getLegalUser.legalRepresentative.countryOfResidence)) ||
+                  (!updatedPaymentAccount.legalUser && (updatedPaymentAccount.getNaturalUser.email != paymentAccount.getNaturalUser.email ||
+                  updatedPaymentAccount.getNaturalUser.nationality != paymentAccount.getNaturalUser.nationality ||
+                  updatedPaymentAccount.getNaturalUser.countryOfResidence
+                    != paymentAccount.getNaturalUser.countryOfResidence))
+
+                //val shouldCreateOrUpdateUser = shouldCreateUser || shouldUpdateUser
+
+                val documents: List[KycDocument] = initDocuments(updatedPaymentAccount)
+
+                val shouldUpdateDocuments = shouldUpdateKYC
+
+                val shouldCreateUboDeclaration = updatedPaymentAccount.legalUser &&
+                  updatedPaymentAccount.getLegalUser.uboDeclarationRequired &&
+                  updatedPaymentAccount.getLegalUser.uboDeclaration.isEmpty
+
+                val clientId = paymentAccount.clientId.orElse(
+                  internalClientId
+                )
+                val paymentProvider = loadPaymentProvider(clientId)
+                import paymentProvider._
+                (paymentAccount.userId match {
+                  case None =>
+                    createOrUpdatePaymentAccount(
+                      Some(updatedPaymentAccount),
+                      acceptedTermsOfPSP.getOrElse(false),
+                      ipAddress,
+                      userAgent,
+                      tokenId
+                    )
+                  case Some(_) if shouldUpdateUser =>
+                    if (shouldUpdateUserType) {
+                      createOrUpdatePaymentAccount(
+                        Some(updatedPaymentAccount.resetUserId(None)),
+                        acceptedTermsOfPSP.getOrElse(false),
+                        ipAddress,
+                        userAgent,
+                        tokenId
+                      )
+                    } else {
                       createOrUpdatePaymentAccount(
                         Some(updatedPaymentAccount),
                         acceptedTermsOfPSP.getOrElse(false),
@@ -1184,242 +1319,143 @@ trait PaymentBehavior
                         userAgent,
                         tokenId
                       )
-                    case Some(_) if shouldUpdateUser =>
-                      if (shouldUpdateUserType) {
-                        createOrUpdatePaymentAccount(
-                          Some(updatedPaymentAccount.resetUserId(None)),
-                          acceptedTermsOfPSP.getOrElse(false),
-                          ipAddress,
-                          userAgent,
-                          tokenId
+                    }
+                  case some => some
+                }) match {
+                  case Some(userId) =>
+                    keyValueDao.addKeyValue(userId, entityId)
+                    updatedPaymentAccount = updatedPaymentAccount.resetUserId(Some(userId))
+                    (paymentAccount.walletId match {
+                      case None =>
+                        createOrUpdateWallet(
+                          Some(userId),
+                          "EUR",
+                          updatedPaymentAccount.externalUuid,
+                          None
                         )
-                      } else {
-                        createOrUpdatePaymentAccount(
-                          Some(updatedPaymentAccount),
-                          acceptedTermsOfPSP.getOrElse(false),
-                          ipAddress,
-                          userAgent,
-                          tokenId
+                      case Some(_) if shouldUpdateUserType =>
+                        createOrUpdateWallet(
+                          Some(userId),
+                          "EUR",
+                          updatedPaymentAccount.externalUuid,
+                          None
                         )
-                      }
-                    case some => some
-                  }) match {
-                    case Some(userId) =>
-                      keyValueDao.addKeyValue(userId, entityId)
-                      updatedPaymentAccount = updatedPaymentAccount.resetUserId(Some(userId))
-                      (paymentAccount.walletId match {
-                        case None =>
-                          createOrUpdateWallet(
-                            Some(userId),
-                            "EUR",
-                            updatedPaymentAccount.externalUuid,
-                            None
+                      case some => some
+                    }) match {
+                      case Some(walletId) =>
+                        keyValueDao.addKeyValue(walletId, entityId)
+                        updatedPaymentAccount = updatedPaymentAccount.resetWalletId(Some(walletId))
+
+                        var events: List[ExternalSchedulerEvent] = List.empty
+
+                        if (
+                          updatedPaymentAccount.legalUser && acceptedTermsOfPSP.getOrElse(
+                            false
                           )
-                        case Some(_) if shouldUpdateUserType =>
-                          createOrUpdateWallet(
-                            Some(userId),
-                            "EUR",
-                            updatedPaymentAccount.externalUuid,
-                            None
+                        ) {
+                          updatedPaymentAccount = updatedPaymentAccount.withLegalUser(
+                            updatedPaymentAccount.getLegalUser.withLastAcceptedTermsOfPSP(
+                              lastUpdated
+                            )
                           )
-                        case some => some
-                      }) match {
-                        case Some(walletId) =>
-                          keyValueDao.addKeyValue(walletId, entityId)
-                          updatedPaymentAccount =
-                            updatedPaymentAccount.resetWalletId(Some(walletId))
-                          (paymentAccount.bankAccount.flatMap(_.id) match {
-                            case None =>
-                              createOrUpdateBankAccount(
-                                updatedPaymentAccount.resetBankAccountId().bankAccount,
-                                bankTokenId
+                          // TermsOfPSPAcceptedEvent
+                          events = events ++
+                            List(
+                              TermsOfPSPAcceptedEvent.defaultInstance
+                                .withExternalUuid(updatedPaymentAccount.externalUuid)
+                                .withLastUpdated(lastUpdated)
+                                .withLastAcceptedTermsOfPSP(lastUpdated)
+                            )
+                        }
+
+                        if (shouldCreateUboDeclaration) {
+                          createDeclaration(userId) match {
+                            case Some(uboDeclaration) =>
+                              keyValueDao.addKeyValue(uboDeclaration.id, entityId)
+                              updatedPaymentAccount = updatedPaymentAccount.withLegalUser(
+                                updatedPaymentAccount.getLegalUser.withUboDeclaration(
+                                  uboDeclaration
+                                )
                               )
-                            case Some(_) if shouldCreateOrUpdateBankAccount =>
-                              createOrUpdateBankAccount(
-                                updatedPaymentAccount.resetBankAccountId().bankAccount,
-                                bankTokenId
-                              )
-                            case some => some
-                          }) match {
-                            case Some(bankAccountId) =>
-                              keyValueDao.addKeyValue(bankAccountId, entityId)
-                              updatedPaymentAccount =
-                                updatedPaymentAccount.resetBankAccountId(Some(bankAccountId))
-
-                              var events: List[ExternalSchedulerEvent] = List.empty
-
-                              if (shouldCreateBankAccount) {
-                                updatedPaymentAccount = updatedPaymentAccount
-                                  .withBankAccount(
-                                    updatedPaymentAccount.getBankAccount
-                                      .withCreatedDate(lastUpdated)
-                                      .withLastUpdated(lastUpdated)
-                                  )
-                              } else if (shouldUpdateBankAccount) {
-                                updatedPaymentAccount = updatedPaymentAccount
-                                  .withBankAccount(
-                                    updatedPaymentAccount.getBankAccount
-                                      .withLastUpdated(lastUpdated)
-                                  )
-                              }
-
-                              // BankAccountUpdatedEvent
+                              // UboDeclarationUpdatedEvent
                               events = events ++
                                 List(
-                                  BankAccountUpdatedEvent.defaultInstance
+                                  UboDeclarationUpdatedEvent.defaultInstance
                                     .withExternalUuid(updatedPaymentAccount.externalUuid)
                                     .withLastUpdated(lastUpdated)
-                                    .withUserId(userId)
-                                    .withWalletId(walletId)
-                                    .withBankAccountId(bankAccountId)
+                                    .withUboDeclaration(uboDeclaration)
                                 )
-
-                              if (
-                                updatedPaymentAccount.legalUser && acceptedTermsOfPSP.getOrElse(
-                                  false
-                                )
-                              ) {
-                                updatedPaymentAccount = updatedPaymentAccount.withLegalUser(
-                                  updatedPaymentAccount.getLegalUser.withLastAcceptedTermsOfPSP(
-                                    lastUpdated
-                                  )
-                                )
-                                // TermsOfPSPAcceptedEvent
-                                events = events ++
-                                  List(
-                                    TermsOfPSPAcceptedEvent.defaultInstance
-                                      .withExternalUuid(updatedPaymentAccount.externalUuid)
-                                      .withLastUpdated(lastUpdated)
-                                      .withLastAcceptedTermsOfPSP(lastUpdated)
-                                  )
-                              }
-
-                              if (shouldCreateUboDeclaration) {
-                                createDeclaration(userId) match {
-                                  case Some(uboDeclaration) =>
-                                    keyValueDao.addKeyValue(uboDeclaration.id, entityId)
-                                    updatedPaymentAccount = updatedPaymentAccount.withLegalUser(
-                                      updatedPaymentAccount.getLegalUser.withUboDeclaration(
-                                        uboDeclaration
-                                      )
-                                    )
-                                    // UboDeclarationUpdatedEvent
-                                    events = events ++
-                                      List(
-                                        UboDeclarationUpdatedEvent.defaultInstance
-                                          .withExternalUuid(updatedPaymentAccount.externalUuid)
-                                          .withLastUpdated(lastUpdated)
-                                          .withUboDeclaration(uboDeclaration)
-                                      )
-                                  case _ =>
-                                    log.warn(s"Could not create ubo declaration for user $userId")
-                                }
-                              }
-
-                              if (shouldUpdateDocuments) { // TODO we should rely on the payment provider to update document status
-                                updatedPaymentAccount = updatedPaymentAccount
-                                  /*.withDocuments(
-                                      documents.map(
-                                        _.copy(
-                                          lastUpdated = Some(lastUpdated),
-                                          status = KycDocument.KycDocumentStatus.KYC_DOCUMENT_NOT_SPECIFIED,
-                                          refusedReasonType = None,
-                                          refusedReasonMessage = None
-                                        )
-                                      )
-                                    )*/
-                                  .withDocuments(documents)
-                                  .withPaymentAccountStatus(
-                                    PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO
-                                  )
-
-                                // PaymentAccountStatusUpdatedEvent
-                                events = events ++
-                                  List(
-                                    PaymentAccountStatusUpdatedEvent.defaultInstance
-                                      .withExternalUuid(updatedPaymentAccount.externalUuid)
-                                      .withLastUpdated(lastUpdated)
-                                      .withPaymentAccountStatus(
-                                        updatedPaymentAccount.paymentAccountStatus
-                                      )
-                                  )
-                              } else {
-                                updatedPaymentAccount =
-                                  updatedPaymentAccount.withDocuments(documents)
-                              }
-
-                              if (shouldCancelMandate) {
-                                updatedPaymentAccount = updatedPaymentAccount.copy(
-                                  bankAccount = updatedPaymentAccount.bankAccount.map(
-                                    _.copy(
-                                      mandateId = None,
-                                      mandateStatus = None
-                                    )
-                                  )
-                                )
-
-                                // MandateUpdatedEvent
-                                events = events ++
-                                  List(
-                                    MandateUpdatedEvent.defaultInstance
-                                      .withExternalUuid(updatedPaymentAccount.externalUuid)
-                                      .withLastUpdated(lastUpdated)
-                                      .withBankAccountId(bankAccountId)
-                                      .copy(
-                                        mandateId = None,
-                                        mandateStatus = None
-                                      )
-                                  )
-                              }
-
-                              // DocumentsUpdatedEvent
-                              events = events ++
-                                List(
-                                  DocumentsUpdatedEvent.defaultInstance
-                                    .withExternalUuid(updatedPaymentAccount.externalUuid)
-                                    .withLastUpdated(lastUpdated)
-                                    .withDocuments(updatedPaymentAccount.documents)
-                                )
-
-                              val encodedPaymentAccount =
-                                updatedPaymentAccount.copy(
-                                  bankAccount = updatedPaymentAccount.bankAccount.map(
-                                    _.encode(shouldUpdateBic, shouldUpdateIban)
-                                  )
-                                )
-
-                              Effect.persist(
-                                events :+
-                                PaymentAccountUpsertedEvent.defaultInstance
-                                  .withDocument(encodedPaymentAccount)
-                                  .withLastUpdated(lastUpdated)
-                              ) thenRun (_ =>
-                                BankAccountCreatedOrUpdated(
-                                  shouldCreateUser,
-                                  shouldUpdateUserType,
-                                  shouldUpdateKYC,
-                                  shouldUpdateUser,
-                                  shouldCreateBankAccount,
-                                  shouldUpdateBankAccount,
-                                  shouldUpdateDocuments,
-                                  shouldCancelMandate,
-                                  shouldCreateUboDeclaration,
-                                  encodedPaymentAccount.view
-                                ) ~> replyTo
-                              )
-
                             case _ =>
-                              Effect.none.thenRun(_ => BankAccountNotCreatedOrUpdated ~> replyTo)
+                              log.warn(s"Could not create ubo declaration for user $userId")
                           }
-                        case _ =>
-                          Effect.none.thenRun(_ => BankAccountNotCreatedOrUpdated ~> replyTo)
-                      }
-                    case _ => Effect.none.thenRun(_ => BankAccountNotCreatedOrUpdated ~> replyTo)
-                  }
-              }
+                        }
 
-            case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
-          }
+                        if (shouldUpdateDocuments) { // TODO we should rely on the payment provider to update document status
+                          updatedPaymentAccount = updatedPaymentAccount
+                            /*.withDocuments(
+                                    documents.map(
+                                      _.copy(
+                                        lastUpdated = Some(lastUpdated),
+                                        status = KycDocument.KycDocumentStatus.KYC_DOCUMENT_NOT_SPECIFIED,
+                                        refusedReasonType = None,
+                                        refusedReasonMessage = None
+                                      )
+                                    )
+                                  )*/
+                            .withDocuments(documents)
+                            .withPaymentAccountStatus(
+                              PaymentAccount.PaymentAccountStatus.DOCUMENTS_KO
+                            )
+
+                          // PaymentAccountStatusUpdatedEvent
+                          events = events ++
+                            List(
+                              PaymentAccountStatusUpdatedEvent.defaultInstance
+                                .withExternalUuid(updatedPaymentAccount.externalUuid)
+                                .withLastUpdated(lastUpdated)
+                                .withPaymentAccountStatus(
+                                  updatedPaymentAccount.paymentAccountStatus
+                                )
+                            )
+                        } else {
+                          updatedPaymentAccount = updatedPaymentAccount.withDocuments(documents)
+                        }
+
+                        // DocumentsUpdatedEvent
+                        events = events ++
+                          List(
+                            DocumentsUpdatedEvent.defaultInstance
+                              .withExternalUuid(updatedPaymentAccount.externalUuid)
+                              .withLastUpdated(lastUpdated)
+                              .withDocuments(updatedPaymentAccount.documents)
+                          )
+
+                        Effect.persist(
+                          events :+
+                          PaymentAccountUpsertedEvent.defaultInstance
+                            .withDocument(updatedPaymentAccount)
+                            .withLastUpdated(lastUpdated)
+                        ) thenRun (_ =>
+                          UserPaymentAccountCreatedOrUpdated(
+                            shouldCreateUser,
+                            shouldUpdateUserType,
+                            shouldUpdateKYC,
+                            shouldUpdateUser,
+                            shouldUpdateDocuments,
+                            shouldCreateUboDeclaration,
+                            updatedPaymentAccount.view
+                          ) ~> replyTo
+                        )
+
+                      case _ =>
+                        Effect.none.thenRun(_ => UserPaymentAccountNotCreatedOrUpdated ~> replyTo)
+                    }
+                  case _ =>
+                    Effect.none.thenRun(_ => UserPaymentAccountNotCreatedOrUpdated ~> replyTo)
+                }
+            }
+
+          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
 
       case cmd: CreateOrUpdateKycDocument =>
