@@ -1346,7 +1346,13 @@ trait PaymentBehavior
                         keyValueDao.addKeyValue(walletId, entityId)
                         updatedPaymentAccount = updatedPaymentAccount.resetWalletId(Some(walletId))
 
-                        var events: List[ExternalSchedulerEvent] = List.empty
+                        var events: List[ExternalSchedulerEvent] =
+                          List(
+                            PaymentAccountCreatedOrUpdatedEvent.defaultInstance
+                              .withLastUpdated(lastUpdated)
+                              .withExternalUuid(updatedPaymentAccount.externalUuid)
+                              .copy(profile = updatedPaymentAccount.profile)
+                          )
 
                         if (
                           updatedPaymentAccount.legalUser && acceptedTermsOfPSP.getOrElse(
