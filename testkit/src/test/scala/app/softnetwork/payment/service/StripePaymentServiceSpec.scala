@@ -230,14 +230,14 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       externalUserId = "soleTrader-production"
       val user = legalUser.withLegalRepresentative(naturalUser.withExternalUuid(externalUserId))
       val token = createAccountToken(PaymentAccount.defaultInstance.withLegalUser(user))
-      /*val bankAccount = BankAccount(
+      val bankAccount = BankAccount(
         Option(sellerBankAccountId),
         ownerName,
         ownerAddress,
         iban,
         bic
       )
-      val bankToken = createBankToken(bankAccount, individual = false)*/
+      val bankToken = createBankToken(bankAccount, individual = false)
       createNewSession(sellerSession(externalUserId))
       val command =
         UserPaymentAccountCommand(
@@ -256,8 +256,19 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        val bankAccount = loadBankAccount()
-        sellerBankAccountId = bankAccount.bankAccountId
+        withHeaders(
+          Post(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+            BankAccountCommand(
+              bankAccount,
+              Some(bankToken.getId)
+            )
+          )
+        ) ~> routes ~> check {
+          status shouldEqual StatusCodes.OK
+          val bc = loadBankAccount()
+          sellerBankAccountId = bc.bankAccountId
+        }
       }
     }
   }
@@ -269,7 +280,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         .withLegalUserType(LegalUser.LegalUserType.BUSINESS)
         .withLegalRepresentative(naturalUser.withExternalUuid(externalUserId))
       val token = createAccountToken(PaymentAccount.defaultInstance.withLegalUser(user))
-      /*val bankAccount =
+      val bankAccount =
         BankAccount(
           Option(sellerBankAccountId),
           ownerName,
@@ -277,27 +288,38 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           iban,
           bic
         )
-      val bankToken = createBankToken(bankAccount, individual = false)*/
+      val bankToken = createBankToken(bankAccount, individual = false)
       createNewSession(sellerSession(externalUserId))
-      val bank =
+      val userAccount =
         UserPaymentAccountCommand(
           user,
           Some(true),
           Some(token.getId)
         )
-      log.info(serialization.write(bank))
+      log.info(serialization.write(userAccount))
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$accountRoute",
-          bank
+          userAccount
         ).withHeaders(
           `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
           `User-Agent`("test")
         )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        val bankAccount = loadBankAccount()
-        sellerBankAccountId = bankAccount.bankAccountId
+        withHeaders(
+          Post(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$bankRoute",
+            BankAccountCommand(
+              bankAccount,
+              Some(bankToken.getId)
+            )
+          )
+        ) ~> routes ~> check {
+          status shouldEqual StatusCodes.OK
+          val bc = loadBankAccount()
+          sellerBankAccountId = bc.bankAccountId
+        }
       }
     }
     "declare beneficial owner(s)" in {

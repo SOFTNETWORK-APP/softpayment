@@ -1012,7 +1012,8 @@ trait PaymentBehavior
                     bankAccount
                       .copy(
                         mandateId = paymentAccount.bankAccount.flatMap(_.mandateId),
-                        mandateStatus = paymentAccount.bankAccount.flatMap(_.mandateStatus)
+                        mandateStatus = paymentAccount.bankAccount.flatMap(_.mandateStatus),
+                        userId = paymentAccount.userId.getOrElse("")
                       )
                       .withIban(iban)
                       .withBic(bic)
