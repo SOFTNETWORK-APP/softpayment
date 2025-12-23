@@ -471,7 +471,7 @@ trait PaymentBehavior
               case Some(authorId) =>
                 paymentAccount.walletId match {
                   case Some(debitedWalletId) =>
-                    if(debitedAccount == creditedAccount) { // direct transfer from the platform account to authorId
+                    if (debitedAccount == creditedAccount) { // direct transfer from the platform account to authorId
                       val creditedUserId = authorId
                       val creditedWalletId = debitedWalletId
                       Some(
@@ -488,8 +488,7 @@ trait PaymentBehavior
                             externalReference = externalReference
                           )
                       )
-                    }
-                    else{
+                    } else {
                       // load credited payment account
                       paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
                         case Success(s) =>
