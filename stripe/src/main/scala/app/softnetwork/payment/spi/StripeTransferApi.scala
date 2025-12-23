@@ -150,6 +150,7 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
                   .setAmount(Math.min(amountToTransfer, availableAmount))
                   .setDestination(transferTransaction.creditedUserId)
                   .setCurrency(transferTransaction.currency)
+                  // .setSourceType(TransferCreateParams.SourceType.CARD)
                   .putMetadata("available_amount", availableAmount.toString)
                   .putMetadata("debited_amount", transferTransaction.debitedAmount.toString)
                   .putMetadata("fees_amount", transferTransaction.feesAmount.toString)

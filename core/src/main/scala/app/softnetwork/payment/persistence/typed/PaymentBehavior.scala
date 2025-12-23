@@ -471,37 +471,56 @@ trait PaymentBehavior
               case Some(authorId) =>
                 paymentAccount.walletId match {
                   case Some(debitedWalletId) =>
-                    // load credited payment account
-                    paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
-                      case Success(s) =>
-                        maybeCreditedPaymentAccount = s
-                        maybeCreditedPaymentAccount match {
-                          case Some(creditedPaymentAccount) => // credited account
-                            creditedPaymentAccount.userId match {
-                              case Some(creditedUserId) =>
-                                creditedPaymentAccount.walletId match {
-                                  case Some(creditedWalletId) =>
-                                    Some(
-                                      TransferTransaction.defaultInstance
-                                        .withDebitedAmount(debitedAmount)
-                                        .withFeesAmount(feesAmount)
-                                        .withCurrency(currency)
-                                        .withAuthorId(authorId)
-                                        .withDebitedWalletId(debitedWalletId)
-                                        .withCreditedUserId(creditedUserId)
-                                        .withCreditedWalletId(creditedWalletId)
-                                        .copy(
-                                          orderUuid = orderUuid,
-                                          externalReference = externalReference
-                                        )
-                                    )
-                                  case _ => None
-                                }
-                              case _ => None
-                            }
-                          case _ => None
-                        }
-                      case Failure(_) => None
+                    if (debitedAccount == creditedAccount) { // direct transfer from the platform account to authorId
+                      val creditedUserId = authorId
+                      val creditedWalletId = debitedWalletId
+                      Some(
+                        TransferTransaction.defaultInstance
+                          .withDebitedAmount(debitedAmount)
+                          .withFeesAmount(feesAmount)
+                          .withCurrency(currency)
+                          .withAuthorId(authorId)
+                          .withDebitedWalletId(debitedWalletId)
+                          .withCreditedUserId(creditedUserId)
+                          .withCreditedWalletId(creditedWalletId)
+                          .copy(
+                            orderUuid = orderUuid,
+                            externalReference = externalReference
+                          )
+                      )
+                    } else {
+                      // load credited payment account
+                      paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
+                        case Success(s) =>
+                          maybeCreditedPaymentAccount = s
+                          maybeCreditedPaymentAccount match {
+                            case Some(creditedPaymentAccount) => // credited account
+                              creditedPaymentAccount.userId match {
+                                case Some(creditedUserId) =>
+                                  creditedPaymentAccount.walletId match {
+                                    case Some(creditedWalletId) =>
+                                      Some(
+                                        TransferTransaction.defaultInstance
+                                          .withDebitedAmount(debitedAmount)
+                                          .withFeesAmount(feesAmount)
+                                          .withCurrency(currency)
+                                          .withAuthorId(authorId)
+                                          .withDebitedWalletId(debitedWalletId)
+                                          .withCreditedUserId(creditedUserId)
+                                          .withCreditedWalletId(creditedWalletId)
+                                          .copy(
+                                            orderUuid = orderUuid,
+                                            externalReference = externalReference
+                                          )
+                                      )
+                                    case _ => None
+                                  }
+                                case _ => None
+                              }
+                            case _ => None
+                          }
+                        case Failure(_) => None
+                      }
                     }
                   case _ => None
                 }
@@ -579,7 +598,10 @@ trait PaymentBehavior
                           .withDebitedAccount(paymentAccount.externalUuid)
                           .withResultMessage(transaction.resultMessage)
                           .withTransaction(transaction)
-                          .copy(externalReference = externalReference)
+                          .copy(
+                            externalReference = externalReference,
+                            orderUuid = orderUuid
+                          )
                       ) :+ transactionUpdatedEvent
                     )
                     .thenRun(_ =>
