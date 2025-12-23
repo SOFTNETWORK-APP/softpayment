@@ -139,6 +139,7 @@ message TransferFailedEvent {
     required string resultMessage = 2;
     optional app.softnetwork.payment.model.Transaction transaction = 3;
     optional string externalReference = 4;
+    optional string orderUuid = 5;
 }
 
 message DirectDebitedEvent {

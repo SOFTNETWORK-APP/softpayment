@@ -4,3 +4,4 @@ sbt.json
 target
 .metals
 *.log
+tmp
