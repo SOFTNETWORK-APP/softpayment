@@ -144,10 +144,25 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
                     0
                 }
 
+              val amount =
+                if (availableAmount == 0) {
+                  mlog.warn(
+                    s"No available amount for currency ${transferTransaction.currency} for order ${transferTransaction.orderUuid}"
+                  )
+                  amountToTransfer
+                } else {
+                  if (availableAmount < amountToTransfer) {
+                    mlog.warn(
+                      s"Available amount $availableAmount is less than amount to transfer $amountToTransfer for order ${transferTransaction.orderUuid}"
+                    )
+                  }
+                  Math.min(amountToTransfer, availableAmount)
+                }
+
               val params =
                 TransferCreateParams
                   .builder()
-                  .setAmount(Math.min(amountToTransfer, availableAmount))
+                  .setAmount(amount)
                   .setDestination(transferTransaction.creditedUserId)
                   .setCurrency(transferTransaction.currency)
                   // .setSourceType(TransferCreateParams.SourceType.CARD)
