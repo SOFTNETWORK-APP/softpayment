@@ -125,7 +125,7 @@ object StripeApi {
 
         val url = s"${config.hooksBaseUrl}?hash=$hash"
 
-        import collection.JavaConverters._
+        import scala.jdk.CollectionConverters._
 
         Try {
           ((Option(

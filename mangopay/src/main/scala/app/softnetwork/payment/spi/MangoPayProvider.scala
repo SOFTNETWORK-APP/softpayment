@@ -51,7 +51,7 @@ import scala.language.implicitConversions
 trait MangoPayProvider extends PaymentProvider {
 
   import scala.language.implicitConversions
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
 
   override implicit def config: MangoPayConfig
 
@@ -2187,10 +2187,10 @@ trait MangoPayProvider extends PaymentProvider {
                   .withCountry(address.getCountry.name())
                   .copy(state = Option(address.getRegion))
               ),
-              technicalEmails = client.getTechEmails.asScala,
-              administrativeEmails = client.getAdminEmails.asScala,
-              billingEmails = client.getBillingEmails.asScala,
-              fraudEmails = client.getFraudEmails.asScala,
+              technicalEmails = client.getTechEmails.asScala.toSeq,
+              administrativeEmails = client.getAdminEmails.asScala.toSeq,
+              billingEmails = client.getBillingEmails.asScala.toSeq,
+              fraudEmails = client.getFraudEmails.asScala.toSeq,
               vatNumber = Option(client.getTaxNumber)
             )
         )
@@ -2292,7 +2292,7 @@ trait MangoPayProvider extends PaymentProvider {
   override def getDeclaration(userId: String, uboDeclarationId: String): Option[UboDeclaration] = {
     Try(MangoPay().getUboDeclarationApi.get(userId, uboDeclarationId)) match {
       case Success(s) =>
-        import scala.collection.JavaConverters._
+        import scala.jdk.CollectionConverters._
         Some(
           UboDeclaration.defaultInstance
             .withId(uboDeclarationId)
@@ -2302,7 +2302,7 @@ trait MangoPayProvider extends PaymentProvider {
               reason = Option(s.getReason),
               message = Option(s.getMessage)
             )
-            .withUbos(s.getUbos.asScala.map(ubo => {
+            .withUbos(s.getUbos.asScala.toSeq.map(ubo => {
               UboDeclaration.UltimateBeneficialOwner.defaultInstance
                 .withId(ubo.getId)
                 .withFirstName(ubo.getFirstName)

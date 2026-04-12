@@ -60,7 +60,7 @@ trait ClientSession[SD <: SessionData with SessionDataDecorator[SD]] extends Com
   def sessionManager(clientId: Option[String]): SessionManager[SD] = {
     clientId match {
       case Some(id) =>
-        softPayAccountDao.loadClient(id) complete () match {
+        softPayAccountDao.loadClient(id).complete() match {
           case Success(s) => clientSessionManager(s)
           case Failure(_) => manager
         }

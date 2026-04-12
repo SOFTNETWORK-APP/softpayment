@@ -16,7 +16,7 @@ import com.stripe.net.Webhook
 
 import scala.util.{Failure, Success, Try}
 import scala.language.implicitConversions
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /** Created by smanciot on 27/04/2021.
   */
@@ -59,7 +59,7 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                   )
               }
               //disable account
-              run(InvalidateRegularUser(accountId)) complete () match {
+              run(InvalidateRegularUser(accountId)).complete() match {
                 case Success(RegularUserInvalidated) =>
                   log.info(
                     s"[Payment Hooks] Stripe Webhook received: Account Updated -> Account disabled for $accountId"
@@ -152,7 +152,7 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                 s"[Payment Hooks] Stripe Webhook received: Account Updated -> Charges and Payouts are enabled for $accountId"
               )
               //enable account
-              run(ValidateRegularUser(account.getId)) complete () match {
+              run(ValidateRegularUser(account.getId)).complete() match {
                 case Success(RegularUserValidated) =>
                   log.info(
                     s"[Payment Hooks] Stripe Webhook received: Account Updated -> Account enabled for $accountId"
@@ -278,7 +278,7 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
         accountId,
         document
       )
-    ) complete () match {
+    ).complete() match {
       case Success(KycDocumentCreatedOrUpdated) =>
         log.info(
           s"[Payment Hooks] Stripe Webhook received: Document ID: $documentId refused"

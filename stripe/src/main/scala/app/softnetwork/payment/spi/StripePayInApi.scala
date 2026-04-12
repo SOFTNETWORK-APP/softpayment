@@ -17,7 +17,7 @@ import com.stripe.param.{
 }
 
 import scala.util.{Failure, Success, Try}
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait StripePayInApi extends PayInApi { _: StripeContext =>
 

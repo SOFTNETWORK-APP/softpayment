@@ -3,7 +3,7 @@ package app.softnetwork.payment.spi
 import app.softnetwork.payment.config.StripeApi
 import com.google.gson.Gson
 import com.stripe.model.Balance
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait StripeBalanceApi extends BalanceApi { self: StripeContext =>
 
@@ -21,6 +21,7 @@ trait StripeBalanceApi extends BalanceApi { self: StripeContext =>
         .retrieve(StripeApi().requestOptions(walletId))
         .getAvailable
         .asScala
+        .toSeq
 
     val availableAmount =
       balances.find(

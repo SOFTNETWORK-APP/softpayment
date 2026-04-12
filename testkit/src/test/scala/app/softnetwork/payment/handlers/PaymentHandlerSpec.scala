@@ -521,9 +521,11 @@ class PaymentHandlerSpec
               sellerBankAccountId = paymentAccount.bankAccount.flatMap(_.id).getOrElse("")
 //              assert(sellerBankAccountId != previousBankAccountId)
               uboDeclarationId = paymentAccount.getLegalUser.uboDeclaration.map(_.id).getOrElse("")
-              paymentClient.loadLegalUserDetails(
-                computeExternalUuidWithProfile(sellerUuid, Some("seller"))
-              ) complete () match {
+              paymentClient
+                .loadLegalUserDetails(
+                  computeExternalUuidWithProfile(sellerUuid, Some("seller"))
+                )
+                .complete() match {
                 case Success(value) =>
                   assert(value.legalUserType.isBusiness)
                   assert(value.legalName == legalUser.legalName)
@@ -867,22 +869,26 @@ class PaymentHandlerSpec
               transaction.status shouldBe Transaction.TransactionStatus.TRANSACTION_CREATED
             case _ => fail()
           }
-          paymentClient.payInWithPreAuthorization(
-            preAuthorizationId,
-            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-            Some(110)
-          ) complete () match {
+          paymentClient
+            .payInWithPreAuthorization(
+              preAuthorizationId,
+              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+              Some(110)
+            )
+            .complete() match {
             case Success(result) =>
               assert(result.transactionId.isEmpty)
               assert(result.error.getOrElse("") == "DebitedAmountAbovePreAuthorizationAmount")
             case Failure(f) => fail(f.getMessage)
           }
           val debitedAmount = 90
-          paymentClient.payInWithPreAuthorization(
-            preAuthorizationId,
-            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-            Some(debitedAmount)
-          ) complete () match {
+          paymentClient
+            .payInWithPreAuthorization(
+              preAuthorizationId,
+              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+              Some(debitedAmount)
+            )
+            .complete() match {
             case Success(result) =>
               transactionId = result.transactionId.getOrElse("")
               assert(transactionId.nonEmpty)
@@ -929,24 +935,28 @@ class PaymentHandlerSpec
                   }
                 case other => fail(other.getClass.toString)
               }
-              paymentClient.loadBalance(
-                currency,
-                Option(computeExternalUuidWithProfile(sellerUuid, Some("seller"))),
-                None
-              ) complete () match {
+              paymentClient
+                .loadBalance(
+                  currency,
+                  Option(computeExternalUuidWithProfile(sellerUuid, Some("seller"))),
+                  None
+                )
+                .complete() match {
                 case Success(balance) =>
                   assert(balance.getOrElse(0) == debitedAmount)
                 case Failure(f) => fail(f.getMessage)
               }
-              paymentClient.payOut(
-                orderUuid,
-                computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-                100,
-                0,
-                currency,
-                None,
-                result.transactionId
-              ) complete () match {
+              paymentClient
+                .payOut(
+                  orderUuid,
+                  computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+                  100,
+                  0,
+                  currency,
+                  None,
+                  result.transactionId
+                )
+                .complete() match {
                 case Success(s) =>
                   transactionId = s.transactionId.getOrElse("")
                   assert(transactionId.nonEmpty)
@@ -983,15 +993,17 @@ class PaymentHandlerSpec
         )
       ) await {
         case result: PaidIn =>
-          paymentClient.payOut(
-            orderUuid,
-            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-            100,
-            0,
-            currency,
-            None,
-            Option(result.transactionId)
-          ) complete () match {
+          paymentClient
+            .payOut(
+              orderUuid,
+              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+              100,
+              0,
+              currency,
+              None,
+              Option(result.transactionId)
+            )
+            .complete() match {
             case Success(s) =>
               val transactionId = s.transactionId
               assert(transactionId.isDefined)
@@ -1033,15 +1045,17 @@ class PaymentHandlerSpec
             )
           ) await {
             case result: PaidIn =>
-              paymentClient.payOut(
-                orderUuid,
-                computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-                100,
-                0,
-                currency,
-                None,
-                Option(result.transactionId)
-              ) complete () match {
+              paymentClient
+                .payOut(
+                  orderUuid,
+                  computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+                  100,
+                  0,
+                  currency,
+                  None,
+                  Option(result.transactionId)
+                )
+                .complete() match {
                 case Success(s) =>
                   assert(s.transactionId.isDefined)
                   assert(s.error.isEmpty)
@@ -1065,27 +1079,31 @@ class PaymentHandlerSpec
       ) await {
         case result: PaidIn =>
           val payInTransactionId = result.transactionId
-          paymentClient.refund(
-            orderUuid,
-            payInTransactionId,
-            101,
-            None,
-            currency,
-            "change my mind",
-            initializedByClient = true
-          ) complete () match {
+          paymentClient
+            .refund(
+              orderUuid,
+              payInTransactionId,
+              101,
+              None,
+              currency,
+              "change my mind",
+              initializedByClient = true
+            )
+            .complete() match {
             case Success(r) =>
               assert(r.transactionId.isEmpty)
               assert(r.error.getOrElse("") == "IllegalTransactionAmount")
-              paymentClient.refund(
-                orderUuid,
-                payInTransactionId,
-                50,
-                None,
-                currency,
-                "change my mind",
-                initializedByClient = true
-              ) complete () match {
+              paymentClient
+                .refund(
+                  orderUuid,
+                  payInTransactionId,
+                  50,
+                  None,
+                  currency,
+                  "change my mind",
+                  initializedByClient = true
+                )
+                .complete() match {
                 case Success(s) =>
                   assert(s.transactionId.isDefined)
                   assert(s.error.isEmpty)
@@ -1150,16 +1168,18 @@ class PaymentHandlerSpec
                   }
                 case other => fail(other.toString)
               }
-              paymentClient.transfer(
-                Some(orderUuid),
-                computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-                computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
-                50,
-                10,
-                currency,
-                payOutRequired = true,
-                None
-              ) complete () match {
+              paymentClient
+                .transfer(
+                  Some(orderUuid),
+                  computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+                  computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
+                  50,
+                  10,
+                  currency,
+                  payOutRequired = true,
+                  None
+                )
+                .complete() match {
                 case Success(s) =>
                   val paidOutTransactionId = s.paidOutTransactionId
                   assert(paidOutTransactionId.isDefined)
@@ -1188,14 +1208,16 @@ class PaymentHandlerSpec
     }
 
     "direct debit" in {
-      paymentClient.directDebit(
-        computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
-        100,
-        0,
-        currency,
-        "Direct Debit",
-        None
-      ) complete () match {
+      paymentClient
+        .directDebit(
+          computeExternalUuidWithProfile(vendorUuid, Some("vendor")),
+          100,
+          0,
+          currency,
+          "Direct Debit",
+          None
+        )
+        .complete() match {
         case Success(s) =>
           assert(s.transactionId.isDefined)
           assert(s.error.isEmpty)

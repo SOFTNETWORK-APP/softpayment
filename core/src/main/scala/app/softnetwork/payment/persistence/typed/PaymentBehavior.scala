@@ -490,7 +490,7 @@ trait PaymentBehavior
                       )
                     } else {
                       // load credited payment account
-                      paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
+                      paymentDao.loadPaymentAccount(creditedAccount, clientId).complete() match {
                         case Success(s) =>
                           maybeCreditedPaymentAccount = s
                           maybeCreditedPaymentAccount match {
@@ -543,14 +543,16 @@ trait PaymentBehavior
                 ) {
                   val payOutTransactionId =
                     if (payOutRequired) {
-                      paymentDao.payOut(
-                        orderUuid.getOrElse(""),
-                        creditedAccount,
-                        debitedAmount,
-                        feesAmount = 0, /* fees have already been applied with Transfer */
-                        currency,
-                        externalReference
-                      ) complete () match {
+                      paymentDao
+                        .payOut(
+                          orderUuid.getOrElse(""),
+                          creditedAccount,
+                          debitedAmount,
+                          feesAmount = 0, /* fees have already been applied with Transfer */
+                          currency,
+                          externalReference
+                        )
+                        .complete() match {
                         case Success(s) =>
                           s match {
                             case Right(r) => Some(r.transactionId)

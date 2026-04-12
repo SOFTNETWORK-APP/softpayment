@@ -455,23 +455,27 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
         preAuthorizationId = responseAs[PaymentPreAuthorized].transactionId
-        paymentClient.payInWithPreAuthorization(
-          preAuthorizationId,
-          computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-          None
-        ) complete () match {
+        paymentClient
+          .payInWithPreAuthorization(
+            preAuthorizationId,
+            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+            None
+          )
+          .complete() match {
           case Success(result) =>
             assert(result.transactionId.isDefined)
             assert(result.error.isEmpty)
-            paymentClient.payOut(
-              orderUuid,
-              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-              100,
-              0,
-              "EUR",
-              Some("reference"),
-              result.transactionId
-            ) complete () match {
+            paymentClient
+              .payOut(
+                orderUuid,
+                computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+                100,
+                0,
+                "EUR",
+                Some("reference"),
+                result.transactionId
+              )
+              .complete() match {
               case Success(s) =>
                 assert(s.transactionId.isDefined)
                 assert(s.error.isEmpty)
@@ -522,15 +526,17 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          paymentClient.payOut(
-            orderUuid,
-            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-            debitedAmount,
-            feesAmount,
-            "EUR",
-            None,
-            transactionId
-          ) complete () match {
+          paymentClient
+            .payOut(
+              orderUuid,
+              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+              debitedAmount,
+              feesAmount,
+              "EUR",
+              None,
+              transactionId
+            )
+            .complete() match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
               assert(s.error.isEmpty)
@@ -575,15 +581,17 @@ trait PaymentRouteSpec[SD <: SessionData with SessionDataDecorator[SD]]
         ) ~> routes ~> check {
           status shouldEqual StatusCodes.OK
           assert(responseAs[PaidIn].transactionId == transactionId)
-          paymentClient.payOut(
-            orderUuid,
-            computeExternalUuidWithProfile(sellerUuid, Some("seller")),
-            debitedAmount,
-            feesAmount,
-            "EUR",
-            None,
-            transactionId
-          ) complete () match {
+          paymentClient
+            .payOut(
+              orderUuid,
+              computeExternalUuidWithProfile(sellerUuid, Some("seller")),
+              debitedAmount,
+              feesAmount,
+              "EUR",
+              None,
+              transactionId
+            )
+            .complete() match {
             case Success(s) =>
               assert(s.transactionId.isDefined)
               assert(s.error.isEmpty)

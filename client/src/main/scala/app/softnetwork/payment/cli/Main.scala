@@ -76,7 +76,7 @@ class Main extends Completion {
             printUsage()
             System.exit(1)
           case Some(cmd) =>
-            cmd.run(list) complete () match {
+            cmd.run(list).complete() match {
               case Success((exit, message)) =>
                 message.foreach(println)
                 System.exit(exit)
