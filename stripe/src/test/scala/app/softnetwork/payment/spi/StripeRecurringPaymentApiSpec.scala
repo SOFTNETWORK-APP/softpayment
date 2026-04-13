@@ -22,10 +22,14 @@ class StripeRecurringPaymentApiSpec extends AnyWordSpec with Matchers {
 
   "toStripeInterval" should {
     "map DAILY to day/1" in {
-      TestApi.toStripeInterval(RecurringPayment.RecurringPaymentFrequency.DAILY) shouldBe ("day", 1L)
+      TestApi.toStripeInterval(
+        RecurringPayment.RecurringPaymentFrequency.DAILY
+      ) shouldBe ("day", 1L)
     }
     "map WEEKLY to week/1" in {
-      TestApi.toStripeInterval(RecurringPayment.RecurringPaymentFrequency.WEEKLY) shouldBe ("week", 1L)
+      TestApi.toStripeInterval(
+        RecurringPayment.RecurringPaymentFrequency.WEEKLY
+      ) shouldBe ("week", 1L)
     }
     "map TWICE_A_MONTH to week/2 (biweekly approximation)" in {
       TestApi.toStripeInterval(
@@ -33,62 +37,72 @@ class StripeRecurringPaymentApiSpec extends AnyWordSpec with Matchers {
       ) shouldBe ("week", 2L)
     }
     "map MONTHLY to month/1" in {
-      TestApi.toStripeInterval(RecurringPayment.RecurringPaymentFrequency.MONTHLY) shouldBe ("month", 1L)
+      TestApi.toStripeInterval(
+        RecurringPayment.RecurringPaymentFrequency.MONTHLY
+      ) shouldBe ("month", 1L)
     }
     "map BIMONTHLY to month/2" in {
-      TestApi.toStripeInterval(RecurringPayment.RecurringPaymentFrequency.BIMONTHLY) shouldBe ("month", 2L)
+      TestApi.toStripeInterval(
+        RecurringPayment.RecurringPaymentFrequency.BIMONTHLY
+      ) shouldBe ("month", 2L)
     }
     "map QUARTERLY to month/3" in {
-      TestApi.toStripeInterval(RecurringPayment.RecurringPaymentFrequency.QUARTERLY) shouldBe ("month", 3L)
+      TestApi.toStripeInterval(
+        RecurringPayment.RecurringPaymentFrequency.QUARTERLY
+      ) shouldBe ("month", 3L)
     }
     "map BIANNUAL to month/6" in {
-      TestApi.toStripeInterval(RecurringPayment.RecurringPaymentFrequency.BIANNUAL) shouldBe ("month", 6L)
+      TestApi.toStripeInterval(
+        RecurringPayment.RecurringPaymentFrequency.BIANNUAL
+      ) shouldBe ("month", 6L)
     }
     "map ANNUAL to year/1" in {
-      TestApi.toStripeInterval(RecurringPayment.RecurringPaymentFrequency.ANNUAL) shouldBe ("year", 1L)
+      TestApi.toStripeInterval(
+        RecurringPayment.RecurringPaymentFrequency.ANNUAL
+      ) shouldBe ("year", 1L)
     }
   }
 
   "toRecurringCardPaymentStatus" should {
     "map active to IN_PROGRESS" in {
       TestApi.toRecurringCardPaymentStatus("active") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.IN_PROGRESS
+      RecurringPayment.RecurringCardPaymentStatus.IN_PROGRESS
     }
     "map trialing to IN_PROGRESS" in {
       TestApi.toRecurringCardPaymentStatus("trialing") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.IN_PROGRESS
+      RecurringPayment.RecurringCardPaymentStatus.IN_PROGRESS
     }
     "map incomplete with requiresAction to AUTHENTICATION_NEEDED" in {
       TestApi.toRecurringCardPaymentStatus("incomplete", requiresAction = true) shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.AUTHENTICATION_NEEDED
+      RecurringPayment.RecurringCardPaymentStatus.AUTHENTICATION_NEEDED
     }
     "map incomplete without requiresAction to CREATED" in {
       TestApi.toRecurringCardPaymentStatus("incomplete") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.CREATED
+      RecurringPayment.RecurringCardPaymentStatus.CREATED
     }
     "map past_due to CREATED" in {
       TestApi.toRecurringCardPaymentStatus("past_due") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.CREATED
+      RecurringPayment.RecurringCardPaymentStatus.CREATED
     }
     "map unpaid to CREATED" in {
       TestApi.toRecurringCardPaymentStatus("unpaid") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.CREATED
+      RecurringPayment.RecurringCardPaymentStatus.CREATED
     }
     "map canceled to ENDED" in {
       TestApi.toRecurringCardPaymentStatus("canceled") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.ENDED
+      RecurringPayment.RecurringCardPaymentStatus.ENDED
     }
     "map incomplete_expired to ENDED" in {
       TestApi.toRecurringCardPaymentStatus("incomplete_expired") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.ENDED
+      RecurringPayment.RecurringCardPaymentStatus.ENDED
     }
     "map paused to ENDED" in {
       TestApi.toRecurringCardPaymentStatus("paused") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.ENDED
+      RecurringPayment.RecurringCardPaymentStatus.ENDED
     }
     "map unknown status to CREATED" in {
       TestApi.toRecurringCardPaymentStatus("some_unknown_status") shouldBe
-        RecurringPayment.RecurringCardPaymentStatus.CREATED
+      RecurringPayment.RecurringCardPaymentStatus.CREATED
     }
   }
 }
