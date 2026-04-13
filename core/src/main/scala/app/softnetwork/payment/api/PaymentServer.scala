@@ -226,6 +226,7 @@ trait PaymentServer extends PaymentServiceApi with PaymentDao {
           nextFeesAmount,
           statementDescriptor,
           externalReference,
+          metadata.toMap,
           Some(clientId)
         ) map {
           case Right(r: RecurringPaymentRegistered) =>

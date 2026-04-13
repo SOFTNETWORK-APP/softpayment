@@ -470,7 +470,7 @@ trait PaymentService[SD <: SessionData with SessionDataDecorator[SD]]
       pathPrefix(Segment) { recurringPayInRegistrationId =>
         parameter("transactionId") { transactionId =>
           run(
-            FirstRecurringPaymentCallback(recurringPayInRegistrationId, transactionId)
+            RecurringPaymentCallback(recurringPayInRegistrationId, transactionId)
           ) completeWith {
             case r: PaidIn =>
               complete(

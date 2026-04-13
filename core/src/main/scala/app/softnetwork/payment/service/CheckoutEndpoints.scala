@@ -327,7 +327,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .description("Execute first recurring payment for 3D secure")
       .serverLogic { case (recurringPayInRegistrationId, transactionId) =>
         run(
-          FirstRecurringPaymentCallback(recurringPayInRegistrationId, transactionId)
+          RecurringPaymentCallback(recurringPayInRegistrationId, transactionId)
         ).map {
           case result: PaidIn             => Right(result)
           case result: PaymentRedirection => Right(result)

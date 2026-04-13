@@ -922,6 +922,192 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
+    "register card for recurring payment" in {
+      createNewSession(customerSession)
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute",
+          PreRegisterPaymentMethod(
+            orderUuid,
+            naturalUser.copy(business = None),
+            paymentType = Transaction.PaymentType.CARD
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        preRegistration = responseAs[PreRegistration]
+      }
+      // confirm setup intent
+      Try {
+        val requestOptions = StripeApi().requestOptions()
+        SetupIntent
+          .retrieve(preRegistration.id, requestOptions)
+          .confirm(
+            SetupIntentConfirmParams
+              .builder()
+              .setPaymentMethod("pm_card_visa")
+              .build(),
+            requestOptions
+          )
+      } match {
+        case Success(_) =>
+        case Failure(f) =>
+          log.error("Error while confirming setup intent", f)
+          fail(f)
+      }
+      // pre-authorize to register the card
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute",
+          Payment(
+            orderUuid,
+            debitedAmount,
+            currency,
+            Option(preRegistration.id),
+            Option(preRegistration.registrationData),
+            registerCard = true,
+            printReceipt = true,
+            feesAmount = Some(feesAmount)
+          )
+        ).withHeaders(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
+          `User-Agent`("test")
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val result = responseAs[PaymentPreAuthorized]
+        preAuthorizationId = result.transactionId
+        loadCards().find(_.getActive) match {
+          case Some(card) =>
+            cardId = card.id
+          case _ => fail("No active card found")
+        }
+      }
+    }
+
+    "register recurring card payment" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute",
+          RegisterRecurringPayment(
+            "",
+            firstDebitedAmount = 4990,
+            firstFeesAmount = 0,
+            currency = currency,
+            `type` = RecurringPayment.RecurringPaymentType.CARD,
+            frequency = Some(RecurringPayment.RecurringPaymentFrequency.MONTHLY),
+            endDate = Some(LocalDate.now().plusMonths(1)),
+            fixedNextAmount = Some(true),
+            nextDebitedAmount = Some(4990),
+            nextFeesAmount = Some(0)
+          )
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        recurringPaymentRegistrationId =
+          responseAs[RecurringPaymentRegistered].recurringPaymentRegistrationId
+        log.info(
+          s"Recurring card payment registered: $recurringPaymentRegistrationId"
+        )
+      }
+    }
+
+    "load recurring card payment after registration" in {
+      withHeaders(
+        Get(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        val recurringPayment = responseAs[RecurringPaymentView]
+        assert(recurringPayment.`type`.isCard)
+        assert(recurringPayment.frequency.exists(_.isMonthly))
+        assert(recurringPayment.firstDebitedAmount == 4990)
+        assert(recurringPayment.firstFeesAmount == 0)
+        assert(recurringPayment.fixedNextAmount.exists(_.self))
+        assert(recurringPayment.nextDebitedAmount.contains(4990))
+        assert(recurringPayment.nextFeesAmount.contains(0))
+        assert(recurringPayment.numberOfRecurringPayments.getOrElse(0) == 0)
+        assert(
+          recurringPayment.cardStatus.exists(s => s.isInProgress || s.isCreated)
+        )
+      }
+    }
+
+    "execute first recurring card payment" in {
+      withHeaders(
+        Post(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/${URLEncoder
+            .encode(recurringPaymentRegistrationId, "UTF-8")}",
+          Payment("", 0)
+        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        withHeaders(
+          Get(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+          )
+        ) ~> routes ~> check {
+          status shouldEqual StatusCodes.OK
+          val recurringPayment = responseAs[RecurringPaymentView]
+          assert(recurringPayment.`type`.isCard)
+          assert(
+            recurringPayment.cardStatus.exists(s => s.isInProgress || s.isCreated)
+          )
+          assert(recurringPayment.numberOfRecurringPayments.getOrElse(0) >= 1)
+        }
+      }
+    }
+
+    "load recurring card payment subscription from Stripe" in {
+      // Verify we can load the subscription directly from Stripe
+      Try {
+        val requestOptions = StripeApi().requestOptions()
+        val subscription =
+          com.stripe.model.Subscription.retrieve(recurringPaymentRegistrationId, requestOptions)
+        assert(subscription.getId == recurringPaymentRegistrationId)
+        assert(
+          subscription.getStatus == "active" ||
+          subscription.getStatus == "trialing" ||
+          subscription.getStatus == "incomplete"
+        )
+        log.info(
+          s"Stripe subscription status: ${subscription.getStatus}"
+        )
+      } match {
+        case Success(_) =>
+        case Failure(f) =>
+          log.error("Error while loading subscription from Stripe", f)
+          fail(f)
+      }
+    }
+
+    "cancel recurring card payment" in {
+      withHeaders(
+        Delete(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+        )
+      ) ~> routes ~> check {
+        status shouldEqual StatusCodes.OK
+        withHeaders(
+          Get(
+            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+          )
+        ) ~> routes ~> check {
+          status shouldEqual StatusCodes.OK
+          val recurringPayment = responseAs[RecurringPaymentView]
+          assert(recurringPayment.cardStatus.exists(_.isEnded))
+        }
+      }
+    }
+
+    // TODO add webhook integration tests for:
+    // - invoice.payment_succeeded → RecurringPaymentCallback (verify entity state updated)
+    // - invoice.payment_failed → RecurringPaymentCallback (verify failure recorded)
+    // - customer.subscription.deleted → UpdateRecurringCardPaymentRegistration(ENDED)
+    // - customer.subscription.updated (canceled) → UpdateRecurringCardPaymentRegistration(ENDED)
+    // These tests require the stripe listen CLI to forward webhook events.
+
     "pay in with PayPal" in {
       createNewSession(customerSession)
       withHeaders(

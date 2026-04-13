@@ -132,13 +132,13 @@ trait PaymentTestKit
     }
   }
 
-  def payInFirstRecurringPaymentCallback(
+  def payInRecurringPaymentCallback(
     recurringPayInRegistrationId: String,
     transactionId: String
   )(implicit ec: ExecutionContext): Future[
     Either[FirstRecurringCardPaymentFailed, Either[PaymentRedirection, FirstRecurringPaidIn]]
   ] = {
-    MockPaymentHandler !? FirstRecurringPaymentCallback(
+    MockPaymentHandler !? RecurringPaymentCallback(
       recurringPayInRegistrationId,
       transactionId
     ) map {

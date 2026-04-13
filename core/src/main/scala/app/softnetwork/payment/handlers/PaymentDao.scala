@@ -485,6 +485,7 @@ trait PaymentDao extends PaymentHandler {
     nextFeesAmount: Option[Int] = None,
     statementDescriptor: Option[String] = None,
     externalReference: Option[String] = None,
+    metadata: Map[String, String] = Map.empty,
     clientId: Option[String] = None
   )(implicit
     system: ActorSystem[_]
@@ -505,6 +506,7 @@ trait PaymentDao extends PaymentHandler {
         nextFeesAmount,
         statementDescriptor,
         externalReference,
+        metadata,
         Some(clientId)
       )
     ) map {
