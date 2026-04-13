@@ -74,7 +74,7 @@ import org.openqa.selenium.htmlunit.HtmlUnitDriver
 import java.net.{InetAddress, URLEncoder}
 import java.time.LocalDate
 import scala.util.{Failure, Success, Try}
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     extends AnyWordSpecLike
@@ -560,25 +560,29 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay out with 3ds card" in {
-      paymentClient.payOut(
-        orderUuid,
-        computeExternalUuidWithProfile(externalUserId, Some("seller")),
-        debitedAmount,
-        feesAmount,
-        currency,
-        Some("reference"),
-        payInTransactionId
-      ) complete () match {
+      paymentClient
+        .payOut(
+          orderUuid,
+          computeExternalUuidWithProfile(externalUserId, Some("seller")),
+          debitedAmount,
+          feesAmount,
+          currency,
+          Some("reference"),
+          payInTransactionId
+        )
+        .complete() match {
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)
           assert(result.error.isEmpty || result.error.exists(_.isEmpty))
           assert(result.transactionStatus.isTransactionSucceeded)
           payOutTransactionId = result.transactionId
-          paymentClient.loadPayOutTransaction(
-            orderUuid,
-            result.transactionId.get
-          ) complete () match {
+          paymentClient
+            .loadPayOutTransaction(
+              orderUuid,
+              result.transactionId.get
+            )
+            .complete() match {
             case Success(result) =>
               log.info(serialization.write(result))
               assert(result.transactionId.getOrElse("") == payOutTransactionId.getOrElse("unknown"))
@@ -683,19 +687,21 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay in with pre authorized card" in {
-      paymentClient.payInWithPreAuthorization(
-        preAuthorizationId,
-        computeExternalUuidWithProfile(externalUserId, Some("seller")),
-        None,
-        Some(feesAmount)
-      ) complete () match {
+      paymentClient
+        .payInWithPreAuthorization(
+          preAuthorizationId,
+          computeExternalUuidWithProfile(externalUserId, Some("seller")),
+          None,
+          Some(feesAmount)
+        )
+        .complete() match {
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)
           assert(result.error.isEmpty)
           assert(result.transactionStatus.isTransactionSucceeded)
           payInTransactionId = result.transactionId
-          paymentClient.loadPayInTransaction(orderUuid, payInTransactionId.get) complete () match {
+          paymentClient.loadPayInTransaction(orderUuid, payInTransactionId.get).complete() match {
             case Success(result) =>
               log.info(serialization.write(result))
               assert(result.transactionId.getOrElse("") == payInTransactionId.getOrElse("unknown"))
@@ -708,25 +714,29 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay out with pre authorized card" in {
-      paymentClient.payOut(
-        orderUuid,
-        computeExternalUuidWithProfile(externalUserId, Some("seller")),
-        debitedAmount,
-        feesAmount,
-        currency,
-        Some("reference"),
-        payInTransactionId
-      ) complete () match {
+      paymentClient
+        .payOut(
+          orderUuid,
+          computeExternalUuidWithProfile(externalUserId, Some("seller")),
+          debitedAmount,
+          feesAmount,
+          currency,
+          Some("reference"),
+          payInTransactionId
+        )
+        .complete() match {
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)
           assert(result.error.isEmpty)
           assert(result.transactionStatus.isTransactionSucceeded)
           payOutTransactionId = result.transactionId
-          paymentClient.loadPayOutTransaction(
-            orderUuid,
-            result.transactionId.get
-          ) complete () match {
+          paymentClient
+            .loadPayOutTransaction(
+              orderUuid,
+              result.transactionId.get
+            )
+            .complete() match {
             case Success(result) =>
               log.info(serialization.write(result))
               assert(result.transactionId.getOrElse("") == payOutTransactionId.getOrElse("unknown"))
@@ -761,7 +771,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         status shouldEqual StatusCodes.OK
         val result = responseAs[PaidIn]
         payInTransactionId = result.transactionId
-        paymentClient.loadPayInTransaction(orderUuid, payInTransactionId.get) complete () match {
+        paymentClient.loadPayInTransaction(orderUuid, payInTransactionId.get).complete() match {
           case Success(result) =>
             log.info(serialization.write(result))
             assert(result.transactionId.getOrElse("") == payInTransactionId.getOrElse("unknown"))
@@ -783,25 +793,29 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay out with pre registered card" in {
-      paymentClient.payOut(
-        orderUuid,
-        computeExternalUuidWithProfile(externalUserId, Some("seller")),
-        debitedAmount,
-        feesAmount,
-        currency,
-        Some("reference"),
-        payInTransactionId
-      ) complete () match {
+      paymentClient
+        .payOut(
+          orderUuid,
+          computeExternalUuidWithProfile(externalUserId, Some("seller")),
+          debitedAmount,
+          feesAmount,
+          currency,
+          Some("reference"),
+          payInTransactionId
+        )
+        .complete() match {
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)
           assert(result.error.isEmpty)
           assert(result.transactionStatus.isTransactionSucceeded)
           payOutTransactionId = result.transactionId
-          paymentClient.loadPayOutTransaction(
-            orderUuid,
-            result.transactionId.get
-          ) complete () match {
+          paymentClient
+            .loadPayOutTransaction(
+              orderUuid,
+              result.transactionId.get
+            )
+            .complete() match {
             case Success(result) =>
               log.info(serialization.write(result))
               assert(result.transactionId.getOrElse("") == payOutTransactionId.getOrElse("unknown"))
@@ -837,7 +851,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         status shouldEqual StatusCodes.OK
         val result = responseAs[PaidIn]
         payInTransactionId = result.transactionId
-        paymentClient.loadPayInTransaction(orderUuid, payInTransactionId.get) complete () match {
+        paymentClient.loadPayInTransaction(orderUuid, payInTransactionId.get).complete() match {
           case Success(result) =>
             log.info(serialization.write(result))
             assert(result.transactionId.getOrElse("") == payInTransactionId.getOrElse("unknown"))
@@ -859,25 +873,29 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay out with registered card" in {
-      paymentClient.payOut(
-        orderUuid,
-        computeExternalUuidWithProfile(externalUserId, Some("seller")),
-        debitedAmount,
-        feesAmount,
-        currency,
-        Some("reference"),
-        payInTransactionId
-      ) complete () match {
+      paymentClient
+        .payOut(
+          orderUuid,
+          computeExternalUuidWithProfile(externalUserId, Some("seller")),
+          debitedAmount,
+          feesAmount,
+          currency,
+          Some("reference"),
+          payInTransactionId
+        )
+        .complete() match {
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)
           assert(result.error.isEmpty)
           assert(result.transactionStatus.isTransactionSucceeded)
           payOutTransactionId = result.transactionId
-          paymentClient.loadPayOutTransaction(
-            orderUuid,
-            result.transactionId.get
-          ) complete () match {
+          paymentClient
+            .loadPayOutTransaction(
+              orderUuid,
+              result.transactionId.get
+            )
+            .complete() match {
             case Success(result) =>
               log.info(serialization.write(result))
               assert(result.transactionId.getOrElse("") == payOutTransactionId.getOrElse("unknown"))
@@ -1012,7 +1030,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
         currency,
         Some("reference"),
         payInTransactionId
-      ) complete () match {
+      ).complete() match {
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)
@@ -1022,7 +1040,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           paymentClient.loadPayOutTransaction(
             orderUuid,
             result.transactionId.get
-          ) complete () match {
+          ).complete() match {
             case Success(result) =>
               log.info(serialization.write(result))
               assert(result.transactionId.getOrElse("") == payOutTransactionId.getOrElse("unknown"))
@@ -1189,25 +1207,29 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "pay out without pre registered card" in {
-      paymentClient.payOut(
-        orderUuid,
-        computeExternalUuidWithProfile(externalUserId, Some("seller")),
-        debitedAmount,
-        feesAmount,
-        currency,
-        Some("reference"),
-        payInTransactionId
-      ) complete () match {
+      paymentClient
+        .payOut(
+          orderUuid,
+          computeExternalUuidWithProfile(externalUserId, Some("seller")),
+          debitedAmount,
+          feesAmount,
+          currency,
+          Some("reference"),
+          payInTransactionId
+        )
+        .complete() match {
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)
           assert(result.error.isEmpty)
           assert(result.transactionStatus.isTransactionSucceeded)
           payOutTransactionId = result.transactionId
-          paymentClient.loadPayOutTransaction(
-            orderUuid,
-            result.transactionId.get
-          ) complete () match {
+          paymentClient
+            .loadPayOutTransaction(
+              orderUuid,
+              result.transactionId.get
+            )
+            .complete() match {
             case Success(result) =>
               log.info(serialization.write(result))
               assert(result.transactionId.getOrElse("") == payOutTransactionId.getOrElse("unknown"))
@@ -1220,15 +1242,17 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "refund pay in and reverse transfer" in {
-      paymentClient.refund(
-        orderUuid,
-        payOutTransactionId,
-        debitedAmount,
-        Some(feesAmount),
-        currency,
-        "reason message",
-        initializedByClient = false
-      ) complete () match {
+      paymentClient
+        .refund(
+          orderUuid,
+          payOutTransactionId,
+          debitedAmount,
+          Some(feesAmount),
+          currency,
+          "reason message",
+          initializedByClient = false
+        )
+        .complete() match {
         case Success(result) =>
           log.info(serialization.write(result))
           assert(result.transactionId.isDefined)

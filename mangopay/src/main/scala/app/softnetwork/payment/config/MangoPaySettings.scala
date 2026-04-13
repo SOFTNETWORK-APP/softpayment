@@ -1,14 +1,14 @@
 package app.softnetwork.payment.config
 
 import com.typesafe.config.{Config, ConfigFactory}
-import configs.Configs
+import configs.ConfigReader
 
 trait MangoPaySettings {
 
   lazy val config: Config = ConfigFactory.load()
 
   lazy val MangoPayConfig: MangoPay.Config =
-    Configs[MangoPay.Config].get(config, "payment.mangopay").toEither match {
+    ConfigReader[MangoPay.Config].read(config, "payment.mangopay").toEither match {
       case Left(configError) =>
         Console.err.println(s"Something went wrong with the provided arguments $configError")
         throw configError.configException

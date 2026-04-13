@@ -101,7 +101,7 @@ trait SoftPayAccountBehavior extends AccountBehavior[SoftPayAccount, BasicAccoun
                 AccountMessages.ProviderAlreadyRegistered ~> replyTo
               }
             } else if (
-              (accountKeyDao.lookupAccount(provider.clientId) complete ()).exists(_ != entityId)
+              (accountKeyDao.lookupAccount(provider.clientId).complete()).exists(_ != entityId)
             ) {
               Effect.none.thenRun { _ =>
                 AccountMessages.ProviderAlreadyRegistered ~> replyTo

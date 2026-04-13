@@ -74,7 +74,7 @@ object MangoPay {
         val url = new URL(s"${config.hooksBaseUrl}")
         if (!Seq("localhost", "127.0.0.1").contains(url.getHost)) {
           // init MangoPay hooks
-          import scala.collection.JavaConverters._
+          import scala.jdk.CollectionConverters._
           val hooks: List[Hook] =
             Try(mangoPayApi.getHookApi.getAll) match {
               case Success(s) => s.asScala.toList

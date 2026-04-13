@@ -37,7 +37,7 @@ trait PaymentCommandHandler { _: Completion =>
     val uuid = pa.externalUuidWithProfile
     state match {
       case None =>
-        keyValueDao.lookupKeyValue(uuid) complete () match {
+        keyValueDao.lookupKeyValue(uuid).complete() match {
           case Success(s) =>
             s match {
               case Some(t) if t != entityId =>
@@ -78,7 +78,7 @@ trait PaymentCommandHandler { _: Completion =>
   )(implicit system: ActorSystem[_]): PaymentProvider = {
     PaymentProviders.paymentProvider(
       clientId
-        .flatMap(softPayAccountDao.loadProvider(_) complete () match {
+        .flatMap(softPayAccountDao.loadProvider(_).complete() match {
           case Success(s) => s
           case Failure(_) => None
         })

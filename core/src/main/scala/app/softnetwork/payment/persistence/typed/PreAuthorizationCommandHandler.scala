@@ -107,7 +107,7 @@ trait PreAuthorizationCommandHandler
                 val creditedUserId: Option[String] =
                   creditedAccount match {
                     case Some(account) =>
-                      paymentDao.loadPaymentAccount(account, clientId) complete () match {
+                      paymentDao.loadPaymentAccount(account, clientId).complete() match {
                         case Success(s) => s.flatMap(_.userId)
                         case Failure(f) =>
                           log.error(s"Error loading credited account: ${f.getMessage}")

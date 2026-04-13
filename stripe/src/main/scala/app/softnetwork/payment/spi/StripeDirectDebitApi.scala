@@ -27,7 +27,7 @@ import com.stripe.param.{
 import java.net.URLEncoder
 import java.util.Date
 import scala.util.{Failure, Success, Try}
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.language.implicitConversions
 
 trait StripeDirectDebitApi extends DirectDebitApi {
@@ -204,6 +204,7 @@ trait StripeDirectDebitApi extends DirectDebitApi {
                       billing
                         .setEmail(email)
                     case None =>
+                      throw new Exception("Customer email is required to create a payment method")
                   }
                   Option(customer.getAddress) match {
                     case Some(address) =>

@@ -8,7 +8,7 @@ import com.stripe.model.{PaymentIntent, Payout, Transfer}
 import com.stripe.param.PayoutCreateParams
 
 import scala.util.{Failure, Success, Try}
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait StripePayOutApi extends PayOutApi {
   _: StripeContext with StripeTransferApi with StripeBalanceApi =>

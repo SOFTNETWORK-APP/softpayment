@@ -117,7 +117,7 @@ trait PayInCommandHandler
                           }
                       }
                     // load credited payment account
-                    paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
+                    paymentDao.loadPaymentAccount(creditedAccount, clientId).complete() match {
                       case Success(s) =>
                         s match {
                           case Some(creditedPaymentAccount) =>
@@ -212,7 +212,7 @@ trait PayInCommandHandler
                           }
                       }
                     // load credited payment account
-                    paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
+                    paymentDao.loadPaymentAccount(creditedAccount, clientId).complete() match {
                       case Success(s) =>
                         s match {
                           case Some(creditedPaymentAccount) =>
@@ -489,7 +489,7 @@ trait PayInCommandHandler
                 )
               case Some(preAuthorizationTransaction) =>
                 // load credited payment account
-                paymentDao.loadPaymentAccount(creditedAccount, clientId) complete () match {
+                paymentDao.loadPaymentAccount(creditedAccount, clientId).complete() match {
                   case Success(s) =>
                     s match {
                       case Some(creditedPaymentAccount) =>

@@ -44,7 +44,7 @@ trait MockMangoPayProvider extends MangoPayProvider with Entity {
 
   import MockMangoPayProvider._
 
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
 
   private val OK = "000000"
 

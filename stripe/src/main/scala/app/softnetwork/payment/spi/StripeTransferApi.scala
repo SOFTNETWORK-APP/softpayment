@@ -11,7 +11,7 @@ import com.stripe.param.{
   TransferCreateParams
 }
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
 trait StripeTransferApi extends TransferApi { _: StripeContext =>

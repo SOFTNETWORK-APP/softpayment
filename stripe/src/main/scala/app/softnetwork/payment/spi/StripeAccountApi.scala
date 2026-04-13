@@ -45,7 +45,7 @@ import java.io.ByteArrayInputStream
 import java.text.SimpleDateFormat
 import java.util.{Calendar, TimeZone}
 import scala.util.{Failure, Success, Try}
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.language.implicitConversions
 
 trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
@@ -1125,7 +1125,8 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
             StripeApi().requestOptions()
           )
           .getData
-          .asScala match {
+          .asScala
+          .toSeq match {
           case persons =>
             Some(
               model.UboDeclaration.defaultInstance
@@ -1188,6 +1189,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
           )
           .getData
           .asScala
+          .toSeq
 
       val ownersProvided =
         persons.map(_.getRelationship.getPercentOwnership.doubleValue()).sum == 100.0
@@ -1237,7 +1239,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
         StripeApi().requestOptions()
       )
 
-      Some(
+      Option(
         model.UboDeclaration.defaultInstance
           .withId(uboDeclarationId)
           .withCreatedDate(persistence.now())
