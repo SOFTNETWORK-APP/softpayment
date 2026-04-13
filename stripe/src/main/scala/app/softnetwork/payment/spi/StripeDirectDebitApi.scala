@@ -204,6 +204,7 @@ trait StripeDirectDebitApi extends DirectDebitApi {
                       billing
                         .setEmail(email)
                     case None =>
+                      throw new Exception("Customer email is required to create a payment method")
                   }
                   Option(customer.getAddress) match {
                     case Some(address) =>
