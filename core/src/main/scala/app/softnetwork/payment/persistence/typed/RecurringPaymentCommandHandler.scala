@@ -15,7 +15,6 @@ import app.softnetwork.payment.message.PaymentMessages.{
   ExecuteNextRecurringPayment,
   FirstRecurringCardPaymentFailed,
   FirstRecurringPaidIn,
-  FirstRecurringPaymentCallback,
   IllegalMandateStatus,
   LoadRecurringPayment,
   MandateNotFound,
@@ -27,6 +26,7 @@ import app.softnetwork.payment.message.PaymentMessages.{
   PaymentResult,
   RecurringCardPaymentRegistrationNotUpdated,
   RecurringCardPaymentRegistrationUpdated,
+  RecurringPaymentCallback,
   RecurringPaymentCommand,
   RecurringPaymentLoaded,
   RecurringPaymentNotFound,
@@ -122,7 +122,8 @@ trait RecurringPaymentCommandHandler
                                   frequency = cmd.frequency,
                                   fixedNextAmount = cmd.fixedNextAmount,
                                   nextDebitedAmount = cmd.nextDebitedAmount,
-                                  nextFeesAmount = cmd.nextFeesAmount
+                                  nextFeesAmount = cmd.nextFeesAmount,
+                                  metadata = cmd.metadata
                                 )
                             val clientId = paymentAccount.clientId
                               .orElse(cmd.clientId)
@@ -202,7 +203,8 @@ trait RecurringPaymentCommandHandler
                         frequency = cmd.frequency,
                         fixedNextAmount = cmd.fixedNextAmount,
                         nextDebitedAmount = cmd.nextDebitedAmount,
-                        nextFeesAmount = cmd.nextFeesAmount
+                        nextFeesAmount = cmd.nextFeesAmount,
+                        metadata = cmd.metadata
                       )
                   import app.softnetwork.time._
                   val nextDirectDebit: List[ExternalEntityToSchedulerEvent] =
@@ -391,7 +393,7 @@ trait RecurringPaymentCommandHandler
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
 
-      case cmd: FirstRecurringPaymentCallback =>
+      case cmd: RecurringPaymentCallback =>
         state match {
           case Some(paymentAccount) =>
             import cmd._

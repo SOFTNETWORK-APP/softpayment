@@ -235,4 +235,5 @@ message RecurringPayment {
     optional string cardId = 22;
     optional string statementDescriptor = 23;
     optional string externalReference = 24;
+    map<string, string> metadata = 25;
 }

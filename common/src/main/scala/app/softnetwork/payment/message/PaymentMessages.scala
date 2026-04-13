@@ -520,6 +520,7 @@ object PaymentMessages {
     nextFeesAmount: Option[Int] = None,
     statementDescriptor: Option[String] = None,
     externalReference: Option[String] = None,
+    metadata: Map[String, String] = Map.empty,
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
       with RecurringPaymentCommand {
@@ -580,12 +581,13 @@ object PaymentMessages {
     *   - transaction payIn id
     */
   @InternalApi
-  private[payment] case class FirstRecurringPaymentCallback(
+  private[payment] case class RecurringPaymentCallback(
     recurringPayInRegistrationId: String,
-    transactionId: String
+    transactionId: String,
+    debitedAccount: Option[String] = None
   ) extends PaymentCommandWithKey
       with RecurringPaymentCommand {
-    lazy val key: String = transactionId
+    lazy val key: String = debitedAccount.getOrElse(transactionId)
   }
 
   /** @param recurringPaymentRegistrationId

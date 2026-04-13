@@ -160,6 +160,7 @@ message RegisterRecurringPaymentRequest {
     google.protobuf.StringValue statementDescriptor = 12;
     google.protobuf.StringValue externalReference = 13;
     string clientId = 14;
+    map<string, string> metadata = 15;
 }
 
 message RegisterRecurringPaymentResponse {

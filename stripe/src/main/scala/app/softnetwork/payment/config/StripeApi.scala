@@ -14,6 +14,8 @@ import com.stripe.param.{
   WebhookEndpointUpdateParams
 }
 
+import org.slf4j.{Logger, LoggerFactory}
+
 import java.nio.file.Paths
 import scala.util.{Failure, Success, Try}
 
@@ -73,12 +75,15 @@ object StripeApi {
       this.copy(paymentConfig = paymentConfig)
   }
 
+  private[this] lazy val log: Logger = LoggerFactory.getLogger(getClass)
+
   private[this] var stripeApis: Map[String, StripeApi] = Map.empty
 
   private[this] var stripeWebHooks: Map[String, String] = Map.empty
 
   private[this] lazy val STRIPE_SECRETS_DIR: String = s"${SoftPayClientSettings.SP_SECRETS}/stripe"
 
+  // TODO migrate webhook secrets to encrypted storage (Sealed Secrets / Vault)
   private[this] def addSecret(hash: String, secret: String): Unit = {
     val dir = s"$STRIPE_SECRETS_DIR/$hash"
     Paths.get(dir).toFile.mkdirs()
@@ -93,7 +98,7 @@ object StripeApi {
   private[StripeApi] def loadSecret(hash: String): Option[String] = {
     val dir = s"$STRIPE_SECRETS_DIR/$hash"
     val file = Paths.get(dir, "webhook-secret").toFile
-    Console.println(s"Loading secret from: ${file.getAbsolutePath}")
+    log.debug(s"Loading secret from: ${file.getAbsolutePath}")
     if (file.exists()) {
       import scala.io.Source
       val source = Source.fromFile(file)
@@ -142,7 +147,7 @@ object StripeApi {
               None
           }) match {
             case Some(webhookEndpoint) =>
-              Console.println(s"Webhook endpoint found: ${webhookEndpoint.getId}")
+              log.info(s"Webhook endpoint found: ${webhookEndpoint.getId}")
               loadSecret(hash) match {
                 case None =>
                   Try(webhookEndpoint.delete(requestOptions))
@@ -158,6 +163,18 @@ object StripeApi {
                         )
                         .addEnabledEvent(
                           WebhookEndpointUpdateParams.EnabledEvent.PERSON__UPDATED
+                        )
+                        .addEnabledEvent(
+                          WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
+                        )
+                        .addEnabledEvent(
+                          WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
+                        )
+                        .addEnabledEvent(
+                          WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
+                        )
+                        .addEnabledEvent(
+                          WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
                         )
                         .setUrl(url)
                         .build(),
@@ -178,6 +195,18 @@ object StripeApi {
                   )
                   .addEnabledEvent(
                     WebhookEndpointCreateParams.EnabledEvent.PERSON__UPDATED
+                  )
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
+                  )
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
+                  )
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
+                  )
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
                   )
                   .setUrl(url)
                   .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)

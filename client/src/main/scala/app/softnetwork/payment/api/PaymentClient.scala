@@ -279,6 +279,7 @@ trait PaymentClient extends GrpcClient {
     nextFeesAmount: Option[Int],
     statementDescriptor: Option[String],
     externalReference: Option[String],
+    metadata: Map[String, String] = Map.empty,
     token: Option[String] = None
   ): Future[Option[String]] = {
     val t = token.getOrElse(generatedToken)
@@ -306,7 +307,8 @@ trait PaymentClient extends GrpcClient {
           nextFeesAmount,
           statementDescriptor,
           externalReference,
-          clientId.getOrElse(settings.clientId)
+          clientId.getOrElse(settings.clientId),
+          metadata
         )
       ) map (_.recurringPaymentRegistrationId)
   }
