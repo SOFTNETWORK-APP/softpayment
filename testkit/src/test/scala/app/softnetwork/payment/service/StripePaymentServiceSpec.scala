@@ -12,11 +12,13 @@ import app.softnetwork.payment.data.{
   cardId,
   debitedAmount,
   directDebitTransactionId,
+  enterpriseUser,
   feesAmount,
   firstName,
   iban,
   lastName,
   legalUser,
+  name,
   naturalUser,
   orderUuid,
   ownerAddress,
@@ -26,7 +28,8 @@ import app.softnetwork.payment.data.{
   recurringPaymentRegistrationId,
   sellerBankAccountId,
   ubo,
-  uboDeclarationId
+  uboDeclarationId,
+  vatNumber
 }
 import app.softnetwork.payment.handlers.MockPaymentDao
 import app.softnetwork.payment.message.PaymentMessages.{
@@ -65,8 +68,8 @@ import com.stripe.model.PaymentIntent
 import com.stripe.param.PaymentIntentConfirmParams
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
-import com.stripe.model.SetupIntent
-import com.stripe.param.SetupIntentConfirmParams
+import com.stripe.model.{Customer, SetupIntent, TaxId}
+import com.stripe.param.{SetupIntentConfirmParams, TaxIdListParams}
 import org.json4s.Formats
 import org.openqa.selenium.{By, WebDriver, WebElement}
 import org.openqa.selenium.htmlunit.HtmlUnitDriver
@@ -923,13 +926,13 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
     }
 
     "register card for recurring payment" in {
-      createNewSession(customerSession)
+      createNewSession(enterpriseSession)
       withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$cardRoute",
           PreRegisterPaymentMethod(
             orderUuid,
-            naturalUser.copy(business = None),
+            enterpriseUser,
             paymentType = Transaction.PaymentType.CARD
           )
         )
@@ -983,6 +986,46 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           case _ => fail("No active card found")
         }
       }
+    }
+
+    "verify enterprise customer payment account" in {
+      val paymentAccount = loadPaymentAccount()
+      assert(
+        paymentAccount.naturalUser.isDefined,
+        "enterprise payment account should have a natural user"
+      )
+      val user = paymentAccount.naturalUser.get
+      assert(user.name.contains(name), s"enterprise customer name should be '$name'")
+      assert(
+        user.additionalProperties.get("vatNumber").contains(vatNumber),
+        s"enterprise customer additionalProperties should contain vatNumber '$vatNumber'"
+      )
+      assert(user.userId.isDefined, "enterprise customer should have a Stripe userId")
+      // verify Stripe customer directly
+      val customerId = user.userId.get
+      val customer = Customer.retrieve(customerId, StripeApi().requestOptions())
+      assert(customer.getName == name, s"Stripe customer name should be '$name'")
+      // verify tax ID was registered
+      val taxIds = TaxId
+        .list(
+          TaxIdListParams
+            .builder()
+            .setOwner(
+              TaxIdListParams.Owner
+                .builder()
+                .setType(TaxIdListParams.Owner.Type.CUSTOMER)
+                .setCustomer(customerId)
+                .build()
+            )
+            .build(),
+          StripeApi().requestOptions()
+        )
+        .getData
+        .asScala
+      assert(taxIds.nonEmpty, "Stripe customer should have at least one tax ID")
+      val taxId = taxIds.head
+      assert(taxId.getValue == vatNumber, s"Stripe tax ID value should be '$vatNumber'")
+      assert(taxId.getType == "eu_vat", "Stripe tax ID type should be 'eu_vat' for FR")
     }
 
     "register recurring card payment" in {

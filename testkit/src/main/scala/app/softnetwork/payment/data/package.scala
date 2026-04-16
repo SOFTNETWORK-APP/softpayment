@@ -17,6 +17,8 @@ package object data {
 
   val customerUuid = "customer"
 
+  val enterpriseUuid = "enterprise"
+
   val sellerUuid = "seller"
 
   val vendorUuid = "vendor"
@@ -30,9 +32,16 @@ package object data {
   /** natural user */
   val firstName = "firstName"
   val lastName = "lastName"
+  val name = "SoftNetwork"
   val birthday = "26/12/1972"
   val email = "demo@softnetwork.fr"
   val phone = "+33102030405"
+  val country = "FR"
+  val address: Address = Address.defaultInstance
+    .withAddressLine("17 rue Bouilloux Lafont")
+    .withCity("Paris")
+    .withPostalCode("75015")
+    .withCountry(country)
 
   val business: Business = Business.defaultInstance
     .withMerchantCategoryCode("5817")
@@ -40,11 +49,7 @@ package object data {
     .withSupport(BusinessSupport.defaultInstance.withEmail(email).withPhone(phone))
 
   val ownerName = s"$firstName $lastName"
-  val ownerAddress: Address = Address.defaultInstance
-    .withAddressLine("17 rue Bouilloux Lafont")
-    .withCity("Paris")
-    .withPostalCode("75015")
-    .withCountry("FR")
+  val ownerAddress: Address = address
 
   val naturalUser: NaturalUser =
     NaturalUser.defaultInstance
@@ -56,8 +61,8 @@ package object data {
       .withEmail(email)
       .withPhone(phone)
       .withBusiness(business)
-      .withNationality("FR")
-      .withCountryOfResidence("FR")
+      .withNationality(country)
+      .withCountryOfResidence(country)
 
   /** bank account */
   var sellerBankAccountId: String = _
@@ -91,6 +96,18 @@ package object data {
     .withPercentOwnership(100.0)
     .withPhone(phone)
     .withEmail(email)
+
+  val enterpriseUser: NaturalUser =
+    NaturalUser.defaultInstance
+      .withName(name)
+      .withExternalUuid(enterpriseUuid)
+      .withAddress(ownerAddress)
+      .withEmail(email)
+      .withPhone(phone)
+      .withNationality(country)
+      .withCountryOfResidence(country)
+      .withAdditionalProperties(Map("vatNumber" -> vatNumber))
+      .withNaturalUserType(NaturalUser.NaturalUserType.PAYER)
 
   var uboDeclarationId: String = _
 

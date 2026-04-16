@@ -18,7 +18,7 @@ import app.softnetwork.time
 import app.softnetwork.time.dateToInstant
 import com.google.gson.Gson
 import com.stripe.Stripe
-import com.stripe.model.{Customer, Token}
+import com.stripe.model.{Customer, TaxId, Token}
 import com.stripe.param.{
   AccountListParams,
   CustomerCreateParams,
@@ -26,6 +26,8 @@ import com.stripe.param.{
   CustomerUpdateParams,
   ExternalAccountCollectionCreateParams,
   ExternalAccountCollectionListParams,
+  TaxIdCreateParams,
+  TaxIdListParams,
   TokenCreateParams
 }
 
@@ -124,198 +126,54 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
       case Some(naturalUser) =>
         mlog.info(s"natural user -> ${asJson(naturalUser)}")
         // create or update natural user
-        val birthday = naturalUser.birthday
-        val sdf = new SimpleDateFormat("dd/MM/yyyy")
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
-        Try(sdf.parse(birthday)) match {
-          case Success(date) =>
-            val customer =
-              naturalUser.naturalUserType.contains(model.NaturalUser.NaturalUserType.PAYER)
-            if (customer) {
-              createOrUpdateCustomer(naturalUser)
-            } else {
-              val tos_shown_and_accepted =
-                acceptedTermsOfPSP && ipAddress.isDefined && userAgent.isDefined
-              val c = Calendar.getInstance()
-              c.setTime(date)
-              Try(
-                (naturalUser.userId match {
-                  case Some(userId) if userId.startsWith("acct_") =>
-                    Option(Account.retrieve(userId, StripeApi().requestOptions()))
-                  case _ =>
-                    Account
-                      .list(
-                        AccountListParams
-                          .builder()
-                          .setLimit(100)
-                          .build(),
-                        StripeApi().requestOptions()
-                      )
-                      .getData
-                      .asScala
-                      .find(acc => acc.getMetadata.get("external_uuid") == naturalUser.externalUuid)
-                }) match {
-                  case Some(account) =>
-                    mlog.info(s"individual account to update -> ${new Gson().toJson(account)}")
-
-                    // update individual account
-                    val token = tokenId match {
-                      case Some(t) =>
-                        Token.retrieve(t, StripeApi().requestOptions())
-                      case _ =>
-                        // create account with token
-                        val individual =
-                          TokenCreateParams.Account.Individual
+        val customer =
+          naturalUser.naturalUserType.contains(model.NaturalUser.NaturalUserType.PAYER)
+        if (customer) {
+          createOrUpdateCustomer(naturalUser)
+        } else {
+          val birthday = naturalUser.birthday
+          if (birthday.trim.isEmpty) {
+            mlog.error(
+              s"Cannot create connected account for COLLECTOR user ${naturalUser.externalUuid}: birthday is required but was empty"
+            )
+            None
+          } else {
+            val sdf = new SimpleDateFormat("dd/MM/yyyy")
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
+            Try(sdf.parse(birthday)) match {
+              case Success(date) =>
+                val tos_shown_and_accepted =
+                  acceptedTermsOfPSP && ipAddress.isDefined && userAgent.isDefined
+                val c = Calendar.getInstance()
+                c.setTime(date)
+                Try(
+                  (naturalUser.userId match {
+                    case Some(userId) if userId.startsWith("acct_") =>
+                      Option(Account.retrieve(userId, StripeApi().requestOptions()))
+                    case _ =>
+                      Account
+                        .list(
+                          AccountListParams
                             .builder()
-                            .setFirstName(naturalUser.firstName)
-                            .setLastName(naturalUser.lastName)
-                            .setDob(
-                              TokenCreateParams.Account.Individual.Dob
-                                .builder()
-                                .setDay(c.get(Calendar.DAY_OF_MONTH))
-                                .setMonth(c.get(Calendar.MONTH) + 1)
-                                .setYear(c.get(Calendar.YEAR))
-                                .build()
-                            )
-                            .setEmail(naturalUser.email)
-                        naturalUser.phone match {
-                          case Some(phone) =>
-                            individual.setPhone(phone)
-                          case _ =>
-                        }
-                        naturalUser.address match {
-                          case Some(address) =>
-                            individual.setAddress(
-                              TokenCreateParams.Account.Individual.Address
-                                .builder()
-                                .setCity(address.city)
-                                .setCountry(address.country)
-                                .setLine1(address.addressLine)
-                                .setPostalCode(address.postalCode)
-                                .build()
-                            )
-                          case _ =>
-                        }
-                        val params = TokenCreateParams.Account
-                          .builder()
-                          .setBusinessType(TokenCreateParams.Account.BusinessType.INDIVIDUAL)
-                          .setIndividual(individual.build())
-                          .setTosShownAndAccepted(tos_shown_and_accepted)
-                        mlog.info(
-                          s"update individual account token params -> ${new Gson().toJson(params.build())}"
-                        )
-                        Token.create(
-                          TokenCreateParams
-                            .builder()
-                            .setAccount(params.build())
+                            .setLimit(100)
                             .build(),
                           StripeApi().requestOptions()
                         )
-                    }
-                    val params =
-                      AccountUpdateParams
-                        .builder()
-                        .setAccountToken(token.getId)
-                        .setCapabilities(
-                          AccountUpdateParams.Capabilities
-                            .builder()
-                            .setBankTransferPayments(
-                              AccountUpdateParams.Capabilities.BankTransferPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setCardPayments(
-                              AccountUpdateParams.Capabilities.CardPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setCartesBancairesPayments(
-                              AccountUpdateParams.Capabilities.CartesBancairesPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setTransfers(
-                              AccountUpdateParams.Capabilities.Transfers
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setSepaBankTransferPayments(
-                              AccountUpdateParams.Capabilities.SepaBankTransferPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setSepaDebitPayments(
-                              AccountUpdateParams.Capabilities.SepaDebitPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .build()
+                        .getData
+                        .asScala
+                        .find(acc =>
+                          acc.getMetadata.get("external_uuid") == naturalUser.externalUuid
                         )
-                        .setSettings(
-                          AccountUpdateParams.Settings
-                            .builder()
-                            .setPayouts(
-                              AccountUpdateParams.Settings.Payouts
-                                .builder()
-                                .setSchedule(
-                                  AccountUpdateParams.Settings.Payouts.Schedule
-                                    .builder()
-                                    .setInterval(
-                                      AccountUpdateParams.Settings.Payouts.Schedule.Interval.MANUAL
-                                    )
-                                    .build()
-                                )
-                                .build()
-                            )
-                            .build()
-                        )
-                        .putMetadata("external_uuid", naturalUser.externalUuid)
-                    naturalUser.business match {
-                      case Some(business) =>
-                        val businessProfile =
-                          AccountUpdateParams.BusinessProfile
-                            .builder()
-                            .setMcc(business.merchantCategoryCode)
-                            .setUrl(business.website)
-                        business.support match {
-                          case Some(support) =>
-                            businessProfile.setSupportEmail(support.email)
-                            support.phone match {
-                              case Some(phone) =>
-                                businessProfile.setSupportPhone(phone)
-                              case _ =>
-                            }
-                            support.url match {
-                              case Some(url) =>
-                                businessProfile.setSupportUrl(url)
-                              case _ =>
-                            }
-                          case _ =>
-                        }
-                        params.setBusinessProfile(businessProfile.build())
-                      case _ =>
-                    }
-                    mlog.info(
-                      s"update individual account params -> ${new Gson().toJson(params.build())}"
-                    )
-                    account.update(
-                      params.build(),
-                      StripeApi().requestOptions()
-                    )
+                  }) match {
+                    case Some(account) =>
+                      mlog.info(s"individual account to update -> ${new Gson().toJson(account)}")
 
-                  case _ =>
-                    // create account
-                    val token = {
-                      tokenId match {
+                      // update individual account
+                      val token = tokenId match {
                         case Some(t) =>
                           Token.retrieve(t, StripeApi().requestOptions())
                         case _ =>
+                          // create account with token
                           val individual =
                             TokenCreateParams.Account.Individual
                               .builder()
@@ -354,7 +212,7 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             .setIndividual(individual.build())
                             .setTosShownAndAccepted(tos_shown_and_accepted)
                           mlog.info(
-                            s"create individual account token params -> ${new Gson().toJson(params.build())}"
+                            s"update individual account token params -> ${new Gson().toJson(params.build())}"
                           )
                           Token.create(
                             TokenCreateParams
@@ -364,168 +222,321 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
                             StripeApi().requestOptions()
                           )
                       }
-                    }
-                    val params =
-                      AccountCreateParams
-                        .builder()
-                        .setAccountToken(token.getId)
-                        .setCapabilities(
-                          AccountCreateParams.Capabilities
-                            .builder()
-                            .setBankTransferPayments(
-                              AccountCreateParams.Capabilities.BankTransferPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setCardPayments(
-                              AccountCreateParams.Capabilities.CardPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setCartesBancairesPayments(
-                              AccountCreateParams.Capabilities.CartesBancairesPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setTransfers(
-                              AccountCreateParams.Capabilities.Transfers
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setSepaBankTransferPayments(
-                              AccountCreateParams.Capabilities.SepaBankTransferPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .setSepaDebitPayments(
-                              AccountCreateParams.Capabilities.SepaDebitPayments
-                                .builder()
-                                .setRequested(true)
-                                .build()
-                            )
-                            .build()
-                        )
-                        .setController(
-                          AccountCreateParams.Controller
-                            .builder()
-                            .setFees(
-                              AccountCreateParams.Controller.Fees
-                                .builder()
-                                .setPayer(AccountCreateParams.Controller.Fees.Payer.APPLICATION)
-                                .build()
-                            )
-                            .setLosses(
-                              AccountCreateParams.Controller.Losses
-                                .builder()
-                                .setPayments(
-                                  AccountCreateParams.Controller.Losses.Payments.APPLICATION
-                                )
-                                .build()
-                            )
-                            .setRequirementCollection(
-                              AccountCreateParams.Controller.RequirementCollection.APPLICATION
-                            )
-                            .setStripeDashboard(
-                              AccountCreateParams.Controller.StripeDashboard
-                                .builder()
-                                .setType(AccountCreateParams.Controller.StripeDashboard.Type.NONE)
-                                .build()
-                            )
-                            .build()
-                        )
-                        .setCountry(naturalUser.countryOfResidence)
-                        .setSettings(
-                          AccountCreateParams.Settings
-                            .builder()
-                            .setPayouts(
-                              AccountCreateParams.Settings.Payouts
-                                .builder()
-                                .setSchedule(
-                                  AccountCreateParams.Settings.Payouts.Schedule
-                                    .builder()
-                                    .setInterval(
-                                      AccountCreateParams.Settings.Payouts.Schedule.Interval.MANUAL
-                                    )
-                                    .build()
-                                )
-                                .build()
-                            )
-                            .build()
-                        )
-                        .setMetadata(Map("external_uuid" -> naturalUser.externalUuid).asJava)
-
-                    naturalUser.business match {
-                      case Some(business) =>
-                        val businessProfile =
-                          AccountCreateParams.BusinessProfile
-                            .builder()
-                            .setMcc(business.merchantCategoryCode)
-                            .setUrl(business.website)
-                        business.support match {
-                          case Some(support) =>
-                            businessProfile.setSupportEmail(support.email)
-                            support.phone match {
-                              case Some(phone) =>
-                                businessProfile.setSupportPhone(phone)
-                              case _ =>
-                            }
-                            support.url match {
-                              case Some(url) =>
-                                businessProfile.setSupportUrl(url)
-                              case _ =>
-                            }
-                          case _ =>
-                        }
-                        params.setBusinessProfile(businessProfile.build())
-                      case _ =>
-                    }
-
-                    mlog.info(
-                      s"create individual account params -> ${new Gson().toJson(params.build())}"
-                    )
-
-                    Account.create(
-                      params.build(),
-                      StripeApi().requestOptions()
-                    )
-                }
-              ) match {
-                case Success(account) =>
-                  if (tos_shown_and_accepted) {
-                    mlog.info(s"****** tos_shown_and_accepted -> $tos_shown_and_accepted")
-                    val params =
-                      AccountUpdateParams
-                        .builder()
-                        .setTosAcceptance(
-                          AccountUpdateParams.TosAcceptance
-                            .builder()
-                            .setIp(ipAddress.get)
-                            .setUserAgent(userAgent.get)
-                            .setDate(persistence.now().getEpochSecond)
-                            .build()
-                        )
-                        .build()
-                    Try(
+                      val params =
+                        AccountUpdateParams
+                          .builder()
+                          .setAccountToken(token.getId)
+                          .setCapabilities(
+                            AccountUpdateParams.Capabilities
+                              .builder()
+                              .setBankTransferPayments(
+                                AccountUpdateParams.Capabilities.BankTransferPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setCardPayments(
+                                AccountUpdateParams.Capabilities.CardPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setCartesBancairesPayments(
+                                AccountUpdateParams.Capabilities.CartesBancairesPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setTransfers(
+                                AccountUpdateParams.Capabilities.Transfers
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setSepaBankTransferPayments(
+                                AccountUpdateParams.Capabilities.SepaBankTransferPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setSepaDebitPayments(
+                                AccountUpdateParams.Capabilities.SepaDebitPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .build()
+                          )
+                          .setSettings(
+                            AccountUpdateParams.Settings
+                              .builder()
+                              .setPayouts(
+                                AccountUpdateParams.Settings.Payouts
+                                  .builder()
+                                  .setSchedule(
+                                    AccountUpdateParams.Settings.Payouts.Schedule
+                                      .builder()
+                                      .setInterval(
+                                        AccountUpdateParams.Settings.Payouts.Schedule.Interval.MANUAL
+                                      )
+                                      .build()
+                                  )
+                                  .build()
+                              )
+                              .build()
+                          )
+                          .putMetadata("external_uuid", naturalUser.externalUuid)
+                      naturalUser.business match {
+                        case Some(business) =>
+                          val businessProfile =
+                            AccountUpdateParams.BusinessProfile
+                              .builder()
+                              .setMcc(business.merchantCategoryCode)
+                              .setUrl(business.website)
+                          business.support match {
+                            case Some(support) =>
+                              businessProfile.setSupportEmail(support.email)
+                              support.phone match {
+                                case Some(phone) =>
+                                  businessProfile.setSupportPhone(phone)
+                                case _ =>
+                              }
+                              support.url match {
+                                case Some(url) =>
+                                  businessProfile.setSupportUrl(url)
+                                case _ =>
+                              }
+                            case _ =>
+                          }
+                          params.setBusinessProfile(businessProfile.build())
+                        case _ =>
+                      }
+                      mlog.info(
+                        s"update individual account params -> ${new Gson().toJson(params.build())}"
+                      )
                       account.update(
-                        params,
+                        params.build(),
                         StripeApi().requestOptions()
                       )
-                    )
+
+                    case _ =>
+                      // create account
+                      val token = {
+                        tokenId match {
+                          case Some(t) =>
+                            Token.retrieve(t, StripeApi().requestOptions())
+                          case _ =>
+                            val individual =
+                              TokenCreateParams.Account.Individual
+                                .builder()
+                                .setFirstName(naturalUser.firstName)
+                                .setLastName(naturalUser.lastName)
+                                .setDob(
+                                  TokenCreateParams.Account.Individual.Dob
+                                    .builder()
+                                    .setDay(c.get(Calendar.DAY_OF_MONTH))
+                                    .setMonth(c.get(Calendar.MONTH) + 1)
+                                    .setYear(c.get(Calendar.YEAR))
+                                    .build()
+                                )
+                                .setEmail(naturalUser.email)
+                            naturalUser.phone match {
+                              case Some(phone) =>
+                                individual.setPhone(phone)
+                              case _ =>
+                            }
+                            naturalUser.address match {
+                              case Some(address) =>
+                                individual.setAddress(
+                                  TokenCreateParams.Account.Individual.Address
+                                    .builder()
+                                    .setCity(address.city)
+                                    .setCountry(address.country)
+                                    .setLine1(address.addressLine)
+                                    .setPostalCode(address.postalCode)
+                                    .build()
+                                )
+                              case _ =>
+                            }
+                            val params = TokenCreateParams.Account
+                              .builder()
+                              .setBusinessType(TokenCreateParams.Account.BusinessType.INDIVIDUAL)
+                              .setIndividual(individual.build())
+                              .setTosShownAndAccepted(tos_shown_and_accepted)
+                            mlog.info(
+                              s"create individual account token params -> ${new Gson().toJson(params.build())}"
+                            )
+                            Token.create(
+                              TokenCreateParams
+                                .builder()
+                                .setAccount(params.build())
+                                .build(),
+                              StripeApi().requestOptions()
+                            )
+                        }
+                      }
+                      val params =
+                        AccountCreateParams
+                          .builder()
+                          .setAccountToken(token.getId)
+                          .setCapabilities(
+                            AccountCreateParams.Capabilities
+                              .builder()
+                              .setBankTransferPayments(
+                                AccountCreateParams.Capabilities.BankTransferPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setCardPayments(
+                                AccountCreateParams.Capabilities.CardPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setCartesBancairesPayments(
+                                AccountCreateParams.Capabilities.CartesBancairesPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setTransfers(
+                                AccountCreateParams.Capabilities.Transfers
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setSepaBankTransferPayments(
+                                AccountCreateParams.Capabilities.SepaBankTransferPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .setSepaDebitPayments(
+                                AccountCreateParams.Capabilities.SepaDebitPayments
+                                  .builder()
+                                  .setRequested(true)
+                                  .build()
+                              )
+                              .build()
+                          )
+                          .setController(
+                            AccountCreateParams.Controller
+                              .builder()
+                              .setFees(
+                                AccountCreateParams.Controller.Fees
+                                  .builder()
+                                  .setPayer(AccountCreateParams.Controller.Fees.Payer.APPLICATION)
+                                  .build()
+                              )
+                              .setLosses(
+                                AccountCreateParams.Controller.Losses
+                                  .builder()
+                                  .setPayments(
+                                    AccountCreateParams.Controller.Losses.Payments.APPLICATION
+                                  )
+                                  .build()
+                              )
+                              .setRequirementCollection(
+                                AccountCreateParams.Controller.RequirementCollection.APPLICATION
+                              )
+                              .setStripeDashboard(
+                                AccountCreateParams.Controller.StripeDashboard
+                                  .builder()
+                                  .setType(AccountCreateParams.Controller.StripeDashboard.Type.NONE)
+                                  .build()
+                              )
+                              .build()
+                          )
+                          .setCountry(naturalUser.countryOfResidence)
+                          .setSettings(
+                            AccountCreateParams.Settings
+                              .builder()
+                              .setPayouts(
+                                AccountCreateParams.Settings.Payouts
+                                  .builder()
+                                  .setSchedule(
+                                    AccountCreateParams.Settings.Payouts.Schedule
+                                      .builder()
+                                      .setInterval(
+                                        AccountCreateParams.Settings.Payouts.Schedule.Interval.MANUAL
+                                      )
+                                      .build()
+                                  )
+                                  .build()
+                              )
+                              .build()
+                          )
+                          .setMetadata(Map("external_uuid" -> naturalUser.externalUuid).asJava)
+
+                      naturalUser.business match {
+                        case Some(business) =>
+                          val businessProfile =
+                            AccountCreateParams.BusinessProfile
+                              .builder()
+                              .setMcc(business.merchantCategoryCode)
+                              .setUrl(business.website)
+                          business.support match {
+                            case Some(support) =>
+                              businessProfile.setSupportEmail(support.email)
+                              support.phone match {
+                                case Some(phone) =>
+                                  businessProfile.setSupportPhone(phone)
+                                case _ =>
+                              }
+                              support.url match {
+                                case Some(url) =>
+                                  businessProfile.setSupportUrl(url)
+                                case _ =>
+                              }
+                            case _ =>
+                          }
+                          params.setBusinessProfile(businessProfile.build())
+                        case _ =>
+                      }
+
+                      mlog.info(
+                        s"create individual account params -> ${new Gson().toJson(params.build())}"
+                      )
+
+                      Account.create(
+                        params.build(),
+                        StripeApi().requestOptions()
+                      )
                   }
-                  Some(account.getId)
-                case Failure(f) =>
-                  mlog.error(f.getMessage, f)
-                  None
-              }
+                ) match {
+                  case Success(account) =>
+                    if (tos_shown_and_accepted) {
+                      mlog.info(s"****** tos_shown_and_accepted -> $tos_shown_and_accepted")
+                      val params =
+                        AccountUpdateParams
+                          .builder()
+                          .setTosAcceptance(
+                            AccountUpdateParams.TosAcceptance
+                              .builder()
+                              .setIp(ipAddress.get)
+                              .setUserAgent(userAgent.get)
+                              .setDate(persistence.now().getEpochSecond)
+                              .build()
+                          )
+                          .build()
+                      Try(
+                        account.update(
+                          params,
+                          StripeApi().requestOptions()
+                        )
+                      )
+                    }
+                    Some(account.getId)
+                  case Failure(f) =>
+                    mlog.error(f.getMessage, f)
+                    None
+                }
+              case Failure(f) =>
+                mlog.error(f.getMessage, f)
+                None
             }
-          case Failure(f) =>
-            mlog.error(f.getMessage, f)
-            None
+          }
         }
       case _ => None
     }
@@ -2085,7 +2096,9 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
           val params = CustomerUpdateParams
             .builder()
             //.setEmail(naturalUser.email)
-            .setName(s"${naturalUser.firstName} ${naturalUser.lastName}")
+            .setName(
+              naturalUser.name.getOrElse(s"${naturalUser.firstName} ${naturalUser.lastName}")
+            )
             .setMetadata(
               Map(
                 "external_uuid" -> naturalUser.externalUuid
@@ -2120,7 +2133,9 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
           val params = CustomerCreateParams
             .builder()
             .setEmail(naturalUser.email)
-            .setName(s"${naturalUser.firstName} ${naturalUser.lastName}")
+            .setName(
+              naturalUser.name.getOrElse(s"${naturalUser.firstName} ${naturalUser.lastName}")
+            )
             .setMetadata(
               Map(
                 "external_uuid" -> naturalUser.externalUuid
@@ -2152,9 +2167,157 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
           Customer.create(params.build(), StripeApi().requestOptions())
       }
     } match {
-      case Success(customer) => Some(customer.getId)
+      case Success(customer) =>
+        naturalUser.additionalProperties.get("vatNumber").foreach { vatNumber =>
+          val country = naturalUser.additionalProperties
+            .getOrElse("countryOfResidence", naturalUser.countryOfResidence)
+          registerCustomerTaxId(customer.getId, vatNumber, country)
+        }
+        Some(customer.getId)
       case Failure(f) =>
         mlog.error(f.getMessage, f)
+        None
+    }
+  }
+
+  private[this] def createTaxId(
+    customerId: String,
+    vatNumber: String,
+    taxIdType: TaxIdCreateParams.Type
+  ): TaxId = {
+    TaxId.create(
+      TaxIdCreateParams
+        .builder()
+        .setType(taxIdType)
+        .setValue(vatNumber)
+        .setOwner(
+          TaxIdCreateParams.Owner
+            .builder()
+            .setType(TaxIdCreateParams.Owner.Type.CUSTOMER)
+            .setCustomer(customerId)
+            .build()
+        )
+        .build(),
+      StripeApi().requestOptions()
+    )
+  }
+
+  private[this] def registerCustomerTaxId(
+    customerId: String,
+    vatNumber: String,
+    country: String
+  ): Unit = {
+    resolveTaxIdType(country).foreach { taxIdType =>
+      val taxIdTypeName = taxIdType.getValue
+      Try {
+        // List existing tax IDs for this customer to check for duplicates
+        val existing = TaxId
+          .list(
+            TaxIdListParams
+              .builder()
+              .setOwner(
+                TaxIdListParams.Owner
+                  .builder()
+                  .setType(TaxIdListParams.Owner.Type.CUSTOMER)
+                  .setCustomer(customerId)
+                  .build()
+              )
+              .build(),
+            StripeApi().requestOptions()
+          )
+          .getData
+          .asScala
+          .find(_.getType == taxIdTypeName)
+
+        existing match {
+          case Some(existingTaxId) if existingTaxId.getValue == vatNumber =>
+            // Same type and value — nothing to do
+            mlog.info(
+              s"Tax ID ${existingTaxId.getId} (type=$taxIdTypeName, value=$vatNumber) already registered for customer $customerId"
+            )
+          case Some(existingTaxId) =>
+            // Same type but different value — Stripe tax IDs are immutable, must delete and recreate
+            existingTaxId.delete(StripeApi().requestOptions())
+            mlog.info(
+              s"Deleted outdated tax ID ${existingTaxId.getId} (type=$taxIdTypeName) for customer $customerId"
+            )
+            val taxId = createTaxId(customerId, vatNumber, taxIdType)
+            mlog.info(
+              s"Registered tax ID ${taxId.getId} (type=$taxIdTypeName) for customer $customerId"
+            )
+          case None =>
+            // No existing tax ID for this type — create
+            val taxId = createTaxId(customerId, vatNumber, taxIdType)
+            mlog.info(
+              s"Registered tax ID ${taxId.getId} (type=$taxIdTypeName) for customer $customerId"
+            )
+        }
+      } match {
+        case Success(_) => // already logged above
+        case Failure(f) =>
+          mlog.error(
+            s"Failed to register tax ID for customer $customerId: ${f.getMessage}",
+            f
+          )
+      }
+    }
+  }
+
+  private[this] val euCountries: Set[String] = Set(
+    "AT",
+    "BE",
+    "BG",
+    "HR",
+    "CY",
+    "CZ",
+    "DK",
+    "EE",
+    "FI",
+    "FR",
+    "DE",
+    "GR",
+    "HU",
+    "IE",
+    "IT",
+    "LV",
+    "LT",
+    "LU",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SK",
+    "SI",
+    "ES",
+    "SE"
+  )
+
+  private[this] def resolveTaxIdType(
+    country: String
+  ): Option[TaxIdCreateParams.Type] = {
+    country.trim.toUpperCase match {
+      case c if euCountries.contains(c) => Some(TaxIdCreateParams.Type.EU_VAT)
+      case "GB"                         => Some(TaxIdCreateParams.Type.GB_VAT)
+      case "CH"                         => Some(TaxIdCreateParams.Type.CH_VAT)
+      case "NO"                         => Some(TaxIdCreateParams.Type.NO_VAT)
+      case "US"                         => Some(TaxIdCreateParams.Type.US_EIN)
+      case "AU"                         => Some(TaxIdCreateParams.Type.AU_ABN)
+      case "BR"                         => Some(TaxIdCreateParams.Type.BR_CNPJ)
+      case "CA"                         => Some(TaxIdCreateParams.Type.CA_BN)
+      case "IN"                         => Some(TaxIdCreateParams.Type.IN_GST)
+      case "JP"                         => Some(TaxIdCreateParams.Type.JP_TRN)
+      case "KR"                         => Some(TaxIdCreateParams.Type.KR_BRN)
+      case "MX"                         => Some(TaxIdCreateParams.Type.MX_RFC)
+      case "NZ"                         => Some(TaxIdCreateParams.Type.NZ_GST)
+      case "SG"                         => Some(TaxIdCreateParams.Type.SG_GST)
+      case "ZA"                         => Some(TaxIdCreateParams.Type.ZA_VAT)
+      // Note: RU is a sanctioned country — Stripe may reject or flag this depending on account configuration
+      case "RU" => Some(TaxIdCreateParams.Type.RU_INN)
+      case unknown =>
+        mlog.warn(
+          s"Unknown country for tax ID type resolution: $unknown — skipping tax ID registration"
+        )
         None
     }
   }
