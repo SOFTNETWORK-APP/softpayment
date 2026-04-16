@@ -8,7 +8,7 @@ import app.softnetwork.api.server.config.ServerSettings.RootPath
 import app.softnetwork.payment.api.{PaymentClient, PaymentGrpcServicesTestKit}
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.config.PaymentSettings.PaymentConfig._
-import app.softnetwork.payment.data.{customerUuid, sellerUuid}
+import app.softnetwork.payment.data.{customerUuid, enterpriseUuid, sellerUuid}
 import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.payment.model._
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -28,6 +28,9 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   lazy val customerSession: SD with SessionDataDecorator[SD] =
     companion.newSession.withId(customerUuid).withProfile("customer").withClientId(clientId)
+
+  lazy val enterpriseSession: SD with SessionDataDecorator[SD] =
+    companion.newSession.withId(enterpriseUuid).withProfile("customer").withClientId(clientId)
 
   var externalUserId: String = "individual"
 

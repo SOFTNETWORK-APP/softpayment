@@ -322,6 +322,10 @@ message PaymentAccountCreatedOrUpdatedEvent {
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     optional string profile = 3;
+    oneof user {
+        app.softnetwork.payment.model.NaturalUser naturalUser = 4;
+        app.softnetwork.payment.model.LegalUser legalUser = 5;
+    }
 }
 
 message CancelMandateCommandEvent {

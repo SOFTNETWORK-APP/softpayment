@@ -82,11 +82,11 @@ message NaturalUser {
     option (scalapb.message).extends = "ProtobufDomainObject";
     option (scalapb.message).extends = "NaturalUserDecorator";
     option (scalapb.message).companion_extends = "NaturalUserCompanion";
-    required string firstName = 1;
-    required string lastName = 2;
+    required string firstName = 1 [default = ""];
+    required string lastName = 2 [default = ""];
     required string email = 3;
     required string nationality = 4 [default = "FR"];
-    required string birthday = 5;
+    required string birthday = 5 [default = ""];
     required string countryOfResidence = 6 [default = "FR"];
     optional string userId = 7;
     optional string walletId = 8;
@@ -98,6 +98,8 @@ message NaturalUser {
     optional string phone = 14;
     optional Business business = 15;
     optional string title = 16;
+    optional string name = 17;
+    map<string, string> additionalProperties = 18;
 }
 
 message LegalUser {

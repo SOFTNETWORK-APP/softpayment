@@ -22,7 +22,9 @@ case class NaturalUserView(
   address: Option[Address] = None,
   phone: Option[String] = None,
   business: Option[Business] = None,
-  title: Option[String] = None
+  title: Option[String] = None,
+  name: Option[String] = None,
+  additionalProperties: Map[String, String] = Map.empty
 ) extends User
 
 object NaturalUserView {
@@ -42,7 +44,9 @@ object NaturalUserView {
       address,
       phone,
       business,
-      title
+      title,
+      paymentUser.name,
+      paymentUser.additionalProperties
     )
   }
 }

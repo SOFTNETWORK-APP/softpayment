@@ -46,6 +46,17 @@ trait PaymentBehavior
 
   override protected val manifestWrapper: ManifestW = ManifestW()
 
+  private def toEventUser(
+    user: PaymentAccount.User
+  ): PaymentAccountCreatedOrUpdatedEvent.User = user match {
+    case PaymentAccount.User.NaturalUser(value) =>
+      PaymentAccountCreatedOrUpdatedEvent.User.NaturalUser(value)
+    case PaymentAccount.User.LegalUser(value) =>
+      PaymentAccountCreatedOrUpdatedEvent.User.LegalUser(value)
+    case _ =>
+      PaymentAccountCreatedOrUpdatedEvent.User.Empty
+  }
+
   def paymentDao: PaymentDao = PaymentDao
 
   def softPayAccountDao: SoftPayAccountDao = SoftPayAccountDao
@@ -283,7 +294,10 @@ trait PaymentBehavior
               PaymentAccountCreatedOrUpdatedEvent.defaultInstance
                 .withLastUpdated(lastUpdated)
                 .withExternalUuid(updatedPaymentAccount.externalUuid)
-                .copy(profile = updatedPaymentAccount.profile)
+                .copy(
+                  profile = updatedPaymentAccount.profile,
+                  user = toEventUser(updatedPaymentAccount.user)
+                )
             ) :+
             PaymentAccountUpsertedEvent.defaultInstance
               .withDocument(updatedPaymentAccount)
@@ -1376,7 +1390,10 @@ trait PaymentBehavior
                             PaymentAccountCreatedOrUpdatedEvent.defaultInstance
                               .withLastUpdated(lastUpdated)
                               .withExternalUuid(updatedPaymentAccount.externalUuid)
-                              .copy(profile = updatedPaymentAccount.profile)
+                              .copy(
+                                profile = updatedPaymentAccount.profile,
+                                user = toEventUser(updatedPaymentAccount.user)
+                              )
                           )
 
                         if (
