@@ -141,8 +141,17 @@ trait StripeRecurringPaymentApi extends RecurringPaymentApi { _: StripeContext =
             .setPriceData(priceDataBuilder.build())
             .build()
         )
+        .setAutomaticTax(
+          SubscriptionCreateParams.AutomaticTax
+            .builder()
+            .setEnabled(metadata.contains("automatic_tax"))
+            .build()
+        )
         .putMetadata("transaction_type", "recurring_payment")
         .putMetadata("recurring_payment_type", "card")
+
+      // Propagate all user-supplied metadata to Stripe subscription
+      metadata.foreach { case (k, v) => params.putMetadata(k, v) }
 
       recurringPayment.externalReference.foreach(ref =>
         params.putMetadata("external_reference", ref)

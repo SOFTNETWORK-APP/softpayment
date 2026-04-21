@@ -16,8 +16,6 @@ import app.softnetwork.payment.model.{KycDocument, RecurringPayment}
 import com.stripe.model.{Account, Event, Invoice, Person, StripeObject, Subscription}
 import com.stripe.net.Webhook
 
-import java.util.concurrent.ConcurrentHashMap
-
 import scala.util.{Failure, Success, Try}
 import scala.jdk.CollectionConverters._
 
@@ -25,27 +23,26 @@ import scala.jdk.CollectionConverters._
   */
 trait StripeEventHandler extends Completion { _: BasicPaymentService with PaymentHandler =>
 
-  /** Bounded set of recently processed webhook event IDs for idempotency. Stripe may deliver the
-    * same event multiple times.
+  /** Bounded LRU set of recently processed webhook event IDs for idempotency. Stripe may deliver
+    * the same event multiple times. Uses a synchronized LinkedHashMap configured as LRU to evict
+    * oldest entries first.
     */
-  private[this] val processedEventIds: ConcurrentHashMap[String, java.lang.Boolean] =
-    new ConcurrentHashMap[String, java.lang.Boolean](256)
-
   private[this] val MaxProcessedEventIds = 10000
+
+  private[this] val processedEventIds: java.util.Map[String, java.lang.Boolean] =
+    java.util.Collections.synchronizedMap(
+      new java.util.LinkedHashMap[String, java.lang.Boolean](256, 0.75f, true) {
+        override def removeEldestEntry(
+          eldest: java.util.Map.Entry[String, java.lang.Boolean]
+        ): Boolean =
+          size() > MaxProcessedEventIds
+      }
+    )
 
   private[this] def isEventAlreadyProcessed(eventId: String): Boolean = {
     if (processedEventIds.containsKey(eventId)) {
       true
     } else {
-      if (processedEventIds.size() >= MaxProcessedEventIds) {
-        // Evict oldest entries (ConcurrentHashMap has no LRU, so clear half)
-        val iterator = processedEventIds.keys()
-        var count = 0
-        while (iterator.hasMoreElements && count < MaxProcessedEventIds / 2) {
-          processedEventIds.remove(iterator.nextElement())
-          count += 1
-        }
-      }
       processedEventIds.put(eventId, java.lang.Boolean.TRUE)
       false
     }
