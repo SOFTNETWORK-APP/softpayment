@@ -297,7 +297,9 @@ trait RecurringPaymentCommandHandler
                         List(
                           RecurringPaymentRegisteredEvent.defaultInstance
                             .withExternalUuid(paymentAccount.externalUuid)
-                            .withRecurringPayment(recurringPayment)
+                            .withRecurringPayment(
+                              recurringPayment.withCardStatus(result.status)
+                            )
                         ) ++ {
                           if (result.status.isEnded) { // cancel scheduled payIn for recurring card payment
                             List(
