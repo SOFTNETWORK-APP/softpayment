@@ -20,36 +20,34 @@ import scala.concurrent.ExecutionContext
 trait PostgresPaymentTestKit extends JdbcPaymentTestKit with PostgresTestKit {
   _: Suite =>
 
-  override lazy val jdbcPaymentAccountProvider: JdbcPaymentAccountProvider =
-    new JdbcPaymentAccountProvider with PostgresProfile {
-      override implicit def executionContext: ExecutionContext = classicSystem.dispatcher
-
-      override implicit def classicSystem: actor.ActorSystem = typedSystem()
-
-      override lazy val config: Config = PostgresPaymentTestKit.this.config
-    }
+  override lazy val jdbcPaymentAccountProvider: Option[JdbcPaymentAccountProvider] =
+    Some(
+      new JdbcPaymentAccountProvider with PostgresProfile {
+        override implicit def executionContext: ExecutionContext = classicSystem.dispatcher
+        override implicit def classicSystem: actor.ActorSystem = typedSystem()
+        override lazy val config: Config = PostgresPaymentTestKit.this.config
+      }
+    )
 
   override lazy val jdbcTransactionProvider: JdbcTransactionProvider = new JdbcTransactionProvider
     with PostgresProfile {
     override implicit def executionContext: ExecutionContext = classicSystem.dispatcher
-
     override implicit def classicSystem: actor.ActorSystem = typedSystem()
-
     override lazy val config: Config = PostgresPaymentTestKit.this.config
   }
 
   override def paymentAccountToJdbcProcessorStream
-    : ActorSystem[_] => PaymentAccountToJdbcProcessStream = sys =>
-    new PaymentAccountToJdbcProcessStream
-      with InMemoryJournalProvider
-      with InMemoryOffsetProvider
-      with PostgresProfile {
-      override implicit def system: ActorSystem[_] = sys
-
-      override val forTests: Boolean = true
-
-      override lazy val config: Config = PostgresPaymentTestKit.this.config
-    }
+    : ActorSystem[_] => Option[PaymentAccountToJdbcProcessStream] = sys =>
+    Some(
+      new PaymentAccountToJdbcProcessStream
+        with InMemoryJournalProvider
+        with InMemoryOffsetProvider
+        with PostgresProfile {
+        override implicit def system: ActorSystem[_] = sys
+        override val forTests: Boolean = true
+        override lazy val config: Config = PostgresPaymentTestKit.this.config
+      }
+    )
 
   override def transactionToJdbcProcessorStream
     : ActorSystem[_] => TransactionToJdbcProcessorStream = sys =>
@@ -58,9 +56,7 @@ trait PostgresPaymentTestKit extends JdbcPaymentTestKit with PostgresTestKit {
       with InMemoryOffsetProvider
       with PostgresProfile {
       override implicit def system: ActorSystem[_] = sys
-
       override val forTests: Boolean = true
-
       override lazy val config: Config = PostgresPaymentTestKit.this.config
     }
 }

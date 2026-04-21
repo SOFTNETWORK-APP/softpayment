@@ -170,7 +170,7 @@ trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     }
   }
 
-  private[this] def executeWebhook(payload: String): Unit = {
+  protected def executeWebhook(payload: String): Unit = {
     val stripeApi = StripeApi()
     stripeApi.secret match {
       case Some(secret) =>

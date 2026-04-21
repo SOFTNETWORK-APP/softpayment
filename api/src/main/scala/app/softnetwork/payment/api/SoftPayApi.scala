@@ -70,14 +70,17 @@ trait SoftPayApi[SD <: SessionData with SessionDataDecorator[SD]] extends SoftPa
       override implicit def system: ActorSystem[_] = sys
     }
 
-  def paymentAccountToJdbcProcessorStream: ActorSystem[_] => PaymentAccountToJdbcProcessStream
+  def paymentAccountToJdbcProcessorStream
+    : ActorSystem[_] => Option[PaymentAccountToJdbcProcessStream] =
+    _ => None
 
   def transactionToJdbcProcessorStream: ActorSystem[_] => TransactionToJdbcProcessorStream
 
-  override def paymentEventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
-    super.paymentEventProcessorStreams(sys) :+ paymentAccountToJdbcProcessorStream(
-      sys
-    ) :+ transactionToJdbcProcessorStream(sys)
+  override def paymentEventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] =
+    sys =>
+      super.paymentEventProcessorStreams(sys) ++
+      paymentAccountToJdbcProcessorStream(sys).toSeq :+
+      transactionToJdbcProcessorStream(sys)
 
   implicit def sessionConfig: SessionConfig = Settings.Session.DefaultSessionConfig
 

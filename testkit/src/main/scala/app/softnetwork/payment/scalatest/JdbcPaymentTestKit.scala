@@ -26,18 +26,20 @@ trait JdbcPaymentTestKit extends PaymentTestKit with JdbcPersistenceTestKit { _:
       )
       .withFallback(ConfigFactory.load())
 
-  def jdbcPaymentAccountProvider: JdbcPaymentAccountProvider
+  def jdbcPaymentAccountProvider: Option[JdbcPaymentAccountProvider] = None
 
   def jdbcTransactionProvider: JdbcTransactionProvider
 
-  def paymentAccountToJdbcProcessorStream: ActorSystem[_] => PaymentAccountToJdbcProcessStream
+  def paymentAccountToJdbcProcessorStream
+    : ActorSystem[_] => Option[PaymentAccountToJdbcProcessStream] = _ => None
 
   def transactionToJdbcProcessorStream: ActorSystem[_] => TransactionToJdbcProcessorStream
 
-  override def paymentEventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] = sys =>
-    super.paymentEventProcessorStreams(sys) :+ paymentAccountToJdbcProcessorStream(
-      sys
-    ) :+ transactionToJdbcProcessorStream(sys)
+  override def paymentEventProcessorStreams: ActorSystem[_] => Seq[EventProcessorStream[_]] =
+    sys =>
+      super.paymentEventProcessorStreams(sys) ++
+      paymentAccountToJdbcProcessorStream(sys).toSeq :+
+      transactionToJdbcProcessorStream(sys)
 
   lazy val transactionProbe: TestProbe[TransactionUpdatedEvent] =
     createTestProbe[TransactionUpdatedEvent]()

@@ -31,15 +31,16 @@ object SoftPayWithSchedulerRoutesPostgresLauncher
   override protected def manager: SessionManager[JwtClaims] = SessionManagers.jwt
 
   override def paymentAccountToJdbcProcessorStream
-    : ActorSystem[_] => PaymentAccountToJdbcProcessStream = sys =>
-    new PaymentAccountToJdbcProcessStream
-      with JdbcJournalProvider
-      with JdbcOffsetProvider
-      with PostgresProfile {
-      override implicit def system: ActorSystem[_] = sys
-
-      override lazy val config: Config = SoftPayWithSchedulerRoutesPostgresLauncher.this.config
-    }
+    : ActorSystem[_] => Option[PaymentAccountToJdbcProcessStream] = sys =>
+    Some(
+      new PaymentAccountToJdbcProcessStream
+        with JdbcJournalProvider
+        with JdbcOffsetProvider
+        with PostgresProfile {
+        override implicit def system: ActorSystem[_] = sys
+        override lazy val config: Config = SoftPayWithSchedulerRoutesPostgresLauncher.this.config
+      }
+    )
 
   override def transactionToJdbcProcessorStream
     : ActorSystem[_] => TransactionToJdbcProcessorStream = sys =>
