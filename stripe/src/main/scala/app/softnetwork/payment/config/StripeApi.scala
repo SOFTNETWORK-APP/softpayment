@@ -225,6 +225,7 @@ object StripeApi {
           case Failure(f) =>
             Console.err.println(s"Error creating stripe webhook endpoint: ${f.getMessage}")
             if (apiKey.startsWith("sk_test_")) { // In test mode, we can proceed without a webhook endpoint
+              stripeApis = stripeApis.updated(provider.providerId, stripeApi)
               stripeApi
             } else {
               throw f
