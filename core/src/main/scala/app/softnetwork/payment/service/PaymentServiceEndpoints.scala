@@ -23,7 +23,8 @@ trait PaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     with KycDocumentEndpoints[SD]
     with UboDeclarationEndpoints[SD]
     with RecurringPaymentEndpoints[SD]
-    with MandateEndpoints[SD] {
+    with MandateEndpoints[SD]
+    with BillingPortalEndpoints[SD] {
   _: PaymentHandler with SessionMaterials[SD] =>
 
   /** should be implemented by each payment provider
@@ -43,6 +44,7 @@ trait PaymentServiceEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
     uboDeclarationEndpoints ++
     mandateEndpoints ++
     recurringPaymentEndpoints ++
+    billingPortalEndpoints ++
     hooks
 
 }

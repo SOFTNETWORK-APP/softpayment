@@ -996,6 +996,29 @@ trait PaymentBehavior
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
 
+      case cmd: CreateBillingPortalSession =>
+        state match {
+          case Some(paymentAccount) =>
+            val userId = paymentAccount.getNaturalUser.userId
+              .orElse(paymentAccount.getLegalUser.legalRepresentative.userId)
+            userId match {
+              case Some(uid) =>
+                val clientId = paymentAccount.clientId.orElse(
+                  internalClientId
+                )
+                val paymentProvider = loadPaymentProvider(clientId)
+                paymentProvider.createBillingPortalSession(uid, cmd.returnUrl) match {
+                  case Some(url) =>
+                    Effect.none.thenRun(_ => BillingPortalSessionCreated(url) ~> replyTo)
+                  case None =>
+                    Effect.none.thenRun(_ => BillingPortalSessionNotCreated ~> replyTo)
+                }
+              case None =>
+                Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+            }
+          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+        }
+
       case cmd: LoadTransaction =>
         import cmd._
         state match {

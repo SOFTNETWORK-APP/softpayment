@@ -2699,6 +2699,20 @@ trait MangoPayProvider extends PaymentProvider {
             None
         }
     }
+
+  /** Create a billing portal session for the given user.
+    *
+    * @param userId
+    *   \- the provider user ID
+    * @param returnUrl
+    *   \- the URL to redirect to after the user leaves the portal
+    * @return
+    *   the billing portal session URL, or None on failure
+    */
+  override def createBillingPortalSession(userId: String, returnUrl: String): Option[String] = {
+    mlog.warn("Billing portal is not supported by MangoPay provider")
+    None
+  }
 }
 
 class MangoPayProviderFactory extends PaymentProviderSpi {
