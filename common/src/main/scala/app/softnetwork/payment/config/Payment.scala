@@ -18,6 +18,7 @@ object Payment {
     accountRoute: String,
     declarationRoute: String,
     kycRoute: String,
+    billingPortalRoute: String,
     disableBankAccountDeletion: Boolean,
     externalToPaymentAccountTag: String,
     akkaNodeRole: String

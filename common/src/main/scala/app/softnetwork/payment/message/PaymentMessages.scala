@@ -632,6 +632,26 @@ object PaymentMessages {
     lazy val key: String = account
   }
 
+  case class BillingPortalRequest(returnUrl: String)
+
+  /** Create a billing portal session for the authenticated user.
+    *
+    * @param account
+    *   - payment account reference (externalUuid)
+    * @param returnUrl
+    *   - the URL to redirect to after the user leaves the portal
+    * @param clientId
+    *   - optional client id
+    */
+  case class CreateBillingPortalSession(
+    account: String,
+    returnUrl: String,
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey
+      with PaymentAccountCommand {
+    lazy val key: String = account
+  }
+
   /** @param transactionId
     *   - transaction id
     */
@@ -1115,6 +1135,8 @@ object PaymentMessages {
 
   case class BalanceLoaded(balance: Int) extends PaymentResult
 
+  case class BillingPortalSessionCreated(url: String) extends PaymentResult
+
   class PaymentError(override val message: String) extends ErrorMessage(message) with PaymentResult
 
   case object PaymentMethodNotPreRegistered extends PaymentError("PaymentMethodNotPreRegistered")
@@ -1154,6 +1176,8 @@ object PaymentMessages {
   ) extends PaymentError(resultMessage)
 
   case object PaymentAccountNotFound extends PaymentError("PaymentAccountNotFound")
+
+  case object BillingPortalSessionNotCreated extends PaymentError("BillingPortalSessionNotCreated")
 
   case object MandateAlreadyExists extends PaymentError("MandateAlreadyExists")
 

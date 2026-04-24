@@ -33,8 +33,10 @@ trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
         ApiErrors.InternalServerError(PaymentMethodNotPreRegistered)
       case r: PreAuthorizationFailed => ApiErrors.InternalServerError(r)
       case r: PayInFailed            => ApiErrors.InternalServerError(r)
-      case r: PaymentError           => ApiErrors.BadRequest(r.message)
-      case _                         => ApiErrors.BadRequest("Unknown")
+      case BillingPortalSessionNotCreated =>
+        ApiErrors.InternalServerError(BillingPortalSessionNotCreated)
+      case r: PaymentError => ApiErrors.BadRequest(r.message)
+      case _               => ApiErrors.BadRequest("Unknown")
     }
 
   protected[payment] def extractBrowserInfo(
