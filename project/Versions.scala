@@ -6,7 +6,7 @@ object Versions {
 
   val notification = "0.9.0"
 
-  val account = "0.8.1"
+  val account = "0.8.2"
 
   val scalatest = "3.2.16"
 
