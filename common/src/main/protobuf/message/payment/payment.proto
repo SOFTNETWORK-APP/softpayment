@@ -290,6 +290,7 @@ message RegisterRecurringPaymentCommandEvent {
     optional int32 nextDebitedAmount = 10;
     optional int32 nextFeesAmount = 11;
     optional string clientId = 12;
+    optional string cardId = 13;
 }
 
 message RecurringPaymentRegisteredEvent {

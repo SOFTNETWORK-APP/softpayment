@@ -101,10 +101,13 @@ trait RecurringPaymentCommandHandler
                   case Some(userId) =>
                     paymentAccount.walletId match {
                       case Some(walletId) =>
-                        paymentAccount.cards
-                          .filterNot(_.expired)
-                          .find(_.getActive)
-                          .map(_.id) match {
+                        cmd.cardId
+                          .orElse(
+                            paymentAccount.cards
+                              .filterNot(_.expired)
+                              .find(_.getActive)
+                              .map(_.id)
+                          ) match {
                           case Some(cardId) =>
                             val createdDate = now()
                             var recurringPayment =

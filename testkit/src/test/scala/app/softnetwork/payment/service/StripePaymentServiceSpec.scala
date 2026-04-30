@@ -1042,7 +1042,8 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             endDate = Some(LocalDate.now().plusMonths(1)),
             fixedNextAmount = Some(true),
             nextDebitedAmount = Some(4990),
-            nextFeesAmount = Some(0)
+            nextFeesAmount = Some(0),
+            cardId = Some(cardId)
           )
         )
       ) ~> routes ~> check {

@@ -181,18 +181,19 @@ trait PaymentCommandProcessorStream extends EventProcessorStream[PaymentEventWit
           case evt: RegisterRecurringPaymentCommandEvent =>
             import evt._
             val command = RegisterRecurringPayment(
-              debitedAccount,
-              firstDebitedAmount,
-              firstFeesAmount,
-              currency,
-              `type`,
-              startDate,
-              endDate,
-              frequency,
-              fixedNextAmount,
-              nextDebitedAmount,
-              nextFeesAmount,
-              clientId
+              debitedAccount = debitedAccount,
+              firstDebitedAmount = firstDebitedAmount,
+              firstFeesAmount = firstFeesAmount,
+              currency = currency,
+              `type` = `type`,
+              startDate = startDate,
+              endDate = endDate,
+              frequency = frequency,
+              fixedNextAmount = fixedNextAmount,
+              nextDebitedAmount = nextDebitedAmount,
+              nextFeesAmount = nextFeesAmount,
+              cardId = cardId,
+              clientId = clientId
             )
             !?(command) map {
               case _: RecurringPaymentRegistered =>

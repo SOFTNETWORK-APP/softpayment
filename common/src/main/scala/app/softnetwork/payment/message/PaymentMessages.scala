@@ -503,6 +503,9 @@ object PaymentMessages {
     *   - statement descriptor
     * @param externalReference
     *   - optional external reference
+    * @param cardId
+    *   - optional card id to use for the recurring payment (if not provided, the first active card
+    *     will be used)
     * @param clientId
     *   - optional client id
     */
@@ -521,6 +524,7 @@ object PaymentMessages {
     statementDescriptor: Option[String] = None,
     externalReference: Option[String] = None,
     metadata: Map[String, String] = Map.empty,
+    cardId: Option[String] = None,
     clientId: Option[String] = None
   ) extends PaymentCommandWithKey
       with RecurringPaymentCommand {
