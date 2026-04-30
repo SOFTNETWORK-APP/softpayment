@@ -140,6 +140,9 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
                     .withActive(
                       Option(paymentMethod.getCustomer).isDefined
                     ) // if detached from customer, it is disabled
+                    .copy(
+                      customerId = Option(paymentMethod.getCustomer)
+                    )
                 )
               case _ => None
             }
@@ -207,6 +210,9 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
                     .withActive(
                       Option(paymentMethod.getCustomer).isDefined
                     ) // if detached from customer, it is disabled
+                    .copy(
+                      customerId = Option(paymentMethod.getCustomer)
+                    )
                 )
               case _ => None
             }
