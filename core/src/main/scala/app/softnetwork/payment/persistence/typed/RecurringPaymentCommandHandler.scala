@@ -10,6 +10,7 @@ import app.softnetwork.payment.message.PaymentEvents.{
   RecurringPaymentRegisteredEvent
 }
 import app.softnetwork.payment.message.PaymentMessages.{
+  CardNotAttachedToCustomer,
   CardNotFound,
   ExecuteFirstRecurringPayment,
   ExecuteNextRecurringPayment,
@@ -45,6 +46,7 @@ import app.softnetwork.payment.message.TransactionEvents.{
   TransactionUpdatedEvent
 }
 import app.softnetwork.payment.model.{
+  Card,
   DirectDebitTransaction,
   FirstRecurringPaymentTransaction,
   PaymentAccount,
@@ -135,42 +137,65 @@ trait RecurringPaymentCommandHandler
                               )
                             val paymentProvider = loadPaymentProvider(clientId)
                             import paymentProvider._
-                            registerRecurringCardPayment(
-                              userId,
-                              walletId,
-                              cardId,
-                              recurringPayment
-                            ) match {
-                              case Some(result) =>
-                                recurringPayment = recurringPayment
-                                  .withId(result.id)
-                                  .withCardStatus(result.status)
-                                  .copy(
-                                    nextRecurringPaymentDate =
-                                      recurringPayment.nextPaymentDate.map(_.toDate)
-                                  )
-                                keyValueDao.addKeyValue(recurringPayment.getId, entityId)
-                                Effect
-                                  .persist(
-                                    List(
-                                      RecurringPaymentRegisteredEvent.defaultInstance
-                                        .withExternalUuid(paymentAccount.externalUuid)
-                                        .withRecurringPayment(recurringPayment)
-                                    ) :+
-                                    PaymentAccountUpsertedEvent.defaultInstance
-                                      .withDocument(
-                                        paymentAccount
-                                          .withRecurryingPayments(
-                                            paymentAccount.recurryingPayments :+ recurringPayment
-                                          )
-                                          .withLastUpdated(createdDate)
-                                      )
-                                      .withLastUpdated(createdDate)
-                                  )
-                                  .thenRun(_ => RecurringPaymentRegistered(result.id) ~> replyTo)
-                              case _ =>
-                                Effect.none.thenRun(_ => RecurringPaymentNotRegistered ~> replyTo)
+                            // Ensure the payment method is attached to the correct customer
+                            val attachmentOk = loadPaymentMethod(cardId) match {
+                              case Some(card: Card) if !card.getActive =>
+                                log.info(
+                                  s"Payment method $cardId not attached to any customer, attaching to $userId"
+                                )
+                                attachPaymentMethod(cardId, userId).isDefined
+                              case Some(card: Card) if card.customerId.exists(_ != userId) =>
+                                log.error(
+                                  s"Payment method $cardId attached to customer ${card.customerId
+                                    .getOrElse("")}, expected $userId"
+                                )
+                                false
+                              case None =>
+                                log.warn(
+                                  s"Payment method $cardId not found, attempting to attach to $userId"
+                                )
+                                attachPaymentMethod(cardId, userId).isDefined
+                              case _ => true // already attached to the correct customer
                             }
+                            if (!attachmentOk) {
+                              Effect.none.thenRun(_ => CardNotAttachedToCustomer ~> replyTo)
+                            } else
+                              registerRecurringCardPayment(
+                                userId,
+                                walletId,
+                                cardId,
+                                recurringPayment
+                              ) match {
+                                case Some(result) =>
+                                  recurringPayment = recurringPayment
+                                    .withId(result.id)
+                                    .withCardStatus(result.status)
+                                    .copy(
+                                      nextRecurringPaymentDate =
+                                        recurringPayment.nextPaymentDate.map(_.toDate)
+                                    )
+                                  keyValueDao.addKeyValue(recurringPayment.getId, entityId)
+                                  Effect
+                                    .persist(
+                                      List(
+                                        RecurringPaymentRegisteredEvent.defaultInstance
+                                          .withExternalUuid(paymentAccount.externalUuid)
+                                          .withRecurringPayment(recurringPayment)
+                                      ) :+
+                                      PaymentAccountUpsertedEvent.defaultInstance
+                                        .withDocument(
+                                          paymentAccount
+                                            .withRecurryingPayments(
+                                              paymentAccount.recurryingPayments :+ recurringPayment
+                                            )
+                                            .withLastUpdated(createdDate)
+                                        )
+                                        .withLastUpdated(createdDate)
+                                    )
+                                    .thenRun(_ => RecurringPaymentRegistered(result.id) ~> replyTo)
+                                case _ =>
+                                  Effect.none.thenRun(_ => RecurringPaymentNotRegistered ~> replyTo)
+                              }
                           case _ => Effect.none.thenRun(_ => CardNotFound ~> replyTo)
                         }
                       case _ => Effect.none.thenRun(_ => WalletNotFound ~> replyTo)

@@ -135,6 +135,7 @@ trait StripeRecurringPaymentApi extends RecurringPaymentApi { _: StripeContext =
         .builder()
         .setCustomer(userId)
         .setDefaultPaymentMethod(cardId)
+        .setOffSession(true)
         .addItem(
           SubscriptionCreateParams.Item
             .builder()

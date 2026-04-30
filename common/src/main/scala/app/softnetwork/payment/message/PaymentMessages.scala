@@ -1263,6 +1263,8 @@ object PaymentMessages {
 
   case object CardNotFound extends PaymentError("CardNotFound")
 
+  case object CardNotAttachedToCustomer extends PaymentError("CardNotAttachedToCustomer")
+
   case object RecurringPaymentNotRegistered extends PaymentError("RecurringPaymentNotRegistered")
 
   case object MandateRequired extends PaymentError("MandateRequired")

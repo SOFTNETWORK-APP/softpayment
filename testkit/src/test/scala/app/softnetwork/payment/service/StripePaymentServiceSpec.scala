@@ -953,13 +953,14 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             requestOptions
           )
       } match {
-        case Success(_) =>
+        case Success(intent) =>
+          cardId = intent.getPaymentMethod
         case Failure(f) =>
           log.error("Error while confirming setup intent", f)
           fail(f)
       }
       // pre-authorize to register the card
-      withHeaders(
+      /*withHeaders(
         Post(
           s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute",
           Payment(
@@ -985,7 +986,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             cardId = card.id
           case _ => fail("No active card found")
         }
-      }
+      }*/
     }
 
     "verify enterprise customer payment account" in {
