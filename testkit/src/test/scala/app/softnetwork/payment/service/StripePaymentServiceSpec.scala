@@ -943,7 +943,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       // confirm setup intent
       Try {
         val requestOptions = StripeApi().requestOptions()
-        SetupIntent
+        val intent = SetupIntent
           .retrieve(preRegistration.id, requestOptions)
           .confirm(
             SetupIntentConfirmParams
@@ -952,41 +952,13 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
               .build(),
             requestOptions
           )
+        cardId = intent.getPaymentMethod
       } match {
-        case Success(intent) =>
-          cardId = intent.getPaymentMethod
+        case Success(_) =>
         case Failure(f) =>
           log.error("Error while confirming setup intent", f)
           fail(f)
       }
-      // pre-authorize to register the card
-      /*withHeaders(
-        Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$preAuthorizeRoute",
-          Payment(
-            orderUuid,
-            debitedAmount,
-            currency,
-            Option(preRegistration.id),
-            Option(preRegistration.registrationData),
-            registerCard = true,
-            printReceipt = true,
-            feesAmount = Some(feesAmount)
-          )
-        ).withHeaders(
-          `X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)),
-          `User-Agent`("test")
-        )
-      ) ~> routes ~> check {
-        status shouldEqual StatusCodes.OK
-        val result = responseAs[PaymentPreAuthorized]
-        preAuthorizationId = result.transactionId
-        loadCards().find(_.getActive) match {
-          case Some(card) =>
-            cardId = card.id
-          case _ => fail("No active card found")
-        }
-      }*/
     }
 
     "verify enterprise customer payment account" in {
