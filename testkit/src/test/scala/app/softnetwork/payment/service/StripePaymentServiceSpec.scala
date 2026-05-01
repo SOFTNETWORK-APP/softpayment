@@ -948,7 +948,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
           .confirm(
             SetupIntentConfirmParams
               .builder()
-              .setPaymentMethod("pm_card_visa")
+              .setPaymentMethod("pm_card_visa") // pm_card_threeDSecure2Required to simulate 3DS
               .build(),
             requestOptions
           )

@@ -192,7 +192,12 @@ trait RecurringPaymentCommandHandler
                                         )
                                         .withLastUpdated(createdDate)
                                     )
-                                    .thenRun(_ => RecurringPaymentRegistered(result.id) ~> replyTo)
+                                    .thenRun(_ =>
+                                      RecurringPaymentRegistered(
+                                        result.id,
+                                        result.clientSecret
+                                      ) ~> replyTo
+                                    )
                                 case _ =>
                                   Effect.none.thenRun(_ => RecurringPaymentNotRegistered ~> replyTo)
                               }

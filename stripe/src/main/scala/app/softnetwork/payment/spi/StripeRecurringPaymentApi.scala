@@ -54,20 +54,25 @@ trait StripeRecurringPaymentApi extends RecurringPaymentApi { _: StripeContext =
     case _                               => RecurringPayment.RecurringCardPaymentStatus.CREATED
   }
 
+  /** Retrieve the PaymentIntent client_secret if the subscription's first payment requires 3DS. */
+  private[spi] def paymentIntentClientSecret(subscription: Subscription)(implicit
+    requestOptions: RequestOptions
+  ): Option[String] = {
+    Try {
+      for {
+        invoiceId <- Option(subscription.getLatestInvoice)
+        invoice = Invoice.retrieve(invoiceId, requestOptions)
+        piId <- Option(invoice.getPaymentIntent)
+        pi = PaymentIntent.retrieve(piId, requestOptions)
+        if pi.getStatus == "requires_action"
+      } yield pi.getClientSecret
+    }.getOrElse(None)
+  }
+
   /** Check if a subscription's latest invoice payment intent requires 3DS action. */
   private[spi] def requiresAction(subscription: Subscription)(implicit
     requestOptions: RequestOptions
-  ): Boolean = {
-    Try {
-      Option(subscription.getLatestInvoice).exists { invoiceId =>
-        val invoice = Invoice.retrieve(invoiceId, requestOptions)
-        Option(invoice.getPaymentIntent).exists { piId =>
-          val pi = PaymentIntent.retrieve(piId, requestOptions)
-          pi.getStatus == "requires_action"
-        }
-      }
-    }.getOrElse(false)
-  }
+  ): Boolean = paymentIntentClientSecret(subscription).isDefined
 
   /** @param userId
     *   - Provider user id
@@ -204,18 +209,20 @@ trait StripeRecurringPaymentApi extends RecurringPaymentApi { _: StripeContext =
       val isFutureStart = recurringPayment.startDate.exists { sd =>
         sd.toInstant.getEpochSecond > java.time.Instant.now().getEpochSecond
       }
-      val status = if (isFutureStart) {
-        RecurringPayment.RecurringCardPaymentStatus.CREATED
-      } else {
-        toRecurringCardPaymentStatus(
-          subscription.getStatus,
-          requiresAction(subscription)
-        )
+      val maybeClientSecret = paymentIntentClientSecret(subscription)
+      val status = maybeClientSecret match {
+        case Some(_) =>
+          RecurringPayment.RecurringCardPaymentStatus.AUTHENTICATION_NEEDED
+        case None if isFutureStart =>
+          RecurringPayment.RecurringCardPaymentStatus.CREATED
+        case None =>
+          toRecurringCardPaymentStatus(subscription.getStatus, requiresAction = false)
       }
 
       RecurringPayment.RecurringCardPaymentResult.defaultInstance
         .withId(subscription.getId)
         .withStatus(status)
+        .copy(clientSecret = maybeClientSecret)
     } match {
       case Success(result) =>
         mlog.info(s"Stripe subscription created: ${result.id} -> ${result.status}")

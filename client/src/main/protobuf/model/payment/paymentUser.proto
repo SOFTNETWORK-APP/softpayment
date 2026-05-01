@@ -210,6 +210,7 @@ message RecurringPayment {
         required string id = 1;
         required RecurringCardPaymentStatus status = 2;
         optional RecurringCardPaymentState currentstate = 3;
+        optional string clientSecret = 4;
     }
     option (scalapb.message).extends = "ProtobufDomainObject";
     option (scalapb.message).extends = "RecurringPaymentDecorator";

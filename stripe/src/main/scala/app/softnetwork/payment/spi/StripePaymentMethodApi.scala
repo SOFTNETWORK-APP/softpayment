@@ -42,7 +42,9 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
               .builder()
               .addPaymentMethodType(paymentType.name.toLowerCase)
               .setCustomer(customer.getId)
-              .setUsage(SetupIntentCreateParams.Usage.OFF_SESSION)
+              .setUsage(
+                SetupIntentCreateParams.Usage.OFF_SESSION
+              ) // TODO check if this is the right usage for pre registration, it means that the payment method will be used for off session payments, which is the case for recurring payments, but not necessarily for one shot payments
               //              .setUseStripeSdk(false)
               //              .addFlowDirection(SetupIntentCreateParams.FlowDirection.INBOUND)
               .putMetadata("currency", currency)
@@ -59,7 +61,7 @@ trait StripePaymentMethodApi extends PaymentMethodApi { _: StripeContext =>
                       SetupIntentCreateParams.PaymentMethodOptions.Card
                         .builder()
                         .setRequestThreeDSecure(
-                          SetupIntentCreateParams.PaymentMethodOptions.Card.RequestThreeDSecure.ANY
+                          SetupIntentCreateParams.PaymentMethodOptions.Card.RequestThreeDSecure.AUTOMATIC
                         )
                         .build()
                     )
