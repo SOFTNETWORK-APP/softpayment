@@ -20,15 +20,21 @@ trait StripeHooksDirectives extends HooksDirectives with PaymentHandler with Str
                 toStripeEvent(payload, signature, secret) match {
                   case Some(event) =>
                     handleStripeEvent(event)
+                    log.info(
+                      s"[Payment Hooks] Stripe event handled: ${event.getType}[${event.getId}]"
+                    )
                     complete(HttpResponse(StatusCodes.OK))
                   case None =>
+                    log.error(s"[Payment Hooks] Failed to parse Stripe event for hash: $hash")
                     complete(HttpResponse(StatusCodes.NotFound))
                 }
               }
             case None =>
+              log.error(s"[Payment Hooks] Missing Stripe-Signature header for hash: $hash")
               complete(HttpResponse(StatusCodes.NotFound))
           }
         case None =>
+          log.error(s"[Payment Hooks] No webhook secret found for hash: $hash")
           complete(HttpResponse(StatusCodes.NotFound))
       }
     }

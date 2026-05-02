@@ -19,8 +19,10 @@ import org.scalatest.Suite
 
 import java.time.Instant
 import scala.concurrent.Await
+import java.nio.file.Paths
+import java.util.concurrent.CountDownLatch
 import scala.concurrent.duration._
-import scala.sys.process.Process
+import scala.sys.process.{Process, ProcessLogger}
 import scala.util.{Failure, Success, Try}
 
 trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
@@ -42,9 +44,34 @@ trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     webhookBinding = Some(binding)
     val serverPort = binding.localAddress.getPort
     val hash = sha256(clientId)
+    val secretLatch = new CountDownLatch(1)
+    val secretPattern = "webhook signing secret is (whsec_[a-f0-9]+)".r
     stripeCLi = Process(
       s"stripe listen --forward-to ${providerConfig.hooksBaseUrl.replace("9000", s"$serverPort").replace("localhost", interface)}?hash=$hash"
-    ).run()
+    ).run(
+      ProcessLogger(
+        line => {
+          log.info(line)
+          secretPattern.findFirstMatchIn(line).foreach { m =>
+            val cliSecret = m.group(1)
+            // Save the CLI webhook secret so the server uses it for signature verification
+            val dir = Paths.get(
+              s"${app.softnetwork.payment.api.config.SoftPayClientSettings.SP_SECRETS}/stripe/$hash"
+            )
+            dir.toFile.mkdirs()
+            val file = dir.resolve("webhook-secret").toFile
+            val writer = new java.io.BufferedWriter(new java.io.FileWriter(file))
+            writer.write(cliSecret)
+            writer.close()
+            log.info(s"Stripe CLI webhook secret saved for hash $hash")
+            secretLatch.countDown()
+          }
+        },
+        line => log.info(line)
+      )
+    )
+    // Wait for the CLI to output its secret (max 30 seconds)
+    secretLatch.await(30, java.util.concurrent.TimeUnit.SECONDS)
   }
 
   override def afterAll(): Unit = {
