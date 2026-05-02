@@ -1267,6 +1267,8 @@ object PaymentMessages {
 
   case object CardNotAttachedToCustomer extends PaymentError("CardNotAttachedToCustomer")
 
+  case object CardDeclined extends PaymentError("CardDeclined")
+
   case object RecurringPaymentNotRegistered extends PaymentError("RecurringPaymentNotRegistered")
 
   case object MandateRequired extends PaymentError("MandateRequired")

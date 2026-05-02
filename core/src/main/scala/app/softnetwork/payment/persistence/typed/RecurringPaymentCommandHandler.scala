@@ -10,6 +10,7 @@ import app.softnetwork.payment.message.PaymentEvents.{
   RecurringPaymentRegisteredEvent
 }
 import app.softnetwork.payment.message.PaymentMessages.{
+  CardDeclined,
   CardNotAttachedToCustomer,
   CardNotFound,
   ExecuteFirstRecurringPayment,
@@ -148,7 +149,7 @@ trait RecurringPaymentCommandHandler
                                   attachPaymentMethod(cardId, userId) match {
                                     case Some(_) => Right(())
                                     case None =>
-                                      Left(new PaymentError("CardDeclined"))
+                                      Left(CardDeclined)
                                   }
                                 case Some(card: Card) if card.customerId.exists(_ != userId) =>
                                   log.error(
@@ -163,7 +164,7 @@ trait RecurringPaymentCommandHandler
                                   attachPaymentMethod(cardId, userId) match {
                                     case Some(_) => Right(())
                                     case None =>
-                                      Left(new PaymentError("CardDeclined"))
+                                      Left(CardDeclined)
                                   }
                                 case _ => Right(()) // already attached to the correct customer
                               }
