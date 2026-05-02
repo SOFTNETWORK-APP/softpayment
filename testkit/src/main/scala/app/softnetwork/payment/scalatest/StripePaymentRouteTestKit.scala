@@ -19,8 +19,9 @@ import org.scalatest.Suite
 
 import java.time.Instant
 import scala.concurrent.Await
+import java.util.concurrent.CountDownLatch
 import scala.concurrent.duration._
-import scala.sys.process.Process
+import scala.sys.process.{Process, ProcessLogger}
 import scala.util.{Failure, Success, Try}
 
 trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
@@ -42,9 +43,22 @@ trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     webhookBinding = Some(binding)
     val serverPort = binding.localAddress.getPort
     val hash = sha256(clientId)
+    val secretLatch = new CountDownLatch(1)
+    val secretPattern = "webhook signing secret is (whsec_[a-f0-9]+)".r
+    def processLine(line: String): Unit = {
+      log.info(line)
+      secretPattern.findFirstMatchIn(line).foreach { m =>
+        val cliSecret = m.group(1)
+        StripeApi.overrideWebHookSecret(hash, cliSecret)
+        log.info(s"Stripe CLI webhook secret saved for hash $hash")
+        secretLatch.countDown()
+      }
+    }
     stripeCLi = Process(
       s"stripe listen --forward-to ${providerConfig.hooksBaseUrl.replace("9000", s"$serverPort").replace("localhost", interface)}?hash=$hash"
-    ).run()
+    ).run(ProcessLogger(processLine, processLine))
+    // Wait for the CLI to output its secret (max 30 seconds)
+    secretLatch.await(30, java.util.concurrent.TimeUnit.SECONDS)
   }
 
   override def afterAll(): Unit = {

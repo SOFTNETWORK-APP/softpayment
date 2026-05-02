@@ -236,4 +236,16 @@ object StripeApi {
 
   def webHookSecret(hash: String): Option[String] =
     stripeWebHooks.get(hash).orElse(loadSecret(hash))
+
+  /** Override the cached webhook secret for a given hash. Only allowed for test API keys
+    * (sk_test_*) — used by test kit when Stripe CLI provides its own signing secret.
+    */
+  def overrideWebHookSecret(hash: String, secret: String)(implicit
+    provider: SoftPayAccount.Client.Provider
+  ): Unit = {
+    if (provider.providerApiKey.startsWith("sk_test_")) {
+      stripeWebHooks = stripeWebHooks.updated(hash, secret)
+      addSecret(hash, secret)
+    }
+  }
 }
