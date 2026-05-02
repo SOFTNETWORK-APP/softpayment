@@ -22,6 +22,7 @@ import scala.concurrent.Await
 import java.util.concurrent.CountDownLatch
 import scala.concurrent.duration._
 import scala.sys.process.{Process, ProcessLogger}
+import scala.sys.process.{Process, ProcessLogger}
 import scala.util.{Failure, Success, Try}
 
 trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
