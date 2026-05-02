@@ -1,5 +1,7 @@
 package app.softnetwork.payment.scalatest
 
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.RawHeader
 import app.softnetwork.api.server.ApiRoutes
@@ -16,6 +18,8 @@ import com.stripe.net.Webhook
 import org.scalatest.Suite
 
 import java.time.Instant
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.sys.process.Process
 import scala.util.{Failure, Success, Try}
 
@@ -24,12 +28,22 @@ trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     with StripePaymentTestKit { _: Suite with ApiRoutes with SessionMaterials[SD] =>
 
   private[this] var stripeCLi: Process = _
+  private[this] var webhookBinding: Option[ServerBinding] = None
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+    // Start a real HTTP server so Stripe CLI can forward webhooks to it
+    val binding = Await.result(
+      Http()(asystem.classicSystem)
+        .newServerAt(interface, 0)
+        .bind(routes),
+      10.seconds
+    )
+    webhookBinding = Some(binding)
+    val serverPort = binding.localAddress.getPort
     val hash = sha256(clientId)
     stripeCLi = Process(
-      s"stripe listen --forward-to ${providerConfig.hooksBaseUrl.replace("9000", s"$port").replace("localhost", interface)}?hash=$hash"
+      s"stripe listen --forward-to ${providerConfig.hooksBaseUrl.replace("9000", s"$serverPort").replace("localhost", interface)}?hash=$hash"
     ).run()
   }
 
@@ -37,6 +51,7 @@ trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     super.afterAll()
     if (stripeCLi.isAlive())
       stripeCLi.destroy()
+    webhookBinding.foreach(b => Await.result(b.unbind(), 5.seconds))
   }
 
   override def validateKycDocuments(): Unit = {
