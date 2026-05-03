@@ -63,10 +63,11 @@ trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
   }
 
   override def afterAll(): Unit = {
-    super.afterAll()
+    log.info("Shutting down Stripe CLI and HTTP server")
     if (stripeCLi.isAlive())
       stripeCLi.destroy()
     webhookBinding.foreach(b => Await.result(b.unbind(), 5.seconds))
+    super.afterAll()
   }
 
   override def validateKycDocuments(): Unit = {
