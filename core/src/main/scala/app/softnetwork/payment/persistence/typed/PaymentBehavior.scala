@@ -2186,6 +2186,15 @@ trait PaymentBehavior
                   .withLastUpdated(lastUpdated)
                 Effect
                   .persist(
+                    List(
+                      PaymentAccountCreatedOrUpdatedEvent.defaultInstance
+                        .withLastUpdated(lastUpdated)
+                        .withExternalUuid(updatedPaymentAccount.externalUuid)
+                        .copy(
+                          profile = updatedPaymentAccount.profile,
+                          user = toEventUser(updatedPaymentAccount.user)
+                        )
+                    ) :+
                     PaymentAccountUpsertedEvent.defaultInstance
                       .withDocument(updatedPaymentAccount)
                       .withLastUpdated(lastUpdated)
