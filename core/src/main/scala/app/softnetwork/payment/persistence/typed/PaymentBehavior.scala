@@ -236,6 +236,27 @@ trait PaymentBehavior
           state match {
             case Some(previousPaymentAccount) =>
               updated = true
+              // Sync with payment provider (e.g. Stripe) when updating an existing PAYER customer
+              (previousPaymentAccount.user, paymentAccount.user) match {
+                case (
+                      PaymentAccount.User.NaturalUser(previousUser),
+                      PaymentAccount.User.NaturalUser(naturalUser)
+                    )
+                    if previousUser.userId.isDefined &&
+                      previousUser.naturalUserType.contains(NaturalUserType.PAYER) =>
+                  val clientId =
+                    paymentAccount.clientId.orElse(internalClientId)
+                  val paymentProvider = loadPaymentProvider(clientId)
+                  paymentProvider.createOrUpdatePaymentAccount(
+                    Some(
+                      paymentAccount.withNaturalUser(naturalUser.copy(userId = previousUser.userId))
+                    ),
+                    acceptedTermsOfPSP = false,
+                    None,
+                    None
+                  )
+                case _ =>
+              }
               paymentAccount
                 .withTransactions(
                   previousPaymentAccount.transactions.filterNot(transaction =>
