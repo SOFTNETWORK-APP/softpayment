@@ -249,7 +249,12 @@ trait PaymentBehavior
                   val paymentProvider = loadPaymentProvider(clientId)
                   paymentProvider.createOrUpdatePaymentAccount(
                     Some(
-                      paymentAccount.withNaturalUser(naturalUser.copy(userId = previousUser.userId))
+                      paymentAccount.withNaturalUser(
+                        naturalUser.copy(
+                          userId = previousUser.userId,
+                          naturalUserType = previousUser.naturalUserType
+                        )
+                      )
                     ),
                     acceptedTermsOfPSP = false,
                     None,
