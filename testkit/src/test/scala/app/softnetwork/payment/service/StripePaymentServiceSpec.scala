@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import akka.actor.testkit.typed.scaladsl.FishingOutcomes
 import akka.http.scaladsl.model.{RemoteAddress, StatusCodes}
 import akka.http.scaladsl.model.headers.{`User-Agent`, `X-Forwarded-For`}
 import app.softnetwork.api.server.ApiRoutes
@@ -32,6 +33,7 @@ import app.softnetwork.payment.data.{
   vatNumber
 }
 import app.softnetwork.payment.handlers.MockPaymentDao
+import app.softnetwork.payment.message.PaymentEvents.PaymentAccountUpsertedEvent
 import app.softnetwork.payment.message.PaymentMessages.{
   BankAccountCommand,
   IbanMandate,
@@ -68,14 +70,20 @@ import com.stripe.model.PaymentIntent
 import com.stripe.param.PaymentIntentConfirmParams
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
-import com.stripe.model.{Customer, SetupIntent, TaxId}
-import com.stripe.param.{SetupIntentConfirmParams, TaxIdListParams}
+import com.stripe.model.{Customer, PaymentMethod => StripePaymentMethod, SetupIntent, TaxId}
+import com.stripe.param.{
+  PaymentMethodAttachParams,
+  PaymentMethodDetachParams,
+  SetupIntentConfirmParams,
+  TaxIdListParams
+}
 import org.json4s.Formats
 import org.openqa.selenium.{By, WebDriver, WebElement}
 import org.openqa.selenium.htmlunit.HtmlUnitDriver
 
 import java.net.{InetAddress, URLEncoder}
 import java.time.LocalDate
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import scala.jdk.CollectionConverters._
 
@@ -88,6 +96,8 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
   import app.softnetwork.serialization._
 
   var customer: String = _
+
+  var attachedPaymentMethodId: String = _
 
   var payInTransactionId: Option[String] = None
 
@@ -1051,28 +1061,35 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    "execute first recurring card payment" in {
+    "check first recurring card payment" in {
+      // Stripe automatically creates an invoice when the subscription is registered.
+      // The Stripe CLI forwards the invoice.payment_succeeded webhook, which triggers
+      // RecurringPaymentCallback → persists FirstRecurringPaidInEvent + PaymentAccountUpsertedEvent.
+      // We probe for PaymentAccountUpsertedEvent (published via JDBC processor stream)
+      // since FirstRecurringPaidInEvent (BroadcastEvent) has no processor stream in tests.
+      val probe = createTestProbe[PaymentAccountUpsertedEvent]()
+      subscribeProbe(probe)
+      probe.fishForMessage(30.seconds) {
+        case evt: PaymentAccountUpsertedEvent
+            if evt.document.recurryingPayments.exists(r =>
+              r.getId == recurringPaymentRegistrationId &&
+              r.getNumberOfRecurringPayments >= 1
+            ) =>
+          FishingOutcomes.complete
+        case _ => FishingOutcomes.continueAndIgnore
+      }
       withHeaders(
-        Post(
-          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/${URLEncoder
-            .encode(recurringPaymentRegistrationId, "UTF-8")}",
-          Payment("", 0)
-        ).withHeaders(`X-Forwarded-For`(RemoteAddress(InetAddress.getLocalHost)))
+        Get(
+          s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
+        )
       ) ~> routes ~> check {
         status shouldEqual StatusCodes.OK
-        withHeaders(
-          Get(
-            s"/$RootPath/${PaymentSettings.PaymentConfig.path}/$recurringPaymentRoute/$recurringPaymentRegistrationId"
-          )
-        ) ~> routes ~> check {
-          status shouldEqual StatusCodes.OK
-          val recurringPayment = responseAs[RecurringPaymentView]
-          assert(recurringPayment.`type`.isCard)
-          assert(
-            recurringPayment.cardStatus.exists(s => s.isInProgress || s.isCreated)
-          )
-          assert(recurringPayment.numberOfRecurringPayments.getOrElse(0) >= 1)
-        }
+        val recurringPayment = responseAs[RecurringPaymentView]
+        assert(recurringPayment.`type`.isCard)
+        assert(
+          recurringPayment.cardStatus.exists(s => s.isInProgress || s.isCreated)
+        )
+        assert(recurringPayment.numberOfRecurringPayments.getOrElse(0) >= 1)
       }
     }
 
@@ -1118,12 +1135,109 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
       }
     }
 
-    // TODO add webhook integration tests for:
-    // - invoice.payment_succeeded → RecurringPaymentCallback (verify entity state updated)
-    // - invoice.payment_failed → RecurringPaymentCallback (verify failure recorded)
-    // - customer.subscription.deleted → UpdateRecurringCardPaymentRegistration(ENDED)
-    // - customer.subscription.updated (canceled) → UpdateRecurringCardPaymentRegistration(ENDED)
-    // These tests require the stripe listen CLI to forward webhook events.
+    "handle payment_method.attached webhook" in {
+      val probe = createTestProbe[PaymentAccountUpsertedEvent]()
+      subscribeProbe(probe)
+      // Create a new payment method and attach it to the customer via Stripe API.
+      // Must use retrieve-then-attach pattern (same as StripePaymentMethodApi.attachPaymentMethod).
+      // The Stripe CLI forwards the payment_method.attached webhook automatically.
+      val requestOptions = StripeApi().requestOptions()
+      val pm = com.stripe.model.PaymentMethod.create(
+        com.stripe.param.PaymentMethodCreateParams
+          .builder()
+          .setType(com.stripe.param.PaymentMethodCreateParams.Type.CARD)
+          .setCard(
+            com.stripe.param.PaymentMethodCreateParams.Token
+              .builder()
+              .setToken("tok_visa")
+              .build()
+          )
+          .build(),
+        requestOptions
+      )
+      StripePaymentMethod
+        .retrieve(pm.getId, requestOptions)
+        .attach(
+          PaymentMethodAttachParams.builder().setCustomer(customer).build(),
+          requestOptions
+        )
+      // Use fishForMessage to skip stale events from concurrent webhooks
+      // and wait for the specific event containing our card
+      probe.fishForMessage(30.seconds) {
+        case evt: PaymentAccountUpsertedEvent if evt.document.cards.exists(_.id == pm.getId) =>
+          FishingOutcomes.complete
+        case _ => FishingOutcomes.continueAndIgnore
+      }
+      // Verify the card was registered in the payment account
+      val cards = loadCards()
+      assert(
+        cards.exists(_.id == pm.getId),
+        s"Payment method ${pm.getId} should be registered after attach webhook"
+      )
+      // Store the payment method ID for the detach test
+      attachedPaymentMethodId = pm.getId
+    }
+
+    "handle payment_method.detached webhook" in {
+      // Detach the payment method attached in the previous test.
+      // Must use retrieve-then-detach pattern (same as StripePaymentMethodApi.disablePaymentMethod).
+      val requestOptions = StripeApi().requestOptions()
+      val probe = createTestProbe[PaymentAccountUpsertedEvent]()
+      subscribeProbe(probe)
+      StripePaymentMethod
+        .retrieve(attachedPaymentMethodId, requestOptions)
+        .detach(PaymentMethodDetachParams.builder().build(), requestOptions)
+      // Use fishForMessage to skip stale events and wait for the specific disable event
+      probe.fishForMessage(30.seconds) {
+        case evt: PaymentAccountUpsertedEvent
+            if evt.document.cards.exists(c => c.id == attachedPaymentMethodId && !c.getActive) =>
+          FishingOutcomes.complete
+        case _ => FishingOutcomes.continueAndIgnore
+      }
+      // Verify the card was disabled in the payment account
+      val methods = loadPaymentMethods()
+      assert(
+        methods.cards.exists(c => c.id == attachedPaymentMethodId && !c.active),
+        s"Payment method $attachedPaymentMethodId should be disabled after detach webhook"
+      )
+    }
+
+    "handle customer.updated webhook" in {
+      // Update the Stripe customer billing info directly
+      val requestOptions = StripeApi().requestOptions()
+      val updatedName = "Updated Test Name"
+      val updatedPhone = "+33607080910"
+      val probe = createTestProbe[PaymentAccountUpsertedEvent]()
+      subscribeProbe(probe)
+      com.stripe.model.Customer
+        .retrieve(customer, requestOptions)
+        .update(
+          com.stripe.param.CustomerUpdateParams
+            .builder()
+            .setName(updatedName)
+            .setPhone(updatedPhone)
+            .build(),
+          requestOptions
+        )
+      // Use fishForMessage to skip stale events and wait for the customer update event
+      probe.fishForMessage(30.seconds) {
+        case evt: PaymentAccountUpsertedEvent
+            if evt.document.user.naturalUser.exists(_.name.contains(updatedName)) =>
+          FishingOutcomes.complete
+        case _ => FishingOutcomes.continueAndIgnore
+      }
+      // Verify the payment account was updated
+      val paymentAccount = loadPaymentAccount()
+      val user = paymentAccount.naturalUser.get
+      assert(
+        user.name.contains(updatedName),
+        s"User name should be updated to '$updatedName'"
+      )
+      assert(
+        user.phone.contains(updatedPhone),
+        s"User phone should be updated to '$updatedPhone'"
+      )
+    }
 
     "pay in with PayPal" in {
       createNewSession(customerSession)

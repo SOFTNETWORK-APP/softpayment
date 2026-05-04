@@ -217,6 +217,98 @@ trait PaymentMethodCommandHandler
           case _ => Effect.none.thenRun(_ => PaymentMethodNotDisabled ~> replyTo)
         }
 
+      case cmd: RegisterPaymentMethodFromWebhook =>
+        state match {
+          case Some(paymentAccount) =>
+            // Idempotency: if payment method already exists, skip persistence
+            if (paymentAccount.paymentMethods.exists(_.id == cmd.paymentMethodId)) {
+              log.info(
+                s"Payment method ${cmd.paymentMethodId} already registered, skipping"
+              )
+              Effect.none.thenRun(_ => PaymentMethodRegistered ~> replyTo)
+            } else {
+              val clientId =
+                paymentAccount.clientId.orElse(cmd.clientId).orElse(internalClientId)
+              val paymentProvider = loadPaymentProvider(clientId)
+              import paymentProvider._
+              loadPaymentMethod(cmd.paymentMethodId) match {
+                case Some(card: Card) =>
+                  val lastUpdated = now()
+                  val updatedPaymentAccount = paymentAccount
+                    .withCards(
+                      paymentAccount.cards.filterNot(_.id == cmd.paymentMethodId) :+ card
+                    )
+                  keyValueDao.addKeyValue(cmd.paymentMethodId, entityId)
+                  Effect
+                    .persist(
+                      PaymentAccountUpsertedEvent.defaultInstance
+                        .withDocument(updatedPaymentAccount.withLastUpdated(lastUpdated))
+                        .withLastUpdated(lastUpdated)
+                    )
+                    .thenRun(_ => PaymentMethodRegistered ~> replyTo)
+                case Some(paypal: Paypal) =>
+                  val lastUpdated = now()
+                  val updatedPaymentAccount = paymentAccount
+                    .withPaypals(
+                      paymentAccount.paypals.filterNot(_.id == cmd.paymentMethodId) :+ paypal
+                    )
+                  keyValueDao.addKeyValue(cmd.paymentMethodId, entityId)
+                  Effect
+                    .persist(
+                      PaymentAccountUpsertedEvent.defaultInstance
+                        .withDocument(updatedPaymentAccount.withLastUpdated(lastUpdated))
+                        .withLastUpdated(lastUpdated)
+                    )
+                    .thenRun(_ => PaymentMethodRegistered ~> replyTo)
+                case _ =>
+                  log.warn(
+                    s"Payment method ${cmd.paymentMethodId} not found for registration"
+                  )
+                  Effect.none.thenRun(_ => PaymentMethodNotFound ~> replyTo)
+              }
+            }
+          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+        }
+
+      case cmd: DisablePaymentMethodFromWebhook =>
+        state match {
+          case Some(paymentAccount) =>
+            paymentAccount.paymentMethods.find(_.id == cmd.paymentMethodId) match {
+              case Some(card: Card) =>
+                val lastUpdated = now()
+                val updatedPaymentAccount = paymentAccount
+                  .withCards(
+                    paymentAccount.cards.filterNot(_.id == cmd.paymentMethodId) :+
+                    card.withActive(false)
+                  )
+                Effect
+                  .persist(
+                    PaymentAccountUpsertedEvent.defaultInstance
+                      .withDocument(updatedPaymentAccount.withLastUpdated(lastUpdated))
+                      .withLastUpdated(lastUpdated)
+                  )
+                  .thenRun(_ => PaymentMethodDisabled ~> replyTo)
+              case Some(paypal: Paypal) =>
+                val lastUpdated = now()
+                val updatedPaymentAccount = paymentAccount
+                  .withPaypals(
+                    paymentAccount.paypals.filterNot(_.id == cmd.paymentMethodId) :+
+                    paypal.withActive(false)
+                  )
+                Effect
+                  .persist(
+                    PaymentAccountUpsertedEvent.defaultInstance
+                      .withDocument(updatedPaymentAccount.withLastUpdated(lastUpdated))
+                      .withLastUpdated(lastUpdated)
+                  )
+                  .thenRun(_ => PaymentMethodDisabled ~> replyTo)
+              case _ =>
+                log.warn(s"Payment method ${cmd.paymentMethodId} not found for disabling")
+                Effect.none.thenRun(_ => PaymentMethodNotFound ~> replyTo)
+            }
+          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+        }
+
     }
   }
 

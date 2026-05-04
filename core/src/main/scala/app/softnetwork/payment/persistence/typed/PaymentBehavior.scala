@@ -2169,6 +2169,35 @@ trait PaymentBehavior
             Effect.none.thenRun(_ => BalanceNotLoaded ~> replyTo)
         }
 
+      case cmd: UpdateCustomerFromWebhook =>
+        state match {
+          case Some(paymentAccount) =>
+            paymentAccount.user match {
+              case PaymentAccount.User.NaturalUser(naturalUser) =>
+                val updatedUser = naturalUser.copy(
+                  name = cmd.name.orElse(naturalUser.name),
+                  email = cmd.email.getOrElse(naturalUser.email),
+                  phone = cmd.phone.orElse(naturalUser.phone),
+                  address = cmd.address.orElse(naturalUser.address)
+                )
+                val lastUpdated = now()
+                val updatedPaymentAccount = paymentAccount
+                  .withUser(PaymentAccount.User.NaturalUser(updatedUser))
+                  .withLastUpdated(lastUpdated)
+                Effect
+                  .persist(
+                    PaymentAccountUpsertedEvent.defaultInstance
+                      .withDocument(updatedPaymentAccount)
+                      .withLastUpdated(lastUpdated)
+                  )
+                  .thenRun(_ => CustomerUpdated ~> replyTo)
+              case _ =>
+                log.warn(s"No natural user found for customer update")
+                Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+            }
+          case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
+        }
+
       case _ => super.handleCommand(entityId, state, command, replyTo, timers)
     }
   }
