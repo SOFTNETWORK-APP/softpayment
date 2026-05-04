@@ -44,13 +44,13 @@ trait JdbcPaymentTestKit extends PaymentTestKit with JdbcPersistenceTestKit { _:
   lazy val transactionProbe: TestProbe[TransactionUpdatedEvent] =
     createTestProbe[TransactionUpdatedEvent]()
 
-  def subscribeJdbPaymentProbes(): Unit = {
+  def subscribeJdbcPaymentProbes(): Unit = {
     subscribeProbe(transactionProbe)
   }
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    subscribeJdbPaymentProbes()
+    subscribeJdbcPaymentProbes()
   }
 
 }

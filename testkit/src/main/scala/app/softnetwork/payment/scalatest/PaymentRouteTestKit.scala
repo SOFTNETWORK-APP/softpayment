@@ -39,17 +39,9 @@ trait PaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
 
   import app.softnetwork.serialization._
 
-  override lazy val additionalConfig: String = paymentGrpcConfig
+  override lazy val additionalConfig: String = paymentGrpcConfig + additionalNotificationConfig
 
   override implicit lazy val ts: ActorSystem[_] = typedSystem()
-
-  /*
-  override def beforeAll(): Unit = {
-    initAndJoinCluster()
-    // pre load routes
-    mainRoutes(typedSystem())
-  }
-   */
 
   def loadPaymentAccount(): PaymentAccountView = {
     withHeaders(
