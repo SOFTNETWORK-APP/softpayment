@@ -2091,11 +2091,10 @@ trait StripeAccountApi extends PaymentAccountApi { _: StripeContext =>
             .asScala
             .headOption
       }) match {
-        // we should not allow a customer to update his email address
-        case Some(customer) if customer.getEmail == naturalUser.email =>
+        case Some(customer) =>
           val params = CustomerUpdateParams
             .builder()
-            //.setEmail(naturalUser.email)
+            .setEmail(naturalUser.email)
             .setName(
               naturalUser.name.getOrElse(s"${naturalUser.firstName} ${naturalUser.lastName}")
             )
