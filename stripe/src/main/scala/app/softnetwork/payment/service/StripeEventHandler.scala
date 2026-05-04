@@ -4,16 +4,31 @@ import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
   CreateOrUpdateKycDocument,
+  CustomerUpdated,
+  DisablePaymentMethodFromWebhook,
   InvalidateRegularUser,
   KycDocumentCreatedOrUpdated,
+  PaymentMethodDisabled,
+  PaymentMethodRegistered,
   RecurringPaymentCallback,
+  RegisterPaymentMethodFromWebhook,
   RegularUserInvalidated,
   RegularUserValidated,
+  UpdateCustomerFromWebhook,
   UpdateRecurringCardPaymentRegistration,
   ValidateRegularUser
 }
-import app.softnetwork.payment.model.{KycDocument, RecurringPayment}
-import com.stripe.model.{Account, Event, Invoice, Person, StripeObject, Subscription}
+import app.softnetwork.payment.model.{Address, KycDocument, RecurringPayment}
+import com.stripe.model.{
+  Account,
+  Customer,
+  Event,
+  Invoice,
+  PaymentMethod => StripePaymentMethod,
+  Person,
+  StripeObject,
+  Subscription
+}
 import com.stripe.net.Webhook
 
 import scala.util.{Failure, Success, Try}
@@ -387,6 +402,112 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                   )
               }
             case _ => // Non-terminal status changes are informational
+          }
+        }
+
+      case "payment_method.attached" =>
+        log.info(s"[Payment Hooks] Webhook: Payment Method Attached")
+        val maybePm: Option[StripePaymentMethod] =
+          extractStripeObject[StripePaymentMethod](event)
+        maybePm.foreach { pm =>
+          val paymentMethodId = pm.getId
+          val customerId = pm.getCustomer
+          log.info(
+            s"[Payment Hooks] Payment method $paymentMethodId attached to customer $customerId"
+          )
+          run(
+            RegisterPaymentMethodFromWebhook(customerId, paymentMethodId)
+          ).complete() match {
+            case Success(_: PaymentMethodRegistered.type) =>
+              log.info(
+                s"[Payment Hooks] Payment method $paymentMethodId registered for $customerId"
+              )
+            case Success(other) =>
+              log.warn(
+                s"[Payment Hooks] Unexpected result for payment method attach: $other"
+              )
+            case Failure(f) =>
+              log.error(
+                s"[Payment Hooks] Failed to register payment method $paymentMethodId: ${f.getMessage}",
+                f
+              )
+          }
+        }
+
+      case "payment_method.detached" =>
+        log.info(s"[Payment Hooks] Webhook: Payment Method Detached")
+        val maybePm: Option[StripePaymentMethod] =
+          extractStripeObject[StripePaymentMethod](event)
+        maybePm.foreach { pm =>
+          val paymentMethodId = pm.getId
+          // After detach, pm.getCustomer() is null. Retrieve the customer ID from
+          // previous_attributes where Stripe stores the pre-detach state.
+          val customerId = Option(pm.getCustomer).orElse {
+            Option(event.getData.getPreviousAttributes)
+              .flatMap(prev => Option(prev.get("customer")).map(_.toString))
+          }
+          customerId match {
+            case Some(cid) =>
+              log.info(
+                s"[Payment Hooks] Payment method $paymentMethodId detached from customer $cid"
+              )
+              run(
+                DisablePaymentMethodFromWebhook(cid, paymentMethodId)
+              ).complete() match {
+                case Success(_: PaymentMethodDisabled.type) =>
+                  log.info(s"[Payment Hooks] Payment method $paymentMethodId disabled")
+                case Success(other) =>
+                  log.warn(
+                    s"[Payment Hooks] Unexpected result for payment method detach: $other"
+                  )
+                case Failure(f) =>
+                  log.error(
+                    s"[Payment Hooks] Failed to disable payment method $paymentMethodId: ${f.getMessage}",
+                    f
+                  )
+              }
+            case None =>
+              log.warn(
+                s"[Payment Hooks] Cannot disable payment method $paymentMethodId: " +
+                "customer ID not found in event data or previous_attributes"
+              )
+          }
+        }
+
+      case "customer.updated" =>
+        log.info(s"[Payment Hooks] Webhook: Customer Updated")
+        val maybeCustomer: Option[Customer] = extractStripeObject[Customer](event)
+        maybeCustomer.foreach { customer =>
+          val customerId = customer.getId
+          log.info(s"[Payment Hooks] Customer $customerId updated")
+          val address = Option(customer.getAddress).map { a =>
+            Address.defaultInstance
+              .withAddressLine(
+                Seq(Option(a.getLine1), Option(a.getLine2)).flatten.mkString(", ")
+              )
+              .withCity(Option(a.getCity).getOrElse(""))
+              .withPostalCode(Option(a.getPostalCode).getOrElse(""))
+              .withCountry(Option(a.getCountry).getOrElse(""))
+              .copy(state = Option(a.getState))
+          }
+          run(
+            UpdateCustomerFromWebhook(
+              customerId,
+              name = Option(customer.getName),
+              email = Option(customer.getEmail),
+              phone = Option(customer.getPhone),
+              address = address
+            )
+          ).complete() match {
+            case Success(_: CustomerUpdated.type) =>
+              log.info(s"[Payment Hooks] Customer $customerId info updated")
+            case Success(other) =>
+              log.warn(s"[Payment Hooks] Unexpected result for customer update: $other")
+            case Failure(f) =>
+              log.error(
+                s"[Payment Hooks] Failed to update customer $customerId: ${f.getMessage}",
+                f
+              )
           }
         }
 

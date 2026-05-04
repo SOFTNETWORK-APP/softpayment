@@ -176,6 +176,15 @@ object StripeApi {
                         .addEnabledEvent(
                           WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
                         )
+                        .addEnabledEvent(
+                          WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__UPDATED
+                        )
+                        .addEnabledEvent(
+                          WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
+                        )
+                        .addEnabledEvent(
+                          WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
+                        )
                         .setUrl(url)
                         .build(),
                       requestOptions
@@ -207,6 +216,15 @@ object StripeApi {
                   )
                   .addEnabledEvent(
                     WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
+                  )
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__UPDATED
+                  )
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
+                  )
+                  .addEnabledEvent(
+                    WebhookEndpointCreateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
                   )
                   .setUrl(url)
                   .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)

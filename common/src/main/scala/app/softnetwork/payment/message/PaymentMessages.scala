@@ -787,6 +787,53 @@ object PaymentMessages {
     val key: String = debitedAccount
   }
 
+  /** Register a payment method from a webhook event (payment method attached to customer).
+    * @param debitedAccount
+    *   - customer id
+    * @param paymentMethodId
+    *   - id of the payment method to register
+    */
+  case class RegisterPaymentMethodFromWebhook(
+    debitedAccount: String,
+    paymentMethodId: String,
+    clientId: Option[String] = None
+  ) extends PaymentCommandWithKey
+      with PaymentMethodCommand {
+    val key: String = debitedAccount
+  }
+
+  /** Disable a payment method from a webhook event (payment method detached from customer).
+    *
+    * Note: On `payment_method.detached`, Stripe sets the `customer` field to null on the
+    * PaymentMethod object. The customer ID must be extracted from `event.data.previous_attributes`
+    * before constructing this command.
+    *
+    * @param debitedAccount
+    *   - customer id (extracted from previous_attributes since it's null after detach)
+    * @param paymentMethodId
+    *   - id of the payment method to disable
+    */
+  case class DisablePaymentMethodFromWebhook(debitedAccount: String, paymentMethodId: String)
+      extends PaymentCommandWithKey
+      with PaymentMethodCommand {
+    val key: String = debitedAccount
+  }
+
+  /** Update customer information from a webhook event (customer updated).
+    * @param debitedAccount
+    *   - customer id
+    */
+  case class UpdateCustomerFromWebhook(
+    debitedAccount: String,
+    name: Option[String] = None,
+    email: Option[String] = None,
+    phone: Option[String] = None,
+    address: Option[Address] = None
+  ) extends PaymentCommandWithKey
+      with PaymentAccountCommand {
+    val key: String = debitedAccount
+  }
+
   /** Commands related to the kyc documents */
 
   /** @param creditedAccount
@@ -1123,6 +1170,10 @@ object PaymentMessages {
 
   case object PaymentMethodDisabled extends PaymentResult
 
+  case object PaymentMethodRegistered extends PaymentResult
+
+  case object CustomerUpdated extends PaymentResult
+
   case object PaymentAccountCreated extends PaymentResult
 
   case object PaymentAccountUpdated extends PaymentResult
@@ -1256,6 +1307,8 @@ object PaymentMessages {
   case object IllegalTransactionAmount extends PaymentError("IllegalTransactionAmount")
 
   case object PaymentMethodsNotLoaded extends PaymentError("PaymentMethodsNotLoaded")
+
+  case object PaymentMethodNotFound extends PaymentError("PaymentMethodNotFound")
 
   case object PaymentMethodNotDisabled extends PaymentError("PaymentMethodNotDisabled")
 
