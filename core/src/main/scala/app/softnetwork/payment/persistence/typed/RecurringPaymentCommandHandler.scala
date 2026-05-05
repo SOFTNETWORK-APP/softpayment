@@ -130,6 +130,7 @@ trait RecurringPaymentCommandHandler
                                   fixedNextAmount = cmd.fixedNextAmount,
                                   nextDebitedAmount = cmd.nextDebitedAmount,
                                   nextFeesAmount = cmd.nextFeesAmount,
+                                  externalReference = cmd.externalReference,
                                   metadata = cmd.metadata
                                 )
                             val clientId = paymentAccount.clientId
@@ -453,14 +454,20 @@ trait RecurringPaymentCommandHandler
                 )
                 val paymentProvider = loadPaymentProvider(clientId)
                 import paymentProvider._
-                loadPayInTransaction("", transactionId, Some(recurringPayInRegistrationId)) match {
+                val orderUuid = recurringPayment.externalReference.getOrElse("")
+                loadPayInTransaction(
+                  orderUuid,
+                  transactionId,
+                  Some(recurringPayInRegistrationId)
+                ) match {
                   case Some(transaction) =>
                     handleRecurringPayment(
                       entityId,
                       replyTo,
                       paymentAccount,
                       recurringPayment,
-                      transaction
+                      transaction,
+                      scheduleNextPayment = false
                     )
                   case _ =>
                     Effect.none.thenRun(_ =>
@@ -658,7 +665,8 @@ trait RecurringPaymentCommandHandler
     replyTo: Option[ActorRef[PaymentResult]],
     paymentAccount: PaymentAccount,
     recurringPayment: RecurringPayment,
-    transaction: Transaction
+    transaction: Transaction,
+    scheduleNextPayment: Boolean = true
   )(implicit
     system: ActorSystem[_],
     log: Logger
@@ -716,6 +724,7 @@ trait RecurringPaymentCommandHandler
               _.getId == recurringPayment.getId
             ) :+ updatedRecurringPayment
           )
+          val nextRecurringPaymentDate = updatedRecurringPayment.nextRecurringPaymentDate
           Effect
             .persist(
               List(
@@ -729,9 +738,7 @@ trait RecurringPaymentCommandHandler
                     .withFrequency(recurringPayment.getFrequency)
                     .withRecurringPaymentRegistrationId(recurringPayment.getId)
                     .withLastUpdated(lastUpdated)
-                    .copy(nextRecurringPaymentDate =
-                      updatedRecurringPayment.nextRecurringPaymentDate
-                    )
+                    .copy(nextRecurringPaymentDate = nextRecurringPaymentDate)
                 } else {
                   NextRecurringPaidEvent.defaultInstance
                     .withDebitedAccount(paymentAccount.externalUuid)
@@ -748,13 +755,11 @@ trait RecurringPaymentCommandHandler
                     .withCumulatedDebitedAmount(updatedRecurringPayment.getCumulatedDebitedAmount)
                     .withCumulatedFeesAmount(updatedRecurringPayment.getCumulatedFeesAmount)
                     .withLastUpdated(lastUpdated)
-                    .copy(nextRecurringPaymentDate =
-                      updatedRecurringPayment.nextRecurringPaymentDate
-                    )
+                    .copy(nextRecurringPaymentDate = nextRecurringPaymentDate)
                 }
               ) :+ {
-                updatedRecurringPayment.nextRecurringPaymentDate match {
-                  case Some(value) =>
+                nextRecurringPaymentDate match {
+                  case Some(value) if scheduleNextPayment =>
                     ExternalEntityToSchedulerEvent(
                       ExternalEntityToSchedulerEvent.Wrapped.AddSchedule(
                         AddSchedule(

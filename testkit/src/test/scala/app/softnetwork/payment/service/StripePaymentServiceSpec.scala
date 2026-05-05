@@ -1026,6 +1026,7 @@ trait StripePaymentServiceSpec[SD <: SessionData with SessionDataDecorator[SD]]
             fixedNextAmount = Some(true),
             nextDebitedAmount = Some(4990),
             nextFeesAmount = Some(0),
+            externalReference = Some("reference"),
             cardId = Some(cardId)
           )
         )
