@@ -236,32 +236,6 @@ trait PaymentBehavior
           state match {
             case Some(previousPaymentAccount) =>
               updated = true
-              // Sync with payment provider (e.g. Stripe) when updating an existing PAYER customer
-              (previousPaymentAccount.user, paymentAccount.user) match {
-                case (
-                      PaymentAccount.User.NaturalUser(previousUser),
-                      PaymentAccount.User.NaturalUser(naturalUser)
-                    )
-                    if previousUser.userId.isDefined &&
-                      previousUser.naturalUserType.contains(NaturalUserType.PAYER) =>
-                  val clientId =
-                    paymentAccount.clientId.orElse(internalClientId)
-                  val paymentProvider = loadPaymentProvider(clientId)
-                  paymentProvider.createOrUpdatePaymentAccount(
-                    Some(
-                      paymentAccount.withNaturalUser(
-                        naturalUser.copy(
-                          userId = previousUser.userId,
-                          naturalUserType = previousUser.naturalUserType
-                        )
-                      )
-                    ),
-                    acceptedTermsOfPSP = false,
-                    None,
-                    None
-                  )
-                case _ =>
-              }
               paymentAccount
                 .withTransactions(
                   previousPaymentAccount.transactions.filterNot(transaction =>
@@ -1284,7 +1258,9 @@ trait PaymentBehavior
                           walletId = previousNaturalUser.walletId
                         )
                         .withNaturalUserType(
-                          updatedNaturalUser.naturalUserType.getOrElse(NaturalUserType.COLLECTOR)
+                          updatedNaturalUser.naturalUserType
+                            .orElse(previousNaturalUser.naturalUserType)
+                            .getOrElse(NaturalUserType.COLLECTOR)
                         )
                     )
                   } else if (updatedUser.isNaturalUser) {
@@ -1361,10 +1337,10 @@ trait PaymentBehavior
                     != paymentAccount.getLegalUser.legalRepresentative.nationality ||
                     updatedPaymentAccount.getLegalUser.legalRepresentative.countryOfResidence
                     != paymentAccount.getLegalUser.legalRepresentative.countryOfResidence)) ||
-                  (!updatedPaymentAccount.legalUser && (updatedPaymentAccount.getNaturalUser.email != paymentAccount.getNaturalUser.email ||
-                  updatedPaymentAccount.getNaturalUser.nationality != paymentAccount.getNaturalUser.nationality ||
-                  updatedPaymentAccount.getNaturalUser.countryOfResidence
-                    != paymentAccount.getNaturalUser.countryOfResidence))
+                  (!updatedPaymentAccount.legalUser &&
+                  !updatedPaymentAccount.getNaturalUser.hasSameProviderInfo(
+                    paymentAccount.getNaturalUser
+                  ))
 
                 //val shouldCreateOrUpdateUser = shouldCreateUser || shouldUpdateUser
 
