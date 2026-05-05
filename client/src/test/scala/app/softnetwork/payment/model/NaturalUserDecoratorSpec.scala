@@ -94,13 +94,15 @@ class NaturalUserDecoratorSpec extends AnyWordSpec with Matchers {
     }
 
     "return false when address differs" in {
-      val other = baseUser.copy(address = Some(
-        Address.defaultInstance
-          .withAddressLine("42 rue Autre")
-          .withCity("Lyon")
-          .withPostalCode("69001")
-          .withCountry("FR")
-      ))
+      val other = baseUser.copy(address =
+        Some(
+          Address.defaultInstance
+            .withAddressLine("42 rue Autre")
+            .withCity("Lyon")
+            .withPostalCode("69001")
+            .withCountry("FR")
+        )
+      )
       baseUser.hasSameProviderInfo(other) shouldBe false
     }
 
@@ -110,14 +112,16 @@ class NaturalUserDecoratorSpec extends AnyWordSpec with Matchers {
     }
 
     "return false when address state differs" in {
-      val other = baseUser.copy(address = Some(
-        Address.defaultInstance
-          .withAddressLine("17 rue Test")
-          .withCity("Paris")
-          .withPostalCode("75015")
-          .withCountry("FR")
-          .copy(state = Some("Ile-de-France"))
-      ))
+      val other = baseUser.copy(address =
+        Some(
+          Address.defaultInstance
+            .withAddressLine("17 rue Test")
+            .withCity("Paris")
+            .withPostalCode("75015")
+            .withCountry("FR")
+            .copy(state = Some("Ile-de-France"))
+        )
+      )
       baseUser.hasSameProviderInfo(other) shouldBe false
     }
 
@@ -143,11 +147,13 @@ class NaturalUserDecoratorSpec extends AnyWordSpec with Matchers {
     }
 
     "return false when business differs" in {
-      val other = baseUser.copy(business = Some(
-        Business.defaultInstance
-          .withMerchantCategoryCode("7372")
-          .withWebsite("https://www.other.com")
-      ))
+      val other = baseUser.copy(business =
+        Some(
+          Business.defaultInstance
+            .withMerchantCategoryCode("7372")
+            .withWebsite("https://www.other.com")
+        )
+      )
       baseUser.hasSameProviderInfo(other) shouldBe false
     }
 
@@ -163,9 +169,8 @@ class NaturalUserDecoratorSpec extends AnyWordSpec with Matchers {
     }
 
     "return false when additionalProperties has extra key" in {
-      val other = baseUser.copy(additionalProperties =
-        baseUser.additionalProperties + ("newKey" -> "value")
-      )
+      val other =
+        baseUser.copy(additionalProperties = baseUser.additionalProperties + ("newKey" -> "value"))
       baseUser.hasSameProviderInfo(other) shouldBe false
     }
 
