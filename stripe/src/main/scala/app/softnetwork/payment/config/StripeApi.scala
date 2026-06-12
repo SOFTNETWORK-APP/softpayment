@@ -57,6 +57,12 @@ object StripeApi {
     override val hooksPath: String,
     override val mandatePath: String,
     override val paypalPath: String,
+    // Whether the (single) webhook endpoint registered for this provider is a Connect endpoint:
+    //   true  -> receives events from CONNECTED accounts (account.updated, person.updated, …)
+    //   false -> receives events from the PLATFORM account (customer.updated, invoice.*,
+    //            customer.subscription.*, payment_method.*) — what the license-server needs.
+    // Defaults to false. See the setConnect(...) call below.
+    connected: Boolean = false,
     paymentConfig: Payment.Config = PaymentSettings.PaymentConfig
   ) extends ProviderConfig(
         clientId,
@@ -228,7 +234,14 @@ object StripeApi {
                   )
                   .setUrl(url)
                   .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)
-                  .setConnect(true)
+                  // connect=true -> events from connected accounts only; connect=false -> events from
+                  // the platform account (customer.updated, invoice.*, subscription.*, payment_method.*).
+                  // Driven by payment.stripe.connected (default false). NOTE: `connect` is immutable
+                  // after endpoint creation, so flipping this requires deleting the existing endpoint
+                  // so it is recreated. FUTURE: support several webhook endpoints per provider (one per
+                  // scope) — not on the roadmap and not needed by the license-server (single endpoint,
+                  // connected=false, suffices to receive customer.updated for org sync).
+                  .setConnect(config.connected)
                   .build(),
                 requestOptions
               )
