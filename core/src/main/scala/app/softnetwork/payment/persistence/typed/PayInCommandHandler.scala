@@ -157,7 +157,8 @@ trait PayInCommandHandler
                                       registerMeansOfPayment,
                                       printReceipt,
                                       transaction,
-                                      registerWallet
+                                      registerWallet,
+                                      correlationId = cmd.correlationId // Story 13.7
                                     )
                                   case _ =>
                                     Effect.none.thenRun(_ =>
@@ -252,7 +253,8 @@ trait PayInCommandHandler
                                       registerMeansOfPayment,
                                       printReceipt = printReceipt,
                                       transaction,
-                                      registerWallet
+                                      registerWallet,
+                                      correlationId = cmd.correlationId // Story 13.7
                                     )
                                   case _ =>
                                     Effect.none.thenRun(_ =>
@@ -581,7 +583,8 @@ trait PayInCommandHandler
     registerMeansOfPayment: Boolean,
     printReceipt: Boolean,
     transaction: Transaction,
-    registerWallet: Boolean = false
+    registerWallet: Boolean = false,
+    correlationId: Option[String] = None // Story 13.7 — threaded from the checkout command
   )(implicit
     system: ActorSystem[_],
     log: Logger,
@@ -749,6 +752,7 @@ trait PayInCommandHandler
                   .withPaymentMethodId(transaction.paymentMethodId.getOrElse(""))
                   .withPaymentType(transaction.paymentType)
                   .withPrintReceipt(printReceipt)
+                  .copy(correlationId = correlationId) // Story 13.7 — durable hop
               ) ++
               (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)

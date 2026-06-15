@@ -58,6 +58,10 @@ message PaidInEvent {
     required string paymentMethodId = 7;
     required app.softnetwork.payment.model.Transaction.PaymentType paymentType = 8;
     optional bool printReceipt = 9;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail), set from the
+    // checkout command. ScalaPB → correlationId: Option[String] + withCorrelationId.
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 10;
 }
 
 message PayInFailedEvent {
@@ -176,6 +180,9 @@ message FirstRecurringPaidInEvent {
     required string recurringPaymentRegistrationId = 7;
     required app.softnetwork.payment.model.RecurringPayment.RecurringPaymentFrequency frequency = 8;
     optional google.protobuf.Timestamp nextRecurringPaymentDate = 9 [(scalapb.field).type = "java.util.Date"];
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 10;
 }
 
 message FirstRecurringCardPaymentFailedEvent {
@@ -207,6 +214,9 @@ message NextRecurringPaidEvent {
     optional google.protobuf.Timestamp nextRecurringPaymentDate = 11 [(scalapb.field).type = "java.util.Date"];
     required int32 cumulatedDebitedAmount = 12;
     required int32 cumulatedFeesAmount = 13;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 14;
 }
 
 message NextRecurringPaymentFailedEvent {
