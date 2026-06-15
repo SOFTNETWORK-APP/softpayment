@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.HttpCorrelation
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
@@ -25,6 +26,7 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         jsonBody[UboDeclaration.UltimateBeneficialOwner]
           .description("The UBO to declare for the authenticated legal payment account")
       )
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok)
           .and(
@@ -32,8 +34,13 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               .description("The UBO successfully recorded")
           )
       )
-      .serverLogic(principal => { ubo =>
-        run(CreateOrUpdateUbo(externalUuidWithProfile(principal._2), ubo)).map {
+      .serverLogic(principal => { args =>
+        val ubo = args._1
+        val correlationId = args._2
+        val cmd =
+          CreateOrUpdateUbo(externalUuidWithProfile(principal._2), ubo)
+        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+        run(cmd).map {
           case r: UboCreatedOrUpdated => Right(r.ubo)
           case other                  => Left(error(other))
         }
@@ -43,6 +50,7 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val loadUboDeclaration: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
       .in(PaymentSettings.PaymentConfig.declarationRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok)
           .and(
@@ -51,11 +59,13 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           )
       )
       .serverLogic(principal =>
-        _ =>
-          run(GetUboDeclaration(externalUuidWithProfile(principal._2))).map {
+        cid => {
+          val cmd = GetUboDeclaration(externalUuidWithProfile(principal._2))
+          run(cmd).map {
             case r: UboDeclarationLoaded => Right(r.declaration.view)
             case other                   => Left(error(other))
           }
+        }
       )
       .description("Load the Ubo declaration of the authenticated legal payment account")
 
@@ -69,6 +79,7 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .in(PaymentSettings.PaymentConfig.declarationRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[UboDeclarationAskedForValidation.type].description(
@@ -76,20 +87,19 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           )
         )
       )
-      .serverLogic(principal => { case (ipAddress, userAgent, tokenId) =>
+      .serverLogic(principal => { case (ipAddress, userAgent, tokenId, cid) =>
         val session: SD = principal._2
-        run(
-          ValidateUboDeclaration(
-            externalUuidWithProfile(session),
-            ipAddress,
-            userAgent,
-            tokenId
-          )
+        val cmd = ValidateUboDeclaration(
+          externalUuidWithProfile(session),
+          ipAddress,
+          userAgent,
+          tokenId
         )
-          .map {
-            case UboDeclarationAskedForValidation => Right(UboDeclarationAskedForValidation)
-            case other                            => Left(error(other))
-          }
+        cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+        run(cmd).map {
+          case UboDeclarationAskedForValidation => Right(UboDeclarationAskedForValidation)
+          case other                            => Left(error(other))
+        }
       })
       .description("Validate the Ubo declaration of the authenticated legal payment account")
 

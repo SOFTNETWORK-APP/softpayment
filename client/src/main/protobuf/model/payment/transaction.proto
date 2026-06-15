@@ -130,6 +130,7 @@ message PayInTransaction {
     optional string preAuthorizedTransactionId = 14;
     optional int32 preAuthorizationDebitedAmount = 15;
     optional string preRegistrationId = 16;
+    map<string, string> metadata = 17;
 }
 
 message PayInWithCardTransaction {
@@ -147,6 +148,7 @@ message PayInWithCardTransaction {
     optional bool printReceipt = 11;
     optional string statementDescriptor = 12;
     optional string preRegistrationId = 13;
+    map<string, string> metadata = 14;
 }
 
 message PayInWithPayPalTransaction {
@@ -165,6 +167,7 @@ message PayInWithPayPalTransaction {
     optional BrowserInfo browserInfo = 12;
     optional bool registerPaypal = 13;
     optional string preRegistrationId = 14;
+    map<string, string> metadata = 15;
 }
 
 message RefundTransaction {
@@ -177,6 +180,7 @@ message RefundTransaction {
     required string reasonMessage = 6;
     required bool initializedByClient = 7;
     optional int32 feesRefundAmount = 8;
+    map<string, string> metadata = 9;
 }
 
 message TransferTransaction {
@@ -192,6 +196,7 @@ message TransferTransaction {
     optional string externalReference = 9;
     optional string statementDescriptor = 10;
     optional string payInTransactionId = 11;
+    map<string, string> metadata = 12;
 }
 
 message PayOutTransaction {
@@ -207,6 +212,7 @@ message PayOutTransaction {
     optional string externalReference = 9;
     optional string payInTransactionId = 10;
     optional string statementDescriptor = 11;
+    map<string, string> metadata = 12;
 }
 
 message DirectDebitTransaction {
@@ -220,6 +226,7 @@ message DirectDebitTransaction {
     required string mandateId = 7;
     required string statementDescriptor = 8;
     optional string externalReference = 9;
+    map<string, string> metadata = 10;
 }
 
 message PreAuthorizationTransaction {
@@ -238,6 +245,7 @@ message PreAuthorizationTransaction {
     optional string statementDescriptor = 12;
     optional string preRegistrationId = 13;
     required Transaction.PaymentType paymentType = 14 [default = CARD];
+    map<string, string> metadata = 15;
 }
 
 message PayInWithPreAuthorization {
@@ -252,6 +260,7 @@ message PayInWithPreAuthorization {
     optional int32 feesAmount = 8;
     optional string statementDescriptor = 9;
     optional string preRegistrationId = 10;
+    map<string, string> metadata = 11;
 }
 
 message PreRegistration{

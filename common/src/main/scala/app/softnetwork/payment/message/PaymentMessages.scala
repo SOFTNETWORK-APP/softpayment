@@ -7,13 +7,21 @@ import app.softnetwork.payment.message.PaymentEvents.{
   PaymentEventWithCommand
 }
 import app.softnetwork.payment.model._
-import app.softnetwork.persistence.message.{Command, CommandResult, EntityCommand, ErrorMessage}
+import app.softnetwork.persistence.message.{
+  AuditableCommand,
+  CommandResult,
+  EntityCommand,
+  ErrorMessage
+}
 import app.softnetwork.scheduler.model.Schedule
 
 import java.util.Date
 
 object PaymentMessages {
-  trait PaymentCommand extends Command
+  // Story 13.7 — every payment command carries `var correlationId` + `withCorrelationId` via
+  // AuditableCommand (zero constructor churn). The checkout endpoints stamp it from the inbound
+  // X-Correlation-Id; the handlers thread it onto the persisted payment events (the durable hop).
+  trait PaymentCommand extends AuditableCommand
 
   trait PaymentCommandWithKey extends PaymentCommand {
     def key: String

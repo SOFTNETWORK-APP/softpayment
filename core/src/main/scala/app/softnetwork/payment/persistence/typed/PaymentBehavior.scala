@@ -5,6 +5,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.cluster.sharding.typed.ShardingEnvelope
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.payment.api.config.SoftPayClientSettings
+import app.softnetwork.payment.audit.PaymentAuditLog.audit
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.config.PaymentSettings.PaymentConfig.akkaNodeRole
 import app.softnetwork.payment.handlers.{PaymentDao, SoftPayAccountDao}
@@ -314,6 +315,8 @@ trait PaymentBehavior
 
       case cmd: Refund =>
         import cmd._
+        // Story 13.7 — orderUuid fallback shared by every refund event + audit line (see handlePayIn).
+        val effectiveCorrelationId: String = cmd.correlationId.getOrElse(orderUuid)
         state match {
           case Some(paymentAccount) =>
             val clientId = paymentAccount.clientId
@@ -365,6 +368,7 @@ trait PaymentBehavior
                             )
                           )
                           .withLastUpdated(lastUpdated)
+                          .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                       transaction.status match {
                         case Transaction.TransactionStatus.TRANSACTION_FAILED_FOR_TECHNICAL_REASON =>
                           log.error(
@@ -380,15 +384,25 @@ trait PaymentBehavior
                                   .withOrderUuid(orderUuid)
                                   .withResultMessage(transaction.resultMessage)
                                   .withTransaction(transaction)
+                                  .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                               ) :+ transactionUpdatedEvent
                             )
-                            .thenRun(_ =>
+                            .thenRun { _ =>
+                              audit.event(
+                                effectiveCorrelationId,
+                                "refund_failed",
+                                "order_uuid"            -> orderUuid,
+                                "pay_in_transaction_id" -> payInTransactionId,
+                                "refund_amount"         -> refundAmount,
+                                "currency"              -> currency,
+                                "result"                -> transaction.resultMessage
+                              )
                               RefundFailed(
                                 "",
                                 Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
                                 transaction.resultMessage
                               ) ~> replyTo
-                            )
+                            }
                         case _ =>
                           if (
                             transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated
@@ -414,9 +428,24 @@ trait PaymentBehavior
                                     .withReasonMessage(reasonMessage)
                                     .withInitializedByClient(initializedByClient)
                                     .withPaymentType(transaction.paymentType)
+                                    .copy(correlationId =
+                                      Some(effectiveCorrelationId)
+                                    ) // Story 13.7
                                 ) :+ transactionUpdatedEvent
                               )
-                              .thenRun(_ => Refunded(transaction.id, transaction.status) ~> replyTo)
+                              .thenRun { _ =>
+                                audit.event(
+                                  effectiveCorrelationId,
+                                  "refund",
+                                  "order_uuid"            -> orderUuid,
+                                  "pay_in_transaction_id" -> payInTransactionId,
+                                  "transaction_id"        -> transaction.id,
+                                  "refund_amount"         -> refundAmount,
+                                  "currency"              -> currency,
+                                  "result"                -> transaction.status.name
+                                )
+                                Refunded(transaction.id, transaction.status) ~> replyTo
+                              }
                           } else {
                             log.info(
                               "Order-{} could not be refunded: {} -> {}",
@@ -431,15 +460,28 @@ trait PaymentBehavior
                                     .withOrderUuid(orderUuid)
                                     .withResultMessage(transaction.resultMessage)
                                     .withTransaction(transaction)
+                                    .copy(correlationId =
+                                      Some(effectiveCorrelationId)
+                                    ) // Story 13.7
                                 ) :+ transactionUpdatedEvent
                               )
-                              .thenRun(_ =>
+                              .thenRun { _ =>
+                                audit.event(
+                                  effectiveCorrelationId,
+                                  "refund_failed",
+                                  "order_uuid"            -> orderUuid,
+                                  "pay_in_transaction_id" -> payInTransactionId,
+                                  "transaction_id"        -> transaction.id,
+                                  "refund_amount"         -> refundAmount,
+                                  "currency"              -> currency,
+                                  "result"                -> transaction.resultMessage
+                                )
                                 RefundFailed(
                                   transaction.id,
                                   transaction.status,
                                   transaction.resultMessage
                                 ) ~> replyTo
-                              )
+                              }
                           }
                       }
                     case _ =>
@@ -453,15 +495,25 @@ trait PaymentBehavior
                             RefundFailedEvent.defaultInstance
                               .withOrderUuid(orderUuid)
                               .withResultMessage("no transaction returned by provider")
+                              .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                           )
                         )
-                        .thenRun(_ =>
+                        .thenRun { _ =>
+                          audit.event(
+                            effectiveCorrelationId,
+                            "refund_failed",
+                            "order_uuid"            -> orderUuid,
+                            "pay_in_transaction_id" -> payInTransactionId,
+                            "refund_amount"         -> refundAmount,
+                            "currency"              -> currency,
+                            "result"                -> "no transaction returned by provider"
+                          )
                           RefundFailed(
                             "",
                             Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
                             "no transaction returned by provider"
                           ) ~> replyTo
-                        )
+                        }
                   }
                 }
               case _ => Effect.none.thenRun(_ => IllegalTransactionStatus ~> replyTo)

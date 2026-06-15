@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>payment.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>payment_%d{yyyy-MM-dd}.log</fileNamePattern>
+        </rollingPolicy>
+        <encoder>
+            <pattern>[%date{ISO8601}] [%level] [%logger] [%marker] [%thread] - %msg MDC: {%mdc}%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>8192</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="FILE" />
+    </appender>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- encoders are assigned the type
+            ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+        <encoder>
+            <pattern>%date{MM/dd HH:mm:ss} %-5level[%thread] %logger{1} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    {# Dedicated audit appender — SYNCHRONOUS, never wrapped by ASYNC/neverBlock (C4): audit lines
+    must never be silently dropped under backpressure. PVC-backed file, ~1y of daily rolls; Loki
+    holds the authoritative 1y via the promtail sidecar that tails this file → {stream="audit"}. #}
+    <appender name="AUDIT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>audit.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>audit-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            {# Bound total on-disk audit size so a burst can't fill the log PVC. The appender is
+            synchronous/non-dropping, so a full disk would otherwise stall the emitting thread. #}
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            {# Do NOT ServiceLoader-scan the classpath for Jackson modules. Under JDK 11+ the
+            transitive jackson-module-jaxb-annotations (from rapidoid/dumbster) would try to load
+            javax.xml.bind.annotation.XmlElement — removed from the JDK in Java 11 — and blow up
+            with NoClassDefFoundError. The encoder registers the modules it actually needs itself. #}
+            <findAndRegisterJacksonModules>false</findAndRegisterJacksonModules>
+            <includeMdc>false</includeMdc>
+            <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                <valueMask><value>(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}</value><mask>***@***</mask></valueMask>
+                <valueMask><value>(?i)\b(?:sk|pk|whsec|rk)_[a-z0-9_]+\b</value><mask>***</mask></valueMask>
+                <valueMask><value>(?i)bearer\s+[a-z0-9._/+=-]+</value><mask>Bearer ***</mask></valueMask>
+            </jsonGeneratorDecorator>
+        </encoder>
+    </appender>
+
+    {# additivity=false so audit lines do NOT also propagate to root (no duplicate in app.log).
+    Audit routes ONLY to AUDIT_FILE; the sidecar tails it for {stream="audit"}. No STDOUT copy —
+    that would be re-shipped to {stream="app"} by the node promtail, double-ingesting every audit
+    line and polluting the operational stream. #}
+    <logger name="app.softnetwork.audit" level="INFO" additivity="false">
+        <appender-ref ref="AUDIT_FILE"/>
+    </logger>
+
+    <logger name="akka" level="INFO"/>
+
+    <logger name="slick" level="WARN"/>
+    <logger name="com.zaxxer" level="WARN"/>
+
+    <logger name="app.softnetwork" level="INFO"/>
+
+    <logger name="com.github" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="ASYNC"/>
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

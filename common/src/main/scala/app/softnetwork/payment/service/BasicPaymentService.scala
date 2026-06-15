@@ -1,10 +1,11 @@
 package app.softnetwork.payment.service
 
-import app.softnetwork.api.server.ApiErrors
+import app.softnetwork.api.server.{ApiErrors, HttpCorrelation}
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.BrowserInfo
 import app.softnetwork.persistence.service.Service
 import app.softnetwork.persistence.typed.scaladsl.EntityPattern
+import org.slf4j.MDC
 
 import java.util.TimeZone
 import scala.concurrent.Future
@@ -15,8 +16,16 @@ trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
 
   def run(command: PaymentCommandWithKey)(implicit
     tTag: ClassTag[PaymentCommand]
-  ): Future[PaymentResult] =
+  ): Future[PaymentResult] = {
+    // Story 13.7 — synchronous akka-http routes (PaymentService) build the command on the request
+    // thread, where HttpCorrelation.withCorrelation has put the correlation id on MDC; stamp it onto
+    // the command here, the single dispatch point. Guarded by isEmpty so a tapir endpoint that already
+    // set it explicitly (its serverLogic runs in a Future where MDC does not survive — C14) is not
+    // clobbered.
+    if (command.correlationId.isEmpty)
+      Option(MDC.get(HttpCorrelation.MdcKey)).filter(_.nonEmpty).foreach(command.withCorrelationId)
     super.run(command.key, command)
+  }
 
   def error(result: PaymentResult): ApiErrors.ErrorInfo =
     result match {

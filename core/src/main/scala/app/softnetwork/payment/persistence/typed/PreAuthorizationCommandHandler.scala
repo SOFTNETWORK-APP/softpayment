@@ -5,6 +5,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.api.config.SoftPayClientSettings
+import app.softnetwork.payment.audit.PaymentAuditLog.audit
 import app.softnetwork.payment.message.PaymentEvents.{
   PaymentAccountUpsertedEvent,
   PaymentMethodRegisteredEvent,
@@ -117,6 +118,12 @@ trait PreAuthorizationCommandHandler
                   }
                 val registerMeansOfPayment: Boolean =
                   cmd.registerMeansOfPayment.getOrElse(cmd.paymentType.isCard && cmd.registerCard)
+                val metadata: Map[String, String] =
+                  cmd.correlationId match {
+                    case Some(correlationId) =>
+                      Map("correlationId" -> correlationId)
+                    case None => Map.empty
+                  }
                 preAuthorize(
                   PreAuthorizationTransaction.defaultInstance
                     .withAuthorId(userId)
@@ -133,6 +140,7 @@ trait PreAuthorizationCommandHandler
                       preRegistrationId = registrationId,
                       paymentType = paymentType
                     )
+                    .withMetadata(metadata)
                 ) match {
                   case Some(transaction) =>
                     handlePreAuthorization(
@@ -143,7 +151,8 @@ trait PreAuthorizationCommandHandler
                       registerMeansOfPayment,
                       printReceipt,
                       transaction,
-                      registerWallet
+                      registerWallet,
+                      maybeCorrelationId = cmd.correlationId
                     )
                   case _ => // pre authorization failed
                     Effect.none.thenRun(_ => PaymentNotPreAuthorized ~> replyTo)
@@ -181,7 +190,8 @@ trait PreAuthorizationCommandHandler
                   transaction.copy(
                     preRegistrationId = preRegistrationId,
                     preAuthorizationId = Some(preAuthorizationId)
-                  )
+                  ),
+                  maybeCorrelationId = cmd.correlationId
                 )
               case _ => Effect.none.thenRun(_ => PaymentNotPreAuthorized ~> replyTo)
             }
@@ -190,6 +200,8 @@ trait PreAuthorizationCommandHandler
 
       case cmd: CancelPreAuthorization =>
         import cmd._
+        // Story 13.7 — orderUuid fallback shared by the cancel event + audit line (see handlePayIn).
+        val effectiveCorrelationId: String = cmd.correlationId.getOrElse(orderUuid)
         state match {
           case Some(paymentAccount) =>
             val clientId = paymentAccount.clientId
@@ -215,6 +227,7 @@ trait PreAuthorizationCommandHandler
                         )
                     )
                     .withLastUpdated(lastUpdated)
+                    .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                 Effect
                   .persist(
                     List(
@@ -224,9 +237,19 @@ trait PreAuthorizationCommandHandler
                         .withDebitedAccount(paymentAccount.externalUuid)
                         .withPreAuthorizedTransactionId(preAuthorizationId)
                         .withPreAuthorizationCanceled(preAuthorizationCanceled)
+                        .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                     ) :+ transactionUpdatedEvent
                   )
-                  .thenRun(_ => PreAuthorizationCanceled(preAuthorizationCanceled) ~> replyTo)
+                  .thenRun { _ =>
+                    audit.event(
+                      effectiveCorrelationId,
+                      "preauthorization_canceled",
+                      "order_uuid"     -> orderUuid,
+                      "transaction_id" -> preAuthorizationId,
+                      "result"         -> preAuthorizationCanceled.toString
+                    )
+                    PreAuthorizationCanceled(preAuthorizationCanceled) ~> replyTo
+                  }
               case _ => // should never be the case
                 Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
             }
@@ -244,7 +267,8 @@ trait PreAuthorizationCommandHandler
     registerMeansOfPayment: Boolean,
     printReceipt: Boolean,
     transaction: Transaction,
-    registerWallet: Boolean = false
+    registerWallet: Boolean = false,
+    maybeCorrelationId: Option[String]
   )(implicit
     system: ActorSystem[_],
     log: Logger,
@@ -254,6 +278,10 @@ trait PreAuthorizationCommandHandler
       transaction.id,
       entityId
     ) // add transaction id as a key for this payment account
+    // Story 13.7 — orderUuid fallback; `correlationId` shadows the param so every event carries the
+    // same id, `effectiveCorrelationId` feeds the audit line (see handlePayIn).
+    val effectiveCorrelationId: String = maybeCorrelationId.getOrElse(orderUuid)
+    val correlationId: Option[String] = Some(effectiveCorrelationId)
     val lastUpdated = now()
     var updatedPaymentAccount = paymentAccount.withLastUpdated(lastUpdated)
     val transactionUpdatedEvent =
@@ -265,6 +293,7 @@ trait PreAuthorizationCommandHandler
           )
         )
         .withLastUpdated(lastUpdated)
+        .copy(correlationId = correlationId)
     val walletEvents: List[ExternalSchedulerEvent] =
       if (registerWallet) {
         List(
@@ -274,7 +303,8 @@ trait PreAuthorizationCommandHandler
             .withLastUpdated(lastUpdated)
             .copy(
               userId = paymentAccount.userId.get,
-              walletId = paymentAccount.walletId.get
+              walletId = paymentAccount.walletId.get,
+              correlationId = correlationId
             )
         )
       } else {
@@ -289,6 +319,7 @@ trait PreAuthorizationCommandHandler
               PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
                 .withLastUpdated(lastUpdated)
+                .copy(correlationId = correlationId)
             ) ++ walletEvents :+ transactionUpdatedEvent
           )
           .thenRun(_ =>
@@ -307,6 +338,7 @@ trait PreAuthorizationCommandHandler
               PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
                 .withLastUpdated(lastUpdated)
+                .copy(correlationId = correlationId)
             ) ++ walletEvents :+ transactionUpdatedEvent
           )
           .thenRun(_ =>
@@ -358,6 +390,7 @@ trait PreAuthorizationCommandHandler
                               .withExternalUuid(paymentAccount.externalUuid)
                               .withCard(updatedCard)
                               .withLastUpdated(lastUpdated)
+                              .copy(correlationId = correlationId)
                           )
                         case paypal: Paypal =>
                           updatedPaymentAccount = updatedPaymentAccount.withPaypals(
@@ -369,6 +402,7 @@ trait PreAuthorizationCommandHandler
                               .withExternalUuid(paymentAccount.externalUuid)
                               .withPaypal(paypal)
                               .withLastUpdated(lastUpdated)
+                              .copy(correlationId = correlationId)
                           )
                         case _ => List.empty
                       }
@@ -392,12 +426,27 @@ trait PreAuthorizationCommandHandler
                   .withLastUpdated(lastUpdated)
                   .withPrintReceipt(printReceipt)
                   .withPaymentType(transaction.paymentType)
+                  .copy(correlationId = correlationId)
               ) ++
               (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated) +: walletEvents) :+ transactionUpdatedEvent
+                .withLastUpdated(lastUpdated)
+                .copy(correlationId = correlationId)
+              +: walletEvents) :+ transactionUpdatedEvent
             )
-            .thenRun(_ => PaymentPreAuthorized(transaction.id) ~> replyTo)
+            .thenRun { _ =>
+              audit.event(
+                effectiveCorrelationId,
+                "preauthorization_succeeded",
+                "order_uuid"     -> orderUuid,
+                "transaction_id" -> transaction.id,
+                "amount"         -> transaction.amount,
+                "fees"           -> transaction.fees,
+                "currency"       -> transaction.currency,
+                "result"         -> transaction.status.name
+              )
+              PaymentPreAuthorized(transaction.id) ~> replyTo
+            }
         } else {
           log.error(
             "Order-{} could not be pre authorized: {} -> {}",
@@ -412,12 +461,27 @@ trait PreAuthorizationCommandHandler
                   .withOrderUuid(orderUuid)
                   .withResultMessage(transaction.resultMessage)
                   .withTransaction(transaction)
+                  .copy(correlationId = correlationId)
               ) ++
               (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated) +: walletEvents) :+ transactionUpdatedEvent
+                .withLastUpdated(lastUpdated)
+                .copy(correlationId = correlationId)
+              +: walletEvents) :+ transactionUpdatedEvent
             )
-            .thenRun(_ => PreAuthorizationFailed(transaction.resultMessage) ~> replyTo)
+            .thenRun { _ =>
+              audit.event(
+                effectiveCorrelationId,
+                "preauthorization_failed",
+                "order_uuid"     -> orderUuid,
+                "transaction_id" -> transaction.id,
+                "amount"         -> transaction.amount,
+                "fees"           -> transaction.fees,
+                "currency"       -> transaction.currency,
+                "result"         -> transaction.resultMessage
+              )
+              PreAuthorizationFailed(transaction.resultMessage) ~> replyTo
+            }
         }
     }
   }

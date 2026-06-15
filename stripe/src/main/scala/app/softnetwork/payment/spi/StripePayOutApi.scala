@@ -54,6 +54,7 @@ trait StripePayOutApi extends PayOutApi {
                     externalReference = payOutTransaction.externalReference,
                     statementDescriptor = payOutTransaction.statementDescriptor
                   )
+                  .withMetadata(payOutTransaction.metadata)
 
               transfer(Some(transferTransaction))
 
@@ -128,6 +129,9 @@ trait StripePayOutApi extends PayOutApi {
                   params.putMetadata("external_reference", externalReference)
                 case _ =>
               }
+
+              // Propagate all user-supplied metadata to Stripe payout object
+              payOutTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
 
               if (amountToTransfer <= availableAmount) {
                 val payout = params.build()

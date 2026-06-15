@@ -62,6 +62,9 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
                   .putMetadata("author_id", refundTransaction.authorId)
                   .putMetadata("reason_message", refundTransaction.reasonMessage)
 
+              // Propagate all user-supplied metadata to Stripe refund object
+              refundTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
+
               mlog.info(
                 s"Processing refund fees for order: ${refundTransaction.orderUuid} -> ${new Gson()
                   .toJson(params)}"
@@ -106,6 +109,9 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
                  .putMetadata("order_uuid", refundTransaction.orderUuid)
                  .putMetadata("author_id", refundTransaction.authorId)
                  .putMetadata("reason_message", refundTransaction.reasonMessage)
+
+             // Propagate all user-supplied metadata to Stripe refund object
+             refundTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
 
              mlog.info(
                s"Processing transfer reversal for order: ${refundTransaction.orderUuid} -> ${new Gson()
@@ -168,6 +174,9 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
                   .putMetadata("author_id", refundTransaction.authorId)
                   .putMetadata("reason_message", refundTransaction.reasonMessage)
 
+              // Propagate all user-supplied metadata to Stripe refund object
+              refundTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
+
               mlog.info(
                 s"Processing refund payment for order: ${refundTransaction.orderUuid} -> ${new Gson()
                   .toJson(params)}"
@@ -198,6 +207,9 @@ trait StripeRefundApi extends RefundApi { _: StripeContext =>
                   .putMetadata("order_uuid", refundTransaction.orderUuid)
                   .putMetadata("author_id", refundTransaction.authorId)
                   .putMetadata("reason_message", refundTransaction.reasonMessage)
+
+              // Propagate all user-supplied metadata to Stripe refund object
+              refundTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
 
               mlog.info(
                 s"Processing refund payment for order: ${refundTransaction.orderUuid} -> ${new Gson()

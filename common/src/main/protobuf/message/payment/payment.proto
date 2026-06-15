@@ -37,6 +37,9 @@ message WalletRegisteredEvent {
     required string userId = 3;
     required string walletId = 4;
     required google.protobuf.Timestamp lastUpdated = 5 [(scalapb.field).type = "java.time.Instant"];
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 6;
 }
 
 message CardPreRegisteredEvent { // deprecated replaced by PaymentMethodPreRegisteredEvent
@@ -50,6 +53,9 @@ message CardPreRegisteredEvent { // deprecated replaced by PaymentMethodPreRegis
     required string walletId = 5;
     required string cardPreRegistrationId = 6;
     required app.softnetwork.payment.model.CardOwner owner = 7;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 8;
 }
 
 message PaymentMethodPreRegisteredEvent {
@@ -64,6 +70,9 @@ message PaymentMethodPreRegisteredEvent {
     required string preRegistrationId = 6;
     required app.softnetwork.payment.model.Transaction.PaymentType paymentType = 7;
     optional app.softnetwork.payment.model.CardOwner owner = 8;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 9;
 }
 
 message CardRegisteredEvent { // deprecated, replaced by PaymentMethodRegisteredEvent
@@ -74,6 +83,9 @@ message CardRegisteredEvent { // deprecated, replaced by PaymentMethodRegistered
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     required string externalUuid = 3;
     required app.softnetwork.payment.model.Card card = 4;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 5;
 }
 
 message PaymentMethodRegisteredEvent {
@@ -87,6 +99,9 @@ message PaymentMethodRegisteredEvent {
         app.softnetwork.payment.model.Card card = 4;
         app.softnetwork.payment.model.Paypal paypal = 5;
     }
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 6;
 }
 
 message PaymentAccountUpsertedEvent {
@@ -95,6 +110,9 @@ message PaymentAccountUpsertedEvent {
     option (scalapb.message).extends = "PaymentAccountEvent";
     required app.softnetwork.payment.model.PaymentAccount document = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 3;
 }
 
 message BankAccountUpdatedEvent {
@@ -106,6 +124,9 @@ message BankAccountUpdatedEvent {
     required string userId = 3;
     required string walletId = 4;
     required string bankAccountId = 5;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 6;
 }
 
 message MandateUpdatedEvent {
@@ -117,6 +138,9 @@ message MandateUpdatedEvent {
     optional string mandateId = 3;
     optional app.softnetwork.payment.model.Mandate.MandateStatus mandateStatus = 4;
     required string bankAccountId = 5;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 6;
 }
 
 message TermsOfPSPAcceptedEvent{
@@ -126,6 +150,9 @@ message TermsOfPSPAcceptedEvent{
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     required google.protobuf.Timestamp lastAcceptedTermsOfPSP = 3 [(scalapb.field).type = "java.time.Instant"];
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 4;
 }
 
 message UboDeclarationUpdatedEvent{
@@ -135,6 +162,9 @@ message UboDeclarationUpdatedEvent{
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     optional app.softnetwork.payment.model.UboDeclaration uboDeclaration = 3;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 4;
 }
 
 message RegularUserValidatedEvent{
@@ -144,6 +174,9 @@ message RegularUserValidatedEvent{
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     required string userId = 3;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 4;
 }
 
 message RegularUserInvalidatedEvent{
@@ -153,6 +186,9 @@ message RegularUserInvalidatedEvent{
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     required string userId = 3;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 4;
 }
 
 message PaymentAccountStatusUpdatedEvent {
@@ -162,6 +198,9 @@ message PaymentAccountStatusUpdatedEvent {
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     required app.softnetwork.payment.model.PaymentAccount.PaymentAccountStatus paymentAccountStatus = 3;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 4;
 }
 
 message DocumentsUpdatedEvent {
@@ -171,6 +210,9 @@ message DocumentsUpdatedEvent {
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     repeated app.softnetwork.payment.model.KycDocument documents = 3;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 4;
 }
 
 message DocumentUpdatedEvent {
@@ -180,6 +222,9 @@ message DocumentUpdatedEvent {
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
     required app.softnetwork.payment.model.KycDocument document = 3;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 4;
 }
 
 message BankAccountDeletedEvent {
@@ -188,6 +233,9 @@ message BankAccountDeletedEvent {
     option (scalapb.message).extends = "BroadcastEvent";
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 3;
 }
 
 message ExternalEntityToPaymentEvent{
@@ -206,6 +254,9 @@ message ExternalEntityToPaymentEvent{
         LoadDirectDebitTransactionCommandEvent loadDirectDebitTransaction = 9;
         CancelMandateCommandEvent cancelMandate = 10;
     }
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 11;
 }
 
 message PayInWithPreAuthorizationCommandEvent{
@@ -216,6 +267,9 @@ message PayInWithPreAuthorizationCommandEvent{
     optional int32 debitedAmount = 3;
     optional int32 feesAmount = 4;
     optional string clientId = 5;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 6;
 }
 
 message RefundCommandEvent{
@@ -229,6 +283,9 @@ message RefundCommandEvent{
     required bool initializedByClient = 6;
     optional string clientId = 7;
     optional int32 feesRefundAmount = 8;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 9;
 }
 
 message PayOutCommandEvent{
@@ -241,6 +298,9 @@ message PayOutCommandEvent{
     required string currency = 5 [default = "EUR"];
     optional string externalReference = 6;
     optional string clientId = 7;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 8;
 }
 
 message TransferCommandEvent{
@@ -255,6 +315,9 @@ message TransferCommandEvent{
     required bool payOutRequired = 7 [default = true];
     optional string externalReference = 8;
     optional string clientId = 9;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 10;
 }
 
 message DirectDebitCommandEvent{
@@ -267,12 +330,18 @@ message DirectDebitCommandEvent{
     required string statementDescriptor = 5;
     optional string externalReference = 6;
     optional string clientId = 7;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 8;
 }
 
 message CreateOrUpdatePaymentAccountCommandEvent{
     option (scalapb.message).extends = "ProtobufEvent";
     option (scalapb.message).extends = "PaymentCommandEvent";
     required app.softnetwork.payment.model.PaymentAccount paymentAccount = 1;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 2;
 }
 
 message RegisterRecurringPaymentCommandEvent {
@@ -291,6 +360,9 @@ message RegisterRecurringPaymentCommandEvent {
     optional int32 nextFeesAmount = 11;
     optional string clientId = 12;
     optional string cardId = 13;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 14;
 }
 
 message RecurringPaymentRegisteredEvent {
@@ -299,6 +371,9 @@ message RecurringPaymentRegisteredEvent {
     option (scalapb.message).extends = "BroadcastEvent";
     required string externalUuid = 1;
     required app.softnetwork.payment.model.RecurringPayment recurringPayment = 2;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 3;
 }
 
 message CancelPreAuthorizationCommandEvent {
@@ -307,6 +382,9 @@ message CancelPreAuthorizationCommandEvent {
     required string orderUuid = 1;
     required string cardPreAuthorizedTransactionId = 2;
     optional string clientId = 3;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 4;
 }
 
 message LoadDirectDebitTransactionCommandEvent {
@@ -314,6 +392,9 @@ message LoadDirectDebitTransactionCommandEvent {
     option (scalapb.message).extends = "PaymentCommandEvent";
     required string directDebitTransactionId = 1;
     optional string clientId = 2;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 3;
 }
 
 message PaymentAccountCreatedOrUpdatedEvent {
@@ -327,6 +408,9 @@ message PaymentAccountCreatedOrUpdatedEvent {
         app.softnetwork.payment.model.NaturalUser naturalUser = 4;
         app.softnetwork.payment.model.LegalUser legalUser = 5;
     }
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 6;
 }
 
 message CancelMandateCommandEvent {
@@ -334,6 +418,9 @@ message CancelMandateCommandEvent {
     option (scalapb.message).extends = "PaymentCommandEvent";
     required string externalUuid = 1;
     optional string clientId = 2;
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 3;
 }
 
 message MandateCancelationFailedEvent {
@@ -342,4 +429,7 @@ message MandateCancelationFailedEvent {
     option (scalapb.message).extends = "BroadcastEvent";
     required string externalUuid = 1;
     required google.protobuf.Timestamp lastUpdated = 2 [(scalapb.field).type = "java.time.Instant"];
+    // Story 13.7 — cross-service correlation id (durable hop for the audit trail).
+    option (scalapb.message).extends = "AuditableEvent";
+    optional string correlation_id = 3;
 }

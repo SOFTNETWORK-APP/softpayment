@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.HttpCorrelation
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
@@ -21,14 +22,18 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val loadCards: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
       .in(PaymentSettings.PaymentConfig.cardRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[Seq[CardView]].description("Authenticated user cards")
         )
       )
       .serverLogic(principal =>
-        _ => {
-          run(LoadPaymentMethods(externalUuidWithProfile(principal._2))).map {
+        cid => {
+          val cmd =
+            LoadPaymentMethods(externalUuidWithProfile(principal._2))
+          cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+          run(cmd).map {
             case r: PaymentMethodsLoaded => Right(PaymentMethodsView(r.paymentMethods).cards)
             case other                   => Left(error(other))
           }
@@ -39,14 +44,18 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val loadPaymentMethods: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
       .in(PaymentSettings.PaymentConfig.paymentMethodRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[PaymentMethodsView].description("Authenticated user payment methods")
         )
       )
       .serverLogic(principal =>
-        _ => {
-          run(LoadPaymentMethods(externalUuidWithProfile(principal._2))).map {
+        cid => {
+          val cmd =
+            LoadPaymentMethods(externalUuidWithProfile(principal._2))
+          cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+          run(cmd).map {
             case r: PaymentMethodsLoaded => Right(PaymentMethodsView(r.paymentMethods))
             case other                   => Left(error(other))
           }
@@ -58,6 +67,7 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
     requiredSessionEndpoint.post
       .in(PaymentSettings.PaymentConfig.cardRoute)
       .in(jsonBody[PreRegisterPaymentMethod])
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[PreRegistration]
@@ -65,7 +75,9 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic(principal =>
-        cmd => {
+        args => {
+          val cmd = args._1
+          cmd.withCorrelationId(args._2) // Story 13.7 — origin stamp
           var updatedUser =
             if (cmd.user.externalUuid.trim.isEmpty) {
               cmd.user.withExternalUuid(principal._2.id)
@@ -95,6 +107,7 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
     requiredSessionEndpoint.post
       .in(PaymentSettings.PaymentConfig.paymentMethodRoute)
       .in(jsonBody[PreRegisterPaymentMethod])
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[PreRegistration]
@@ -102,7 +115,9 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic(principal =>
-        cmd => {
+        args => {
+          val cmd = args._1
+          cmd.withCorrelationId(args._2) // Story 13.7 — origin stamp
           var updatedUser =
             if (cmd.user.externalUuid.trim.isEmpty) {
               cmd.user.withExternalUuid(principal._2.id)
@@ -131,12 +146,18 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
     requiredSessionEndpoint.delete
       .in(PaymentSettings.PaymentConfig.cardRoute)
       .in(query[String]("cardId").description("Card id to disable"))
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[PaymentMethodDisabled.type])
       )
       .serverLogic(principal =>
-        cardId => {
-          run(DisablePaymentMethod(externalUuidWithProfile(principal._2), cardId)).map {
+        args => {
+          val cmd = DisablePaymentMethod(
+            externalUuidWithProfile(principal._2),
+            args._1
+          )
+          cmd.withCorrelationId(args._2) // Story 13.7 — origin stamp
+          run(cmd).map {
             case PaymentMethodDisabled => Right(PaymentMethodDisabled)
             case other                 => Left(error(other))
           }
@@ -148,12 +169,18 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
     requiredSessionEndpoint.delete
       .in(PaymentSettings.PaymentConfig.paymentMethodRoute)
       .in(query[String]("paymentMethodId").description("Id of Payment method to disable"))
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[PaymentMethodDisabled.type])
       )
       .serverLogic(principal =>
-        paymentMethodId => {
-          run(DisablePaymentMethod(externalUuidWithProfile(principal._2), paymentMethodId)).map {
+        args => {
+          val cmd = DisablePaymentMethod(
+            externalUuidWithProfile(principal._2),
+            args._1
+          )
+          cmd.withCorrelationId(args._2) // Story 13.7 — origin stamp
+          run(cmd).map {
             case PaymentMethodDisabled => Right(PaymentMethodDisabled)
             case other                 => Left(error(other))
           }

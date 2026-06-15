@@ -1,13 +1,14 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.HttpCorrelation
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
-import app.softnetwork.payment.model.{BankAccountView, PaymentAccount}
+import app.softnetwork.payment.model.BankAccountView
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
 import sttp.capabilities
 import sttp.capabilities.akka.AkkaStreams
-import sttp.model.{HeaderNames, StatusCode}
+import sttp.model.StatusCode
 import sttp.tapir.json.json4s.jsonBody
 import sttp.tapir.server.ServerEndpoint
 
@@ -21,13 +22,16 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val createOrUpdateBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
       .in(PaymentSettings.PaymentConfig.bankRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .in(jsonBody[BankAccountCommand].description("Bank account to create or update"))
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[BankAccountCreatedOrUpdated].description("Bank account created or updated"))
       )
       .serverLogic {
-        case (client, session) => { bankAccountCommand =>
+        case (client, session) => { args =>
+          val correlationId = args._1
+          val bankAccountCommand = args._2
           import bankAccountCommand._
           val updatedBankAccount =
             if (bankAccount.externalUuid.trim().isEmpty) {
@@ -35,14 +39,15 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             } else {
               bankAccount
             }
-          run(
+          val cmd =
             CreateOrUpdateBankAccount(
               externalUuidWithProfile(session),
               updatedBankAccount,
               clientId = client.map(_.clientId).orElse(session.clientId),
               bankTokenId = bankTokenId
             )
-          ).map {
+          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+          run(cmd).map {
             case r: BankAccountCreatedOrUpdated => Right(r)
             case other                          => Left(error(other))
           }
@@ -53,6 +58,7 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val loadBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
       .in(PaymentSettings.PaymentConfig.bankRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[BankAccountView]
@@ -60,13 +66,13 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic { case (client, session) =>
-        _ => {
-          run(
-            LoadBankAccount(
-              externalUuidWithProfile(session),
-              clientId = client.map(_.clientId).orElse(session.clientId)
-            )
-          ).map {
+        correlationId => {
+          val cmd = LoadBankAccount(
+            externalUuidWithProfile(session),
+            clientId = client.map(_.clientId).orElse(session.clientId)
+          )
+          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+          run(cmd).map {
             case r: BankAccountLoaded => Right(r.bankAccount.view)
             case other                => Left(error(other))
           }
@@ -77,16 +83,21 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val deleteBankAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.delete
       .in(PaymentSettings.PaymentConfig.bankRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[BankAccountDeleted.type])
       )
-      .serverLogic(principal =>
-        _ =>
-          run(DeleteBankAccount(externalUuidWithProfile(principal._2), Some(false))).map {
-            case BankAccountDeleted => Right(BankAccountDeleted)
-            case other              => Left(error(other))
-          }
-      )
+      .serverLogic { principal => correlationId =>
+        val cmd = DeleteBankAccount(
+          externalUuidWithProfile(principal._2),
+          Some(false)
+        )
+        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+        run(cmd).map {
+          case BankAccountDeleted => Right(BankAccountDeleted)
+          case other              => Left(error(other))
+        }
+      }
       .description("Delete authenticated user bank account")
 
   val bankAccountEndpoints: List[ServerEndpoint[AkkaStreams with capabilities.WebSockets, Future]] =

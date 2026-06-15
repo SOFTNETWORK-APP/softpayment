@@ -99,6 +99,14 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                 case _ =>
               }
 
+              // Propagate all user-supplied metadata to Stripe payment intent object
+              payInWithPreAuthorization.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
+
+              mlog.info(
+                s"Capture payment for order ${payInWithPreAuthorization.orderUuid} -> ${new Gson()
+                  .toJson(params.build())}"
+              )
+
               resource.capture(
                 params.build(),
                 requestOptions
@@ -269,6 +277,9 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
             case _ =>
 
           }
+
+          // Propagate all user-supplied metadata to Stripe payment intent
+          payInTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
 
           mlog.info(
             s"Creating pay in for order ${payInTransaction.orderUuid} -> ${new Gson()
@@ -500,6 +511,9 @@ trait StripePayInApi extends PayInApi { _: StripeContext =>
                     .build()
                 )
           }
+
+          // Propagate all user-supplied metadata to Stripe payment intent
+          payInTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
 
           mlog.info(
             s"Creating pay in with PayPal for order ${payInTransaction.orderUuid} -> ${new Gson()
