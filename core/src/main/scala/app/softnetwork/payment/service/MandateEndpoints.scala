@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.HttpCorrelation
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
@@ -22,6 +23,7 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
     requiredSessionEndpoint.post
       .in(PaymentSettings.PaymentConfig.mandateRoute)
       .in(jsonBody[Option[IbanMandate]])
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         oneOf[PaymentResult](
           oneOfVariant[MandateCreated.type](
@@ -35,37 +37,41 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           )
         )
       )
-      .serverLogic(principal =>
-        maybeIban =>
-          run(
-            CreateMandate(
-              externalUuidWithProfile(principal._2),
-              iban = maybeIban.map(_.iban),
-              clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
-            )
-          ).map {
-            case MandateCreated                 => Right(MandateCreated)
-            case r: MandateConfirmationRequired => Right(r)
-            case other                          => Left(error(other))
-          }
-      )
+      .serverLogic { principal => args =>
+        val maybeIban = args._1
+        val correlationId = args._2
+        val cmd =
+          CreateMandate(
+            externalUuidWithProfile(principal._2),
+            iban = maybeIban.map(_.iban),
+            clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
+          )
+        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+        run(cmd).map {
+          case MandateCreated                 => Right(MandateCreated)
+          case r: MandateConfirmationRequired => Right(r)
+          case other                          => Left(error(other))
+        }
+      }
       .description("Create a mandate for the authenticated payment account")
 
   val cancelMandate: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.delete
       .in(PaymentSettings.PaymentConfig.mandateRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[MandateCanceled.type].description("Mandate canceled"))
       )
       .serverLogic { case (client, session) =>
-        _ =>
-          run(
+        correlationId =>
+          val cmd =
             CancelMandate(
               externalUuidWithProfile(session),
               clientId = client.map(_.clientId).orElse(session.clientId)
             )
-          ).map {
+          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+          run(cmd).map {
             case MandateCanceled => Right(MandateCanceled)
             case other           => Left(error(other))
           }
@@ -77,16 +83,19 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .in(PaymentSettings.PaymentConfig.mandateRoute)
       .get
       .in(query[String]("MandateId").description("Mandate Id"))
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(jsonBody[MandateResult])
       )
       .description("Update mandate status web hook")
-      .serverLogic(mandateId =>
-        run(UpdateMandateStatus(mandateId)).map {
+      .serverLogic { case (mandateId, cid) =>
+        val cmd = UpdateMandateStatus(mandateId)
+        cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+        run(cmd).map {
           case r: MandateStatusUpdated => Right(r.result)
           case other                   => Left(error(other))
         }
-      )
+      }
 
   val mandateEndpoints: List[ServerEndpoint[AkkaStreams with capabilities.WebSockets, Future]] =
     List(

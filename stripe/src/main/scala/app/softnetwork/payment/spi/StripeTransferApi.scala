@@ -121,6 +121,9 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
                     case _ =>
                   }
 
+                  // Propagate all user-supplied metadata to Stripe transfer object
+                  transferTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
+
                   mlog.info(
                     s"Creating transfer for order ${transferTransaction.orderUuid} -> ${new Gson()
                       .toJson(params.build())}"
@@ -183,6 +186,14 @@ trait StripeTransferApi extends TransferApi { _: StripeContext =>
                   params.putMetadata("external_reference", externalReference)
                 case _ =>
               }
+
+              // Propagate all user-supplied metadata to Stripe transfer object
+              transferTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
+
+              mlog.info(
+                s"Creating transfer for order ${transferTransaction.orderUuid} -> ${new Gson()
+                  .toJson(params.build())}"
+              )
 
               Transfer.create(params.build(), requestOptions)
 

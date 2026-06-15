@@ -9,6 +9,10 @@ import app.softnetwork.payment.model._
 import app.softnetwork.payment.scalatest.PostgresPaymentTestKit
 import app.softnetwork.time._
 import app.softnetwork.persistence.now
+import app.softnetwork.persistence.audit.AuditLog
+import ch.qos.logback.classic.{Logger => LogbackLogger}
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import app.softnetwork.session.config.Settings
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.{Logger, LoggerFactory}
@@ -1011,6 +1015,44 @@ class PaymentHandlerSpec
             case Failure(f) => fail(f.getMessage)
           }
         case other => fail(other.toString)
+      }
+    }
+
+    "emit a charge_succeeded audit line carrying the correlation id (Story 13.7)" in {
+      // Story 13.7 — proves the cid threaded onto the PayIn command reaches the payment pod's audit
+      // trail (the same id rides the persisted PaidInEvent to the licensing pod). An explicit cid is
+      // set so it must win over the orderUuid fallback.
+      val cid = "cid-payin-137"
+      val auditLogger = LoggerFactory.getLogger(AuditLog.LoggerName).asInstanceOf[LogbackLogger]
+      val appender = new ListAppender[ILoggingEvent]()
+      appender.start()
+      auditLogger.addAppender(appender)
+      try {
+        val cmd = PayIn(
+          orderUuid,
+          computeExternalUuidWithProfile(customerUuid, Some("customer")),
+          100,
+          currency,
+          computeExternalUuidWithProfile(sellerUuid, Some("seller"))
+        )
+        cmd.withCorrelationId(cid)
+        !?(cmd) await {
+          case _: PaidIn =>
+            // the emission runs in the behavior's thenRun before the reply, so it is captured by now
+            val line =
+              appender.list.toArray.toList.collect { case e: ILoggingEvent => e }.find { e =>
+                val fields = e.getArgumentArray.map(_.toString).toSet
+                fields.contains("event_type=charge_succeeded") && fields.contains(
+                  s"correlation_id=$cid"
+                )
+              }
+            assert(line.isDefined, "expected a charge_succeeded audit line carrying the cid")
+            assert(line.get.getArgumentArray.map(_.toString).contains("service=payment"))
+          case other => fail(other.toString)
+        }
+      } finally {
+        auditLogger.detachAppender(appender)
+        appender.stop()
       }
     }
 

@@ -5,6 +5,7 @@ import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.api.config.SoftPayClientSettings
+import app.softnetwork.payment.audit.PaymentAuditLog.audit
 import app.softnetwork.payment.message.PaymentEvents.{
   PaymentAccountUpsertedEvent,
   RecurringPaymentRegisteredEvent
@@ -24,7 +25,6 @@ import app.softnetwork.payment.message.PaymentMessages.{
   NextRecurringPaid,
   NextRecurringPaymentFailed,
   PaymentAccountNotFound,
-  PaymentError,
   PaymentRedirection,
   PaymentResult,
   RecurringCardPaymentRegistrationNotUpdated,
@@ -114,6 +114,12 @@ trait RecurringPaymentCommandHandler
                           ) match {
                           case Some(cardId) =>
                             val createdDate = now()
+                            val updatedMetadata =
+                              cmd.correlationId match {
+                                case Some(correlationId) =>
+                                  cmd.metadata.updated("correlation_id", correlationId)
+                                case None => cmd.metadata
+                              }
                             var recurringPayment =
                               RecurringPayment.defaultInstance
                                 .withCreatedDate(createdDate)
@@ -131,7 +137,7 @@ trait RecurringPaymentCommandHandler
                                   nextDebitedAmount = cmd.nextDebitedAmount,
                                   nextFeesAmount = cmd.nextFeesAmount,
                                   externalReference = cmd.externalReference,
-                                  metadata = cmd.metadata
+                                  metadata = updatedMetadata
                                 )
                             val clientId = paymentAccount.clientId
                               .orElse(cmd.clientId)
@@ -188,12 +194,16 @@ trait RecurringPaymentCommandHandler
                                           recurringPayment.nextPaymentDate.map(_.toDate)
                                       )
                                     keyValueDao.addKeyValue(recurringPayment.getId, entityId)
+                                    val effectiveCorrelationId = updatedMetadata
+                                      .get("correlation_id")
+                                      .orElse(Some(recurringPayment.getId))
                                     Effect
                                       .persist(
                                         List(
                                           RecurringPaymentRegisteredEvent.defaultInstance
                                             .withExternalUuid(paymentAccount.externalUuid)
                                             .withRecurringPayment(recurringPayment)
+                                            .copy(correlationId = effectiveCorrelationId)
                                         ) :+
                                         PaymentAccountUpsertedEvent.defaultInstance
                                           .withDocument(
@@ -204,6 +214,7 @@ trait RecurringPaymentCommandHandler
                                               .withLastUpdated(createdDate)
                                           )
                                           .withLastUpdated(createdDate)
+                                          .copy(correlationId = effectiveCorrelationId)
                                       )
                                       .thenRun(_ =>
                                         RecurringPaymentRegistered(
@@ -236,6 +247,12 @@ trait RecurringPaymentCommandHandler
                   //                  }
                 } else {
                   val today = now()
+                  val updatedMetadata =
+                    cmd.correlationId match {
+                      case Some(correlationId) =>
+                        cmd.metadata.updated("correlation_id", correlationId)
+                      case None => cmd.metadata
+                    }
                   var recurringPayment =
                     RecurringPayment.defaultInstance
                       .withId(generateUUID())
@@ -252,8 +269,10 @@ trait RecurringPaymentCommandHandler
                         fixedNextAmount = cmd.fixedNextAmount,
                         nextDebitedAmount = cmd.nextDebitedAmount,
                         nextFeesAmount = cmd.nextFeesAmount,
-                        metadata = cmd.metadata
+                        metadata = updatedMetadata
                       )
+                  val effectiveCorrelationId =
+                    updatedMetadata.get("correlation_id").orElse(Some(recurringPayment.getId))
                   import app.softnetwork.time._
                   val nextDirectDebit: List[ExternalEntityToSchedulerEvent] =
                     recurringPayment.nextPaymentDate.map(_.toDate) match {
@@ -270,7 +289,8 @@ trait RecurringPaymentCommandHandler
                                   1,
                                   Some(false),
                                   Some(value),
-                                  None
+                                  None,
+                                  correlationId = effectiveCorrelationId
                                 )
                               )
                             )
@@ -285,6 +305,7 @@ trait RecurringPaymentCommandHandler
                         RecurringPaymentRegisteredEvent.defaultInstance
                           .withExternalUuid(paymentAccount.externalUuid)
                           .withRecurringPayment(recurringPayment)
+                          .copy(correlationId = effectiveCorrelationId)
                       ) ++ nextDirectDebit :+
                       PaymentAccountUpsertedEvent.defaultInstance
                         .withDocument(
@@ -295,6 +316,7 @@ trait RecurringPaymentCommandHandler
                             .withLastUpdated(today)
                         )
                         .withLastUpdated(today)
+                        .copy(correlationId = effectiveCorrelationId)
                     )
                     .thenRun(_ => RecurringPaymentRegistered(recurringPayment.getId) ~> replyTo)
                 }
@@ -340,6 +362,8 @@ trait RecurringPaymentCommandHandler
                           recurringPayment.withCardStatus(result.status)
                         )
                         .withLastUpdated(lastUpdated)
+                    val effectiveCorrelationId =
+                      cmd.correlationId.orElse(Some(recurringPayment.getId))
                     Effect
                       .persist(
                         List(
@@ -348,6 +372,7 @@ trait RecurringPaymentCommandHandler
                             .withRecurringPayment(
                               recurringPayment.withCardStatus(result.status)
                             )
+                            .copy(correlationId = effectiveCorrelationId)
                         ) ++ {
                           if (result.status.isEnded) { // cancel scheduled payIn for recurring card payment
                             List(
@@ -368,6 +393,7 @@ trait RecurringPaymentCommandHandler
                         PaymentAccountUpsertedEvent.defaultInstance
                           .withDocument(updatedPaymentAccount)
                           .withLastUpdated(lastUpdated)
+                          .copy(correlationId = effectiveCorrelationId)
                       )
                       .thenRun(_ => RecurringCardPaymentRegistrationUpdated(result) ~> replyTo)
                   case _ =>
@@ -428,7 +454,7 @@ trait RecurringPaymentCommandHandler
                       paymentAccount,
                       recurringPayment,
                       transaction,
-                      correlationId = cmd.correlationId // Story 13.7
+                      maybeCorrelationId = cmd.correlationId // Story 13.7
                     )
                   case _ =>
                     Effect.none.thenRun(_ =>
@@ -469,7 +495,7 @@ trait RecurringPaymentCommandHandler
                       recurringPayment,
                       transaction,
                       scheduleNextPayment = false,
-                      correlationId = cmd.correlationId // Story 13.7
+                      maybeCorrelationId = cmd.correlationId // Story 13.7
                     )
                   case _ =>
                     Effect.none.thenRun(_ =>
@@ -532,7 +558,7 @@ trait RecurringPaymentCommandHandler
                               paymentAccount,
                               recurringPayment,
                               transaction,
-                              correlationId = cmd.correlationId // Story 13.7
+                              maybeCorrelationId = cmd.correlationId // Story 13.7
                             )
                           case _ =>
                             val reason = "no transaction"
@@ -544,7 +570,8 @@ trait RecurringPaymentCommandHandler
                               debitedAmount,
                               feesAmount,
                               currency,
-                              reason
+                              reason,
+                              maybeCorrelationId = cmd.correlationId // Story 13.7
                             )
                         }
                       case _ =>
@@ -557,7 +584,8 @@ trait RecurringPaymentCommandHandler
                           debitedAmount,
                           feesAmount,
                           currency,
-                          reason
+                          reason,
+                          maybeCorrelationId = cmd.correlationId // Story 13.7
                         )
                     }
                   case _ => // DirectDebit
@@ -588,7 +616,7 @@ trait RecurringPaymentCommandHandler
                                         paymentAccount,
                                         recurringPayment,
                                         transaction,
-                                        correlationId = cmd.correlationId // Story 13.7
+                                        maybeCorrelationId = cmd.correlationId // Story 13.7
                                       )
                                     case _ =>
                                       val reason = "no transaction"
@@ -600,7 +628,8 @@ trait RecurringPaymentCommandHandler
                                         debitedAmount,
                                         feesAmount,
                                         currency,
-                                        reason
+                                        reason,
+                                        maybeCorrelationId = cmd.correlationId // Story 13.7
                                       )
                                   }
                                 } else {
@@ -613,7 +642,8 @@ trait RecurringPaymentCommandHandler
                                     debitedAmount,
                                     feesAmount,
                                     currency,
-                                    reason
+                                    reason,
+                                    maybeCorrelationId = cmd.correlationId // Story 13.7
                                   )
                                 }
                               case _ =>
@@ -626,7 +656,8 @@ trait RecurringPaymentCommandHandler
                                   debitedAmount,
                                   feesAmount,
                                   currency,
-                                  reason
+                                  reason,
+                                  maybeCorrelationId = cmd.correlationId // Story 13.7
                                 )
                             }
                           case _ =>
@@ -639,7 +670,8 @@ trait RecurringPaymentCommandHandler
                               debitedAmount,
                               feesAmount,
                               currency,
-                              reason
+                              reason,
+                              maybeCorrelationId = cmd.correlationId // Story 13.7
                             )
                         }
                       case _ =>
@@ -652,7 +684,8 @@ trait RecurringPaymentCommandHandler
                           debitedAmount,
                           feesAmount,
                           currency,
-                          reason
+                          reason,
+                          maybeCorrelationId = cmd.correlationId // Story 13.7
                         )
                     }
                 }
@@ -671,7 +704,7 @@ trait RecurringPaymentCommandHandler
     recurringPayment: RecurringPayment,
     transaction: Transaction,
     scheduleNextPayment: Boolean = true,
-    correlationId: Option[String] = None // Story 13.7 — threaded from the triggering command
+    maybeCorrelationId: Option[String] = None // Story 13.7 — threaded from the triggering command
   )(implicit
     system: ActorSystem[_],
     log: Logger
@@ -680,6 +713,11 @@ trait RecurringPaymentCommandHandler
       transaction.id,
       entityId
     ) // add transaction id as a key for this payment account
+    // Story 13.7 — fall back to the transaction's orderUuid when no HTTP-origin cid was threaded.
+    // `correlationId` shadows the param so EVERY event below shares the id; `effectiveCorrelationId`
+    // feeds the audit line — the two always agree (see handlePayIn).
+    val effectiveCorrelationId: String = maybeCorrelationId.getOrElse(transaction.orderUuid)
+    val correlationId: Option[String] = Some(effectiveCorrelationId)
     val lastUpdated = now()
     var updatedPaymentAccount = paymentAccount.withLastUpdated(lastUpdated)
     val transactionUpdatedEvent =
@@ -691,6 +729,7 @@ trait RecurringPaymentCommandHandler
           )
         )
         .withLastUpdated(lastUpdated)
+        .copy(correlationId = correlationId)
     transaction.status match {
       case Transaction.TransactionStatus.TRANSACTION_CREATED
           if transaction.redirectUrl.isDefined => // 3ds
@@ -781,7 +820,8 @@ trait RecurringPaymentCommandHandler
                             1,
                             Some(false),
                             Some(value),
-                            None
+                            None,
+                            correlationId = correlationId
                           )
                         )
                       )
@@ -800,12 +840,27 @@ trait RecurringPaymentCommandHandler
               } :+
               PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated) :+ transactionUpdatedEvent
+                .withLastUpdated(lastUpdated)
+                .copy(correlationId = correlationId)
+              :+ transactionUpdatedEvent
             )
-            .thenRun(_ =>
+            .thenRun { _ =>
+              // Story 13.7 — subscription charge audit; cid rode in on the triggering command and is
+              // on the persisted First/Next recurring event (durable hop to the licensing pod).
+              audit.event(
+                effectiveCorrelationId,
+                "subscription_charged",
+                "registration_id" -> recurringPayment.getId,
+                "transaction_id"  -> transaction.id,
+                "amount"          -> transaction.amount,
+                "fees"            -> transaction.fees,
+                "currency"        -> transaction.currency,
+                "first"           -> first,
+                "result"          -> transaction.status.name
+              )
               (if (first) FirstRecurringPaidIn(transaction.id, transaction.status)
                else NextRecurringPaid(transaction.id, transaction.status)) ~> replyTo
-            )
+            }
         } else {
           log.error(
             "RecurringPayment-{} failed: {} -> {}",
@@ -826,6 +881,7 @@ trait RecurringPaymentCommandHandler
                     .withTransaction(transaction)
                     .withRecurringPaymentRegistrationId(recurringPayment.getId)
                     .withFrequency(recurringPayment.getFrequency)
+                    .copy(correlationId = correlationId)
                 } else {
                   NextRecurringPaymentFailedEvent.defaultInstance
                     .withDebitedAccount(paymentAccount.externalUuid)
@@ -838,7 +894,10 @@ trait RecurringPaymentCommandHandler
                     .withType(recurringPayment.`type`)
                     .withFrequency(recurringPayment.getFrequency)
                     .withNumberOfRecurringPayments(recurringPayment.getNumberOfRecurringPayments)
-                    .copy(lastRecurringPaymentDate = recurringPayment.lastRecurringPaymentDate)
+                    .copy(
+                      lastRecurringPaymentDate = recurringPayment.lastRecurringPaymentDate,
+                      correlationId = correlationId
+                    )
                 }
               ) :+ {
                 recurringPayment.nextRecurringPaymentDate match {
@@ -853,7 +912,8 @@ trait RecurringPaymentCommandHandler
                             1,
                             Some(false),
                             Some(value),
-                            None
+                            None,
+                            correlationId = correlationId
                           )
                         )
                       )
@@ -871,7 +931,18 @@ trait RecurringPaymentCommandHandler
                 }
               } :+ transactionUpdatedEvent
             )
-            .thenRun(_ =>
+            .thenRun { _ =>
+              audit.event(
+                effectiveCorrelationId,
+                "subscription_charge_failed",
+                "registration_id" -> recurringPayment.getId,
+                "transaction_id"  -> transaction.id,
+                "amount"          -> transaction.amount,
+                "fees"            -> transaction.fees,
+                "currency"        -> transaction.currency,
+                "first"           -> first,
+                "result"          -> transaction.getReasonMessage
+              )
               (
                 if (first)
                   FirstRecurringCardPaymentFailed(
@@ -886,7 +957,7 @@ trait RecurringPaymentCommandHandler
                     transaction.getReasonMessage
                   )
               ) ~> replyTo
-            )
+            }
         }
     }
   }
@@ -899,8 +970,17 @@ trait RecurringPaymentCommandHandler
     debitedAmount: Int,
     feesAmount: Int,
     currency: String,
-    reason: String
+    reason: String,
+    maybeCorrelationId: Option[String]
   )(implicit context: ActorContext[_]): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
+    // Story 13.7 — no transaction/orderUuid in scope here, so fall back to the recurring payment's
+    // external reference (its orderUuid) then its registration id. `correlationId` shadows the param
+    // so the failure event + schedule share the id; `effectiveCorrelationId` feeds the audit line.
+    val effectiveCorrelationId: String =
+      maybeCorrelationId.getOrElse(
+        recurringPayment.externalReference.getOrElse(recurringPayment.getId)
+      )
+    val correlationId: Option[String] = Some(effectiveCorrelationId)
     Effect
       .persist(
         List(
@@ -914,7 +994,10 @@ trait RecurringPaymentCommandHandler
             .withType(recurringPayment.`type`)
             .withFrequency(recurringPayment.getFrequency)
             .withNumberOfRecurringPayments(recurringPayment.getNumberOfRecurringPayments)
-            .copy(lastRecurringPaymentDate = recurringPayment.lastRecurringPaymentDate)
+            .copy(
+              lastRecurringPaymentDate = recurringPayment.lastRecurringPaymentDate,
+              correlationId = correlationId
+            )
         ) :+ {
           recurringPayment.nextRecurringPaymentDate match {
             case Some(value) =>
@@ -928,7 +1011,8 @@ trait RecurringPaymentCommandHandler
                       1,
                       Some(false),
                       Some(value),
-                      None
+                      None,
+                      correlationId = correlationId
                     )
                   )
                 )
@@ -946,13 +1030,22 @@ trait RecurringPaymentCommandHandler
           }
         }
       )
-      .thenRun(_ =>
+      .thenRun { _ =>
+        audit.event(
+          effectiveCorrelationId,
+          "subscription_charge_failed",
+          "registration_id" -> recurringPayment.getId,
+          "amount"          -> debitedAmount,
+          "fees"            -> feesAmount,
+          "currency"        -> currency,
+          "result"          -> reason
+        )
         NextRecurringPaymentFailed(
           "",
           Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
           reason
         ) ~> replyTo
-      )
+      }
   }
 
 }

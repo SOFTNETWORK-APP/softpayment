@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.HttpCorrelation
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
@@ -24,6 +25,7 @@ trait PaymentAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .in(clientIp)
       .in(header[Option[String]](HeaderNames.UserAgent))
       .in(jsonBody[UserPaymentAccountCommand].description("Legal or natural user payment account"))
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok)
           .and(
@@ -33,7 +35,7 @@ trait PaymentAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           )
       )
       .serverLogic {
-        case (client, session) => { case (ipAddress, userAgent, userAccountCommand) =>
+        case (client, session) => { case (ipAddress, userAgent, userAccountCommand, cid) =>
           import userAccountCommand._
           var externalUuid: String = ""
           val updatedUser: Option[PaymentAccount.User] = {
@@ -72,7 +74,7 @@ trait PaymentAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
                 )
             }
           }
-          run(
+          val cmd =
             CreateOrUpdateUserPaymentAccount(
               externalUuidWithProfile(session),
               updatedUser,
@@ -82,7 +84,8 @@ trait PaymentAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               userAgent = userAgent,
               tokenId = tokenId
             )
-          ).map {
+          cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+          run(cmd).map {
             case r: UserPaymentAccountCreatedOrUpdated => Right(r)
             case other                                 => Left(error(other))
           }
@@ -93,15 +96,17 @@ trait PaymentAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   lazy val loadPaymentAccount: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.get
       .in(PaymentSettings.PaymentConfig.accountRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(jsonBody[PaymentAccountView].description("Authenticated user payment account"))
       .serverLogic { case (client, session) =>
-        _ => {
-          run(
+        cid => {
+          val cmd =
             LoadPaymentAccount(
               externalUuidWithProfile(session),
               clientId = client.map(_.clientId).orElse(session.clientId)
             )
-          ).map {
+          cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+          run(cmd).map {
             case r: PaymentAccountLoaded => Right(r.paymentAccount.view)
             case other                   => Left(error(other))
           }

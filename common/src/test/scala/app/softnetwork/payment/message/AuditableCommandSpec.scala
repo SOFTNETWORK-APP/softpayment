@@ -6,11 +6,12 @@ import com.twitter.chill.ScalaKryoInstantiator
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-/** Story 13.7 — locks the `AuditableCommand` contract for payment commands: a `correlationId` set at
-  * the checkout endpoint (from `X-Correlation-Id`) must ride the command across the cluster-sharding
-  * boundary, since commands are sent via `!?` under the chill/Kryo serializer. The handler then stamps
-  * it onto the persisted payment event (the durable hop to the licensing pod). If this regresses we
-  * fall back to a constructor field or a dedicated `serialization-binding` for `AuditableCommand`.
+/** Story 13.7 — locks the `AuditableCommand` contract for payment commands: a `correlationId` set
+  * at the checkout endpoint (from `X-Correlation-Id`) must ride the command across the
+  * cluster-sharding boundary, since commands are sent via `!?` under the chill/Kryo serializer. The
+  * handler then stamps it onto the persisted payment event (the durable hop to the licensing pod).
+  * If this regresses we fall back to a constructor field or a dedicated `serialization-binding` for
+  * `AuditableCommand`.
   */
 class AuditableCommandSpec extends AnyWordSpec with Matchers {
 

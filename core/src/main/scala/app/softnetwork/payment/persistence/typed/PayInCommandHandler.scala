@@ -5,6 +5,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.annotation.InternalApi
+import app.softnetwork.payment.audit.PaymentAuditLog.audit
 import app.softnetwork.payment.api.config.SoftPayClientSettings
 import app.softnetwork.payment.config.PaymentSettings.PaymentConfig.payInStatementDescriptor
 import app.softnetwork.payment.message.PaymentEvents.{
@@ -125,6 +126,12 @@ trait PayInCommandHandler
                               case Some(creditedWalletId) =>
                                 val registerMeansOfPayment =
                                   cmd.registerMeansOfPayment.getOrElse(cmd.registerCard)
+                                val metadata: Map[String, String] =
+                                  cmd.correlationId match {
+                                    case Some(correlationId) =>
+                                      Map("correlationId" -> correlationId)
+                                    case None => Map.empty
+                                  }
                                 payIn(
                                   Some(
                                     PayInTransaction.defaultInstance
@@ -146,6 +153,7 @@ trait PayInCommandHandler
                                         browserInfo = browserInfo,
                                         preRegistrationId = registrationId
                                       )
+                                      .withMetadata(metadata)
                                   )
                                 ) match {
                                   case Some(transaction) =>
@@ -158,7 +166,7 @@ trait PayInCommandHandler
                                       printReceipt,
                                       transaction,
                                       registerWallet,
-                                      correlationId = cmd.correlationId // Story 13.7
+                                      maybeCorrelationId = cmd.correlationId // Story 13.7
                                     )
                                   case _ =>
                                     Effect.none.thenRun(_ =>
@@ -221,6 +229,12 @@ trait PayInCommandHandler
                               case Some(creditedWalletId) =>
                                 val registerMeansOfPayment =
                                   cmd.registerMeansOfPayment.getOrElse(false)
+                                val metadata: Map[String, String] =
+                                  cmd.correlationId match {
+                                    case Some(correlationId) =>
+                                      Map("correlationId" -> correlationId)
+                                    case None => Map.empty
+                                  }
                                 payIn(
                                   Some(
                                     PayInTransaction.defaultInstance
@@ -242,6 +256,7 @@ trait PayInCommandHandler
                                         browserInfo = browserInfo,
                                         preRegistrationId = registrationId
                                       )
+                                      .withMetadata(metadata)
                                   )
                                 ) match {
                                   case Some(transaction) =>
@@ -254,7 +269,7 @@ trait PayInCommandHandler
                                       printReceipt = printReceipt,
                                       transaction,
                                       registerWallet,
-                                      correlationId = cmd.correlationId // Story 13.7
+                                      maybeCorrelationId = cmd.correlationId // Story 13.7
                                     )
                                   case _ =>
                                     Effect.none.thenRun(_ =>
@@ -283,6 +298,8 @@ trait PayInCommandHandler
                 }
 
               case _ =>
+                // Story 13.7 — orderUuid fallback so event + audit line agree (see handlePayIn).
+                val effectiveCorrelationId: String = cmd.correlationId.getOrElse(orderUuid)
                 Effect
                   .persist(
                     List(
@@ -294,15 +311,22 @@ trait PayInCommandHandler
                         .withLastUpdated(now())
                         .withPaymentMethodId("")
                         .withPaymentType(paymentType)
+                        .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                     )
                   )
-                  .thenRun(_ =>
+                  .thenRun { _ =>
+                    audit.event(
+                      effectiveCorrelationId,
+                      "charge_failed",
+                      "order_uuid" -> orderUuid,
+                      "result"     -> s"$paymentType not supported"
+                    )
                     PayInFailed(
                       "",
                       Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
                       s"$paymentType not supported"
                     ) ~> replyTo
-                  )
+                  }
             }
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
@@ -370,6 +394,8 @@ trait PayInCommandHandler
                       .copy(
                         paymentMethodId = paymentMethodId
                       )
+                    // Story 13.7 — orderUuid fallback shared by every event in this batch (see handlePayIn).
+                    val effectiveCorrelationId: String = cmd.correlationId.getOrElse(orderUuid)
                     val transactionUpdatedEvent =
                       TransactionUpdatedEvent.defaultInstance
                         .withDocument(
@@ -379,6 +405,7 @@ trait PayInCommandHandler
                           )
                         )
                         .withLastUpdated(lastUpdated)
+                        .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                     if (t.status.isTransactionSucceeded || t.status.isTransactionCreated) {
                       Effect
                         .persist(
@@ -391,15 +418,28 @@ trait PayInCommandHandler
                               .withLastUpdated(lastUpdated)
                               .withPaymentMethodId(paymentMethodId.getOrElse(""))
                               .withPaymentType(t.paymentType)
+                              .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                           ) :+ transactionUpdatedEvent
                         )
-                        .thenRun(_ =>
+                        .thenRun { _ =>
+                          // Story 13.7 — reconciliation/poll confirming a (previously pending)
+                          // charge; persists the PaidInEvent here, so audit here too.
+                          audit.event(
+                            effectiveCorrelationId,
+                            "charge_succeeded",
+                            "order_uuid"     -> orderUuid,
+                            "transaction_id" -> t.id,
+                            "amount"         -> t.amount,
+                            "fees"           -> t.fees,
+                            "currency"       -> t.currency,
+                            "result"         -> t.status.name
+                          )
                           PayInTransactionLoaded(
                             transaction.id,
                             transaction.status,
                             None
                           ) ~> replyTo
-                        )
+                        }
                     } else {
                       Effect
                         .persist(
@@ -408,15 +448,26 @@ trait PayInCommandHandler
                               .withOrderUuid(orderUuid)
                               .withResultMessage(t.resultMessage)
                               .withTransaction(updatedTransaction)
+                              .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                           ) :+ transactionUpdatedEvent
                         )
-                        .thenRun(_ =>
+                        .thenRun { _ =>
+                          audit.event(
+                            effectiveCorrelationId,
+                            "charge_failed",
+                            "order_uuid"     -> orderUuid,
+                            "transaction_id" -> t.id,
+                            "amount"         -> t.amount,
+                            "fees"           -> t.fees,
+                            "currency"       -> t.currency,
+                            "result"         -> t.resultMessage
+                          )
                           PayInTransactionLoaded(
                             transaction.id,
                             transaction.status,
                             None
                           ) ~> replyTo
-                        )
+                        }
                     }
                   case None => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
                 }
@@ -445,7 +496,8 @@ trait PayInCommandHandler
                 handlePayInWithPreAuthorizationFailure(
                   "",
                   replyTo,
-                  "PreAuthorizationTransactionNotFound"
+                  "PreAuthorizationTransactionNotFound",
+                  correlationId = correlationId
                 )
               case Some(preAuthorizationTransaction)
                   if !Seq(
@@ -457,28 +509,32 @@ trait PayInCommandHandler
                 handlePayInWithPreAuthorizationFailure(
                   preAuthorizationTransaction.orderUuid,
                   replyTo,
-                  "IllegalPreAuthorizationTransactionStatus"
+                  "IllegalPreAuthorizationTransactionStatus",
+                  correlationId = correlationId
                 )
               case Some(preAuthorizationTransaction)
                   if preAuthorizationTransaction.preAuthorizationCanceled.getOrElse(false) =>
                 handlePayInWithPreAuthorizationFailure(
                   preAuthorizationTransaction.orderUuid,
                   replyTo,
-                  "PreAuthorizationCanceled"
+                  "PreAuthorizationCanceled",
+                  correlationId = correlationId
                 )
               case Some(preAuthorizationTransaction)
                   if preAuthorizationTransaction.preAuthorizationValidated.getOrElse(false) =>
                 handlePayInWithPreAuthorizationFailure(
                   preAuthorizationTransaction.orderUuid,
                   replyTo,
-                  "PreAuthorizationValidated"
+                  "PreAuthorizationValidated",
+                  correlationId = correlationId
                 )
               case Some(preAuthorizationTransaction)
                   if preAuthorizationTransaction.preAuthorizationExpired.getOrElse(false) =>
                 handlePayInWithPreAuthorizationFailure(
                   preAuthorizationTransaction.orderUuid,
                   replyTo,
-                  "PreAuthorizationExpired"
+                  "PreAuthorizationExpired",
+                  correlationId = correlationId
                 )
               case Some(preAuthorizationTransaction)
                   if debitedAmount.getOrElse(
@@ -487,7 +543,8 @@ trait PayInCommandHandler
                 handlePayInWithPreAuthorizationFailure(
                   preAuthorizationTransaction.orderUuid,
                   replyTo,
-                  "DebitedAmountAbovePreAuthorizationAmount"
+                  "DebitedAmountAbovePreAuthorizationAmount",
+                  correlationId = correlationId
                 )
               case Some(preAuthorizationTransaction) =>
                 // load credited payment account
@@ -502,6 +559,12 @@ trait PayInCommandHandler
                         import paymentProvider._
                         creditedPaymentAccount.walletId match {
                           case Some(creditedWalletId) =>
+                            val metadata: Map[String, String] =
+                              cmd.correlationId match {
+                                case Some(correlationId) =>
+                                  Map("correlationId" -> correlationId)
+                                case None => Map.empty
+                              }
                             payIn(
                               Some(
                                 PayInTransaction.defaultInstance
@@ -522,6 +585,7 @@ trait PayInCommandHandler
                                     preRegistrationId =
                                       preAuthorizationTransaction.preRegistrationId
                                   )
+                                  .withMetadata(metadata)
                               )
                             ) match {
                               case Some(transaction) =>
@@ -538,28 +602,32 @@ trait PayInCommandHandler
                                 handlePayInWithPreAuthorizationFailure(
                                   preAuthorizationTransaction.orderUuid,
                                   replyTo,
-                                  "TransactionNotSpecified"
+                                  "TransactionNotSpecified",
+                                  correlationId = correlationId
                                 )
                             }
                           case _ =>
                             handlePayInWithPreAuthorizationFailure(
                               preAuthorizationTransaction.orderUuid,
                               replyTo,
-                              "CreditedWalletNotFound"
+                              "CreditedWalletNotFound",
+                              correlationId = correlationId
                             )
                         }
                       case _ =>
                         handlePayInWithPreAuthorizationFailure(
                           preAuthorizationTransaction.orderUuid,
                           replyTo,
-                          "CreditedPaymentAccountNotFound"
+                          "CreditedPaymentAccountNotFound",
+                          correlationId = correlationId
                         )
                     }
                   case Failure(_) =>
                     handlePayInWithPreAuthorizationFailure(
                       preAuthorizationTransaction.orderUuid,
                       replyTo,
-                      "CreditedPaymentAccountNotFound"
+                      "CreditedPaymentAccountNotFound",
+                      correlationId = correlationId
                     )
                 }
             }
@@ -567,7 +635,8 @@ trait PayInCommandHandler
             handlePayInWithPreAuthorizationFailure(
               "",
               replyTo,
-              "PaymentAccountNotFound"
+              "PaymentAccountNotFound",
+              correlationId = correlationId
             )
         }
 
@@ -584,7 +653,7 @@ trait PayInCommandHandler
     printReceipt: Boolean,
     transaction: Transaction,
     registerWallet: Boolean = false,
-    correlationId: Option[String] = None // Story 13.7 — threaded from the checkout command
+    maybeCorrelationId: Option[String] = None // Story 13.7 — threaded from the checkout command
   )(implicit
     system: ActorSystem[_],
     log: Logger,
@@ -594,6 +663,12 @@ trait PayInCommandHandler
       transaction.id,
       entityId
     ) // add transaction id as a key for this payment account
+    // Story 13.7 — never let a persisted event / audit line be untraceable: fall back to the orderUuid
+    // (a stable business key) when no HTTP-origin cid was threaded. `correlationId` shadows the param
+    // so EVERY event persisted below carries the same id (the durable hop the licensing pod reads), and
+    // `effectiveCorrelationId` feeds the audit line — the two always agree.
+    val effectiveCorrelationId: String = maybeCorrelationId.getOrElse(orderUuid)
+    val correlationId: Option[String] = Some(effectiveCorrelationId)
     val lastUpdated = now()
     var updatedPaymentAccount = paymentAccount.withLastUpdated(lastUpdated)
     var transactionUpdatedEvents = {
@@ -604,6 +679,7 @@ trait PayInCommandHandler
               .copy(clientId = paymentAccount.clientId, debitedUserId = paymentAccount.userId)
           )
           .withLastUpdated(lastUpdated)
+          .copy(correlationId = correlationId) // Story 13.7
       )
     }
     val walletEvents: List[ExternalSchedulerEvent] =
@@ -615,7 +691,8 @@ trait PayInCommandHandler
             .withLastUpdated(lastUpdated)
             .copy(
               userId = paymentAccount.userId.get,
-              walletId = paymentAccount.walletId.get
+              walletId = paymentAccount.walletId.get,
+              correlationId = correlationId // Story 13.7
             )
         )
       } else {
@@ -628,7 +705,9 @@ trait PayInCommandHandler
           .persist(
             (PaymentAccountUpsertedEvent.defaultInstance
               .withDocument(updatedPaymentAccount)
-              .withLastUpdated(lastUpdated) +: walletEvents) ++ transactionUpdatedEvents
+              .withLastUpdated(lastUpdated)
+              .copy(correlationId = correlationId) // Story 13.7
+            +: walletEvents) ++ transactionUpdatedEvents
           )
           .thenRun(_ =>
             PaymentRequired(
@@ -644,7 +723,9 @@ trait PayInCommandHandler
           .persist(
             (PaymentAccountUpsertedEvent.defaultInstance
               .withDocument(updatedPaymentAccount)
-              .withLastUpdated(lastUpdated) +: walletEvents) ++ transactionUpdatedEvents
+              .withLastUpdated(lastUpdated)
+              .copy(correlationId = correlationId) // Story 13.7
+            +: walletEvents) ++ transactionUpdatedEvents
           )
           .thenRun(_ => PaymentRedirection(transaction.redirectUrl.get) ~> replyTo)
       case _ =>
@@ -682,6 +763,7 @@ trait PayInCommandHandler
                               .withExternalUuid(paymentAccount.externalUuid)
                               .withCard(updatedCard)
                               .withLastUpdated(lastUpdated)
+                              .copy(correlationId = correlationId) // Story 13.7
                           )
                         case paypal: Paypal =>
                           updatedPaymentAccount = updatedPaymentAccount.withPaypals(
@@ -693,6 +775,7 @@ trait PayInCommandHandler
                               .withExternalUuid(paymentAccount.externalUuid)
                               .withPaypal(paypal)
                               .withLastUpdated(lastUpdated)
+                              .copy(correlationId = correlationId) // Story 13.7
                           )
                         case _ => List.empty
                       }
@@ -733,6 +816,7 @@ trait PayInCommandHandler
                             )
                           )
                           .withLastUpdated(lastUpdated)
+                          .copy(correlationId = correlationId) // Story 13.7
                     case _ =>
                   }
                 case _ =>
@@ -756,9 +840,25 @@ trait PayInCommandHandler
               ) ++
               (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated) +: walletEvents) ++ transactionUpdatedEvents
+                .withLastUpdated(lastUpdated)
+                .copy(correlationId = correlationId) // Story 13.7
+              +: walletEvents) ++ transactionUpdatedEvents
             )
-            .thenRun(_ => PaidIn(transaction.id, transaction.status) ~> replyTo)
+            .thenRun { _ =>
+              // Story 13.7 — terminal payment audit line; the cid rode in on the command and is
+              // already on the persisted PaidInEvent (durable hop to the licensing pod).
+              audit.event(
+                effectiveCorrelationId,
+                "charge_succeeded",
+                "order_uuid"     -> orderUuid,
+                "transaction_id" -> transaction.id,
+                "amount"         -> transaction.amount,
+                "fees"           -> transaction.fees,
+                "currency"       -> transaction.currency,
+                "result"         -> transaction.status.name
+              )
+              PaidIn(transaction.id, transaction.status) ~> replyTo
+            }
         } else {
           log.error(
             "Order-{} could not be paid in: {} -> {}",
@@ -773,14 +873,27 @@ trait PayInCommandHandler
                   .withOrderUuid(orderUuid)
                   .withResultMessage(transaction.resultMessage)
                   .withTransaction(transaction)
+                  .copy(correlationId = correlationId) // Story 13.7
               ) ++
               (PaymentAccountUpsertedEvent.defaultInstance
                 .withDocument(updatedPaymentAccount)
-                .withLastUpdated(lastUpdated) +: walletEvents) ++ transactionUpdatedEvents
+                .withLastUpdated(lastUpdated)
+                .copy(correlationId = correlationId) // Story 13.7
+              +: walletEvents) ++ transactionUpdatedEvents
             )
-            .thenRun(_ =>
+            .thenRun { _ =>
+              audit.event(
+                effectiveCorrelationId,
+                "charge_failed",
+                "order_uuid"     -> orderUuid,
+                "transaction_id" -> transaction.id,
+                "amount"         -> transaction.amount,
+                "fees"           -> transaction.fees,
+                "currency"       -> transaction.currency,
+                "result"         -> transaction.resultMessage
+              )
               PayInFailed(transaction.id, transaction.status, transaction.resultMessage) ~> replyTo
-            )
+            }
         }
     }
   }
@@ -788,16 +901,30 @@ trait PayInCommandHandler
   private[payment] def handlePayInWithPreAuthorizationFailure(
     orderUuid: String,
     replyTo: Option[ActorRef[PaymentResult]],
-    reason: String
+    reason: String,
+    correlationId: Option[String]
   )(implicit context: ActorContext[_]): Effect[ExternalSchedulerEvent, Option[PaymentAccount]] = {
 
+    // Story 13.7 — orderUuid fallback so the event + audit line are traceable and agree (see handlePayIn).
+    val effectiveCorrelationId: String = correlationId.getOrElse(orderUuid)
     Effect
       .persist(
         List(
-          PayInFailedEvent.defaultInstance.withOrderUuid(orderUuid).withResultMessage(reason)
+          PayInFailedEvent.defaultInstance
+            .withOrderUuid(orderUuid)
+            .withResultMessage(reason)
+            .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
         )
       )
-      .thenRun(_ => PayInWithCardPreAuthorizedFailed(reason) ~> replyTo)
+      .thenRun { _ =>
+        audit.event(
+          effectiveCorrelationId,
+          "charge_failed",
+          "order_uuid" -> orderUuid,
+          "result"     -> reason
+        )
+        PayInWithCardPreAuthorizedFailed(reason) ~> replyTo
+      }
   }
 
 }

@@ -1,6 +1,7 @@
 package app.softnetwork.payment.service
 
 import app.softnetwork.concurrent.Completion
+import app.softnetwork.payment.audit.PaymentAuditLog.audit
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
   CreateOrUpdateKycDocument,
@@ -83,6 +84,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
       )
       return
     }
+    // Story 13.7 — audit the inbound webhook; the Stripe event id is its natural correlation key.
+    audit.event(event.getId, "webhook_received", "stripe_event_type" -> event.getType)
     event.getType match {
 
       case "account.updated" =>
@@ -106,7 +109,9 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                   )
               }
               //disable account
-              run(InvalidateRegularUser(accountId)).complete() match {
+              val cmd = InvalidateRegularUser(accountId)
+              cmd.withCorrelationId(resolveCorrelationId(account, event)) // Story 13.7
+              run(cmd).complete() match {
                 case Success(RegularUserInvalidated) =>
                   log.info(
                     s"[Payment Hooks] Stripe Webhook received: Account Updated -> Account disabled for $accountId"
@@ -138,7 +143,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                                 documentId,
                                 KycDocument.KycDocumentType.KYC_IDENTITY_PROOF,
                                 code,
-                                reason
+                                reason,
+                                event.getId
                               )
                             case _ =>
                           }
@@ -160,7 +166,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                                 documentId,
                                 KycDocument.KycDocumentType.KYC_ADDRESS_PROOF,
                                 code,
-                                reason
+                                reason,
+                                event.getId
                               )
                             case _ =>
                           }
@@ -181,7 +188,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                                 documentId,
                                 KycDocument.KycDocumentType.KYC_REGISTRATION_PROOF,
                                 code,
-                                reason
+                                reason,
+                                event.getId
                               )
                             case _ =>
                           }
@@ -199,7 +207,9 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                 s"[Payment Hooks] Stripe Webhook received: Account Updated -> Charges and Payouts are enabled for $accountId"
               )
               //enable account
-              run(ValidateRegularUser(account.getId)).complete() match {
+              val cmd = ValidateRegularUser(account.getId)
+              cmd.withCorrelationId(resolveCorrelationId(account, event)) // Story 13.7
+              run(cmd).complete() match {
                 case Success(RegularUserValidated) =>
                   log.info(
                     s"[Payment Hooks] Stripe Webhook received: Account Updated -> Account enabled for $accountId"
@@ -258,7 +268,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                               documentId,
                               KycDocument.KycDocumentType.KYC_IDENTITY_PROOF,
                               code,
-                              reason
+                              reason,
+                              event.getId
                             )
                           case _ =>
                         }
@@ -278,7 +289,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
                               documentId,
                               KycDocument.KycDocumentType.KYC_ADDRESS_PROOF,
                               code,
-                              reason
+                              reason,
+                              event.getId
                             )
                           case _ =>
                         }
@@ -305,9 +317,13 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
             log.info(
               s"[Payment Hooks] Subscription $subscriptionId invoice paid: $transactionId"
             )
-            run(
-              RecurringPaymentCallback(subscriptionId, transactionId, Some(customerId))
-            ).complete() match {
+            val cmd = RecurringPaymentCallback(
+              subscriptionId,
+              transactionId,
+              Some(customerId)
+            )
+            cmd.withCorrelationId(resolveCorrelationId(invoice, event)) // Story 13.7
+            run(cmd).complete() match {
               case Success(_) =>
                 log.info(
                   s"[Payment Hooks] Recurring payment callback processed: $subscriptionId"
@@ -331,9 +347,10 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
             log.warn(
               s"[Payment Hooks] Subscription $subscriptionId invoice payment failed: $transactionId"
             )
-            run(
+            val cmd =
               RecurringPaymentCallback(subscriptionId, transactionId, Some(customerId))
-            ).complete() match {
+            cmd.withCorrelationId(resolveCorrelationId(invoice, event)) // Story 13.7
+            run(cmd).complete() match {
               case Success(_) =>
                 log.info(
                   s"[Payment Hooks] Payment failure callback processed for $subscriptionId"
@@ -356,13 +373,14 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
           log.info(
             s"[Payment Hooks] Subscription $subscriptionId deleted for customer $customerId"
           )
-          run(
+          val cmd =
             UpdateRecurringCardPaymentRegistration(
               customerId,
               subscriptionId,
               status = Some(RecurringPayment.RecurringCardPaymentStatus.ENDED)
             )
-          ).complete() match {
+          cmd.withCorrelationId(resolveCorrelationId(subscription, event)) // Story 13.7
+          run(cmd).complete() match {
             case Success(_) =>
               log.info(s"[Payment Hooks] Subscription $subscriptionId marked as ENDED")
             case Failure(f) =>
@@ -386,13 +404,14 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
           // If subscription moved to a terminal state, sync local state
           stripeStatus match {
             case "canceled" | "incomplete_expired" | "paused" =>
-              run(
+              val cmd =
                 UpdateRecurringCardPaymentRegistration(
                   customerId,
                   subscriptionId,
                   status = Some(RecurringPayment.RecurringCardPaymentStatus.ENDED)
                 )
-              ).complete() match {
+              cmd.withCorrelationId(resolveCorrelationId(subscription, event)) // Story 13.7
+              run(cmd).complete() match {
                 case Success(_) =>
                   log.info(s"[Payment Hooks] Subscription $subscriptionId synced to ENDED")
                 case Failure(f) =>
@@ -415,9 +434,9 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
           log.info(
             s"[Payment Hooks] Payment method $paymentMethodId attached to customer $customerId"
           )
-          run(
-            RegisterPaymentMethodFromWebhook(customerId, paymentMethodId)
-          ).complete() match {
+          val cmd = RegisterPaymentMethodFromWebhook(customerId, paymentMethodId)
+          cmd.withCorrelationId(resolveCorrelationId(pm, event)) // Story 13.7
+          run(cmd).complete() match {
             case Success(_: PaymentMethodRegistered.type) =>
               log.info(
                 s"[Payment Hooks] Payment method $paymentMethodId registered for $customerId"
@@ -451,9 +470,9 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
               log.info(
                 s"[Payment Hooks] Payment method $paymentMethodId detached from customer $cid"
               )
-              run(
-                DisablePaymentMethodFromWebhook(cid, paymentMethodId)
-              ).complete() match {
+              val cmd = DisablePaymentMethodFromWebhook(cid, paymentMethodId)
+              cmd.withCorrelationId(resolveCorrelationId(pm, event)) // Story 13.7
+              run(cmd).complete() match {
                 case Success(_: PaymentMethodDisabled.type) =>
                   log.info(s"[Payment Hooks] Payment method $paymentMethodId disabled")
                 case Success(other) =>
@@ -490,7 +509,7 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
               .withCountry(Option(a.getCountry).getOrElse(""))
               .copy(state = Option(a.getState))
           }
-          run(
+          val cmd =
             UpdateCustomerFromWebhook(
               customerId,
               name = Option(customer.getName),
@@ -498,7 +517,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
               phone = Option(customer.getPhone),
               address = address
             )
-          ).complete() match {
+          cmd.withCorrelationId(resolveCorrelationId(customer, event)) // Story 13.7
+          run(cmd).complete() match {
             case Success(_: CustomerUpdated.type) =>
               log.info(s"[Payment Hooks] Customer $customerId info updated")
             case Success(other) =>
@@ -514,6 +534,48 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
       case _ =>
         log.info(s"[Payment Hooks] Stripe Webhook received: ${event.getType}")
     }
+  }
+
+  /** Story 13.7 — read the metadata map off any Stripe object that exposes `getMetadata` (most do:
+    * PaymentIntent, Subscription, Invoice, Customer, PaymentMethod, …). Reflection keeps this
+    * generic since the Stripe Java SDK has no common metadata interface. Failure is benign → empty
+    * map.
+    */
+  private[this] def stripeMetadata(obj: StripeObject): Map[String, String] =
+    Try {
+      obj.getClass.getMethod("getMetadata").invoke(obj) match {
+        case m: java.util.Map[_, _] =>
+          m.asScala.collect { case (k: String, v: String) => k -> v }.toMap
+        case _ => Map.empty[String, String]
+      }
+    }.getOrElse(Map.empty[String, String])
+
+  /** Story 13.7 — the subscription id that backs this object, used as a correlation fallback: a
+    * recurring registration with no explicit cid stamps the subscription id as its correlation id
+    * (cf `RecurringPaymentCommandHandler`), so the webhook must resolve to the same value.
+    */
+  private[this] def subscriptionId(obj: StripeObject): Option[String] =
+    obj match {
+      case s: Subscription => Option(s.getId).filter(_.nonEmpty)
+      case i: Invoice      => Option(i.getSubscription).filter(_.nonEmpty)
+      case _               => None
+    }
+
+  /** Story 13.7 — resolve the cross-service correlation id for a webhook-driven command (READ side
+    * of the softpayment <-> Stripe round-trip). The provider writes the id into the Stripe object
+    * metadata at creation (`correlation_id`); otherwise fall back, in order, to the
+    * `external_reference` / `order_uuid` it also stamps, then the backing subscription id
+    * (recurring), then the event id.
+    */
+  private[this] def resolveCorrelationId(obj: StripeObject, event: Event): String = {
+    val metadata = stripeMetadata(obj)
+    metadata
+      .get("correlation_id")
+      .filter(_.nonEmpty)
+      .orElse(metadata.get("external_reference").filter(_.nonEmpty))
+      .orElse(metadata.get("order_uuid").filter(_.nonEmpty))
+      .orElse(subscriptionId(obj))
+      .getOrElse(event.getId)
   }
 
   private[this] def extractStripeObject[T <: StripeObject: scala.reflect.ClassTag](
@@ -535,7 +597,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
     documentId: String,
     documentType: KycDocument.KycDocumentType,
     code: String,
-    reason: String
+    reason: String,
+    correlationId: String // Story 13.7 — Stripe event id, threaded from handleStripeEvent
   ): Unit = {
     log.warn(
       s"[Payment Hooks] Stripe Webhook received: Document ID: $documentId refused"
@@ -546,12 +609,9 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
       .withStatus(KycDocument.KycDocumentStatus.KYC_DOCUMENT_REFUSED)
       .withRefusedReasonType(code)
       .withRefusedReasonMessage(reason)
-    run(
-      CreateOrUpdateKycDocument(
-        accountId,
-        document
-      )
-    ).complete() match {
+    val cmd = CreateOrUpdateKycDocument(accountId, document)
+    cmd.withCorrelationId(correlationId) // Story 13.7 — webhook cid = Stripe event id
+    run(cmd).complete() match {
       case Success(KycDocumentCreatedOrUpdated) =>
         log.info(
           s"[Payment Hooks] Stripe Webhook received: Document ID: $documentId refused"

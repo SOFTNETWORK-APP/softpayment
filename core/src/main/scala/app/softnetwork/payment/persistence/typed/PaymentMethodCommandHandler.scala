@@ -46,6 +46,8 @@ trait PaymentMethodCommandHandler
     command match {
       case cmd: PreRegisterPaymentMethod =>
         import cmd._
+        // Story 13.7 — orderUuid fallback so every persisted event carries a traceable cid.
+        val effectiveCorrelationId: String = cmd.correlationId.getOrElse(orderUuid)
         val (pa, registerWallet) = createOrUpdateCustomer(entityId, state, user, currency, clientId)
         pa match {
           case Some(paymentAccount) =>
@@ -54,6 +56,7 @@ trait PaymentMethodCommandHandler
                 .withDocument(
                   paymentAccount
                 )
+                .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
             paymentAccount.userId match {
               case Some(userId) =>
                 paymentAccount.walletId match {
@@ -83,6 +86,7 @@ trait PaymentMethodCommandHandler
                                 .withUserId(userId)
                                 .withWalletId(walletId)
                                 .withLastUpdated(lastUpdated)
+                                .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                             )
                           } else {
                             List.empty
@@ -108,7 +112,8 @@ trait PaymentMethodCommandHandler
                                           .withBirthday(user.birthday)
                                       )
                                     case _ => None
-                                  }
+                                  },
+                                  correlationId = Some(effectiveCorrelationId) // Story 13.7
                                 )
                             ) ++ walletEvents :+ paymentAccountUpsertedEvent
                           )
@@ -124,6 +129,7 @@ trait PaymentMethodCommandHandler
                                   .withUserId(userId)
                                   .withWalletId(walletId)
                                   .withLastUpdated(lastUpdated)
+                                  .copy(correlationId = Some(effectiveCorrelationId)) // Story 13.7
                               ) :+ paymentAccountUpsertedEvent
                             )
                             .thenRun(_ => PaymentMethodNotPreRegistered ~> replyTo)
@@ -207,6 +213,7 @@ trait PaymentMethodCommandHandler
                                 updatedPaymentAccount
                                   .withLastUpdated(lastUpdated)
                               )
+                              .copy(correlationId = cmd.correlationId)
                           )
                           .thenRun(_ => PaymentMethodDisabled ~> replyTo)
                       case _ => Effect.none.thenRun(_ => PaymentMethodNotDisabled ~> replyTo)
@@ -244,6 +251,7 @@ trait PaymentMethodCommandHandler
                       PaymentAccountUpsertedEvent.defaultInstance
                         .withDocument(updatedPaymentAccount.withLastUpdated(lastUpdated))
                         .withLastUpdated(lastUpdated)
+                        .copy(correlationId = cmd.correlationId)
                     )
                     .thenRun(_ => PaymentMethodRegistered ~> replyTo)
                 case Some(paypal: Paypal) =>
@@ -258,6 +266,7 @@ trait PaymentMethodCommandHandler
                       PaymentAccountUpsertedEvent.defaultInstance
                         .withDocument(updatedPaymentAccount.withLastUpdated(lastUpdated))
                         .withLastUpdated(lastUpdated)
+                        .copy(correlationId = cmd.correlationId)
                     )
                     .thenRun(_ => PaymentMethodRegistered ~> replyTo)
                 case _ =>
@@ -286,6 +295,7 @@ trait PaymentMethodCommandHandler
                     PaymentAccountUpsertedEvent.defaultInstance
                       .withDocument(updatedPaymentAccount.withLastUpdated(lastUpdated))
                       .withLastUpdated(lastUpdated)
+                      .copy(correlationId = cmd.correlationId)
                   )
                   .thenRun(_ => PaymentMethodDisabled ~> replyTo)
               case Some(paypal: Paypal) =>
@@ -300,6 +310,7 @@ trait PaymentMethodCommandHandler
                     PaymentAccountUpsertedEvent.defaultInstance
                       .withDocument(updatedPaymentAccount.withLastUpdated(lastUpdated))
                       .withLastUpdated(lastUpdated)
+                      .copy(correlationId = cmd.correlationId)
                   )
                   .thenRun(_ => PaymentMethodDisabled ~> replyTo)
               case _ =>

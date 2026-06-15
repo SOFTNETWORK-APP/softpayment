@@ -4,8 +4,8 @@ import akka.actor.typed.scaladsl.{ActorContext, TimerScheduler}
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.persistence.typed.scaladsl.Effect
 import app.softnetwork.concurrent.Completion
+import app.softnetwork.payment.audit.PaymentAuditLog.audit
 import app.softnetwork.payment.api.config.SoftPayClientSettings
-import app.softnetwork.payment.message.PaymentEvents.PaymentAccountUpsertedEvent
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.message.TransactionEvents.{
   PaidOutEvent,
@@ -46,6 +46,30 @@ trait PayOutCommandHandler
     command match {
       case cmd: PayOut =>
         import cmd._
+        // Story 13.7 — orderUuid fallback shared by every payout event + audit line (see handlePayIn).
+        val effectiveCorrelationId: String = cmd.correlationId.getOrElse(orderUuid)
+        def auditPayoutSucceeded(transactionId: String, status: String): Unit =
+          audit.event(
+            effectiveCorrelationId,
+            "payout_succeeded",
+            "order_uuid"     -> orderUuid,
+            "transaction_id" -> transactionId,
+            "amount"         -> creditedAmount,
+            "fees"           -> feesAmount,
+            "currency"       -> currency,
+            "result"         -> status
+          )
+        def auditPayoutFailed(result: String, transactionId: String = ""): Unit =
+          audit.event(
+            effectiveCorrelationId,
+            "payout_failed",
+            "order_uuid"     -> orderUuid,
+            "transaction_id" -> transactionId,
+            "amount"         -> creditedAmount,
+            "fees"           -> feesAmount,
+            "currency"       -> currency,
+            "result"         -> result
+          )
         state match {
           case Some(paymentAccount) =>
             val clientId = paymentAccount.clientId
@@ -70,6 +94,12 @@ trait PayOutCommandHandler
                             .find(_.orderUuid == orderUuid)
                             .map(_.id)
                         )
+                        val metadata: Map[String, String] =
+                          cmd.correlationId match {
+                            case Some(correlationId) =>
+                              Map("correlationId" -> correlationId)
+                            case None => Map.empty
+                          }
                         payOut(
                           Some(
                             PayOutTransaction.defaultInstance
@@ -85,6 +115,7 @@ trait PayOutCommandHandler
                                 externalReference = externalReference,
                                 payInTransactionId = pit
                               )
+                              .withMetadata(metadata)
                           )
                         ) match {
                           case Some(transaction) =>
@@ -101,6 +132,7 @@ trait PayOutCommandHandler
                                     )
                                 )
                                 .withLastUpdated(lastUpdated)
+                                .copy(correlationId = Some(effectiveCorrelationId))
                             if (transaction.status.isTransactionFailedForTechnicalReason) {
                               log.error(
                                 "Order-{} could not be paid out: {} -> {}",
@@ -115,16 +147,20 @@ trait PayOutCommandHandler
                                       .withOrderUuid(orderUuid)
                                       .withResultMessage(transaction.resultMessage)
                                       .withTransaction(transaction)
-                                      .copy(externalReference = externalReference)
+                                      .copy(
+                                        externalReference = externalReference,
+                                        correlationId = Some(effectiveCorrelationId)
+                                      )
                                   ) :+ transactionUpdatedEvent
                                 )
-                                .thenRun(_ =>
+                                .thenRun { _ =>
+                                  auditPayoutFailed(transaction.resultMessage, transaction.id)
                                   PayOutFailed(
                                     transaction.id,
                                     transaction.status,
                                     transaction.resultMessage
                                   ) ~> replyTo
-                                )
+                                }
                             } else if (
                               transaction.status.isTransactionSucceeded || transaction.status.isTransactionCreated
                             ) {
@@ -146,12 +182,16 @@ trait PayOutCommandHandler
                                       .withCurrency(currency)
                                       .withTransactionId(transaction.id)
                                       .withPaymentType(transaction.paymentType)
-                                      .copy(externalReference = externalReference)
+                                      .copy(
+                                        externalReference = externalReference,
+                                        correlationId = Some(effectiveCorrelationId)
+                                      )
                                   ) :+ transactionUpdatedEvent
                                 )
-                                .thenRun(_ =>
+                                .thenRun { _ =>
+                                  auditPayoutSucceeded(transaction.id, transaction.status.name)
                                   PaidOut(transaction.id, transaction.status) ~> replyTo
-                                )
+                                }
                             } else {
                               log.error(
                                 "Order-{} could not be paid out : {} -> {}",
@@ -166,16 +206,20 @@ trait PayOutCommandHandler
                                       .withOrderUuid(orderUuid)
                                       .withResultMessage(transaction.resultMessage)
                                       .withTransaction(transaction)
-                                      .copy(externalReference = externalReference)
+                                      .copy(
+                                        externalReference = externalReference,
+                                        correlationId = Some(effectiveCorrelationId)
+                                      )
                                   ) :+ transactionUpdatedEvent
                                 )
-                                .thenRun(_ =>
+                                .thenRun { _ =>
+                                  auditPayoutFailed(transaction.resultMessage, transaction.id)
                                   PayOutFailed(
                                     transaction.id,
                                     transaction.status,
                                     transaction.resultMessage
                                   ) ~> replyTo
-                                )
+                                }
                             }
                           case _ =>
                             log.error(
@@ -188,16 +232,20 @@ trait PayOutCommandHandler
                                   PayOutFailedEvent.defaultInstance
                                     .withOrderUuid(orderUuid)
                                     .withResultMessage("no transaction returned by provider")
-                                    .copy(externalReference = externalReference)
+                                    .copy(
+                                      externalReference = externalReference,
+                                      correlationId = Some(effectiveCorrelationId) // Story 13.7
+                                    )
                                 )
                               )
-                              .thenRun(_ =>
+                              .thenRun { _ =>
+                                auditPayoutFailed("no transaction returned by provider")
                                 PayOutFailed(
                                   "",
                                   Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
                                   "no transaction returned by provider"
                                 ) ~> replyTo
-                              )
+                              }
                         }
                       case _ =>
                         Effect
@@ -206,16 +254,20 @@ trait PayOutCommandHandler
                               PayOutFailedEvent.defaultInstance
                                 .withOrderUuid(orderUuid)
                                 .withResultMessage("no bank account")
-                                .copy(externalReference = externalReference)
+                                .copy(
+                                  externalReference = externalReference,
+                                  correlationId = Some(effectiveCorrelationId)
+                                )
                             )
                           )
-                          .thenRun(_ =>
+                          .thenRun { _ =>
+                            auditPayoutFailed("no bank account")
                             PayOutFailed(
                               "",
                               Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
                               "no bank account"
                             ) ~> replyTo
-                          )
+                          }
                     }
                   case _ =>
                     Effect
@@ -224,16 +276,20 @@ trait PayOutCommandHandler
                           PayOutFailedEvent.defaultInstance
                             .withOrderUuid(orderUuid)
                             .withResultMessage("no wallet id")
-                            .copy(externalReference = externalReference)
+                            .copy(
+                              externalReference = externalReference,
+                              correlationId = Some(effectiveCorrelationId)
+                            )
                         )
                       )
-                      .thenRun(_ =>
+                      .thenRun { _ =>
+                        auditPayoutFailed("no wallet id")
                         PayOutFailed(
                           "",
                           Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
                           "no wallet id"
                         ) ~> replyTo
-                      )
+                      }
                 }
               case _ =>
                 Effect
@@ -242,22 +298,28 @@ trait PayOutCommandHandler
                       PayOutFailedEvent.defaultInstance
                         .withOrderUuid(orderUuid)
                         .withResultMessage("no payment provider user id")
-                        .copy(externalReference = externalReference)
+                        .copy(
+                          externalReference = externalReference,
+                          correlationId = Some(effectiveCorrelationId)
+                        )
                     )
                   )
-                  .thenRun(_ =>
+                  .thenRun { _ =>
+                    auditPayoutFailed("no payment provider user id")
                     PayOutFailed(
                       "",
                       Transaction.TransactionStatus.TRANSACTION_NOT_SPECIFIED,
                       "no payment provider user id"
                     ) ~> replyTo
-                  )
+                  }
             }
           case _ => Effect.none.thenRun(_ => PaymentAccountNotFound ~> replyTo)
         }
 
       case cmd: LoadPayOutTransaction =>
         import cmd._
+        // Story 13.7 — orderUuid fallback shared by every payout event + audit line (see handlePayIn).
+        val effectiveCorrelationId: String = cmd.correlationId.getOrElse(orderUuid)
         state match {
           case Some(paymentAccount) =>
             paymentAccount.transactions.find(t =>
@@ -295,6 +357,7 @@ trait PayOutCommandHandler
                           )
                         )
                         .withLastUpdated(lastUpdated)
+                        .copy(correlationId = Some(effectiveCorrelationId))
                     if (t.status.isTransactionSucceeded || t.status.isTransactionCreated) {
                       Effect
                         .persist(
@@ -308,16 +371,29 @@ trait PayOutCommandHandler
                               .withCurrency(t.currency)
                               .withTransactionId(t.id)
                               .withPaymentType(t.paymentType)
-                              .copy(externalReference = transaction.externalReference)
+                              .copy(
+                                externalReference = transaction.externalReference,
+                                correlationId = Some(effectiveCorrelationId)
+                              )
                           ) :+ transactionUpdatedEvent
                         )
-                        .thenRun(_ =>
+                        .thenRun { _ =>
+                          audit.event(
+                            effectiveCorrelationId,
+                            "payout_succeeded",
+                            "order_uuid"     -> orderUuid,
+                            "transaction_id" -> t.id,
+                            "amount"         -> t.amount,
+                            "fees"           -> t.fees,
+                            "currency"       -> t.currency,
+                            "result"         -> t.status.name
+                          )
                           PayOutTransactionLoaded(
                             transaction.id,
                             transaction.status,
                             None
                           ) ~> replyTo
-                        )
+                        }
                     } else {
                       Effect
                         .persist(
@@ -326,16 +402,29 @@ trait PayOutCommandHandler
                               .withOrderUuid(orderUuid)
                               .withResultMessage(updatedTransaction.resultMessage)
                               .withTransaction(updatedTransaction)
-                              .copy(externalReference = transaction.externalReference)
+                              .copy(
+                                externalReference = transaction.externalReference,
+                                correlationId = Some(effectiveCorrelationId)
+                              )
                           ) :+ transactionUpdatedEvent
                         )
-                        .thenRun(_ =>
+                        .thenRun { _ =>
+                          audit.event(
+                            effectiveCorrelationId,
+                            "payout_failed",
+                            "order_uuid"     -> orderUuid,
+                            "transaction_id" -> t.id,
+                            "amount"         -> t.amount,
+                            "fees"           -> t.fees,
+                            "currency"       -> t.currency,
+                            "result"         -> updatedTransaction.resultMessage
+                          )
                           PayOutTransactionLoaded(
                             transaction.id,
                             transaction.status,
                             None
                           ) ~> replyTo
-                        )
+                        }
                     }
                   case None => Effect.none.thenRun(_ => TransactionNotFound ~> replyTo)
                 }

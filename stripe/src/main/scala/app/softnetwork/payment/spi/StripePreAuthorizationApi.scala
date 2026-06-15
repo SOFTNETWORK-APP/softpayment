@@ -182,6 +182,9 @@ trait StripePreAuthorizationApi extends PreAuthorizationApi { _: StripeContext =
           case _ =>
         }
 
+        // Propagate all user-supplied metadata to Stripe payment intent object
+        preAuthorizationTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
+
         mlog.info(
           s"Creating pre authorization for order ${preAuthorizationTransaction.orderUuid} -> ${new Gson()
             .toJson(params.build())}"

@@ -23,7 +23,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   def payment(payment: Payment): PartialServerEndpointWithSecurityOutput[
     (Seq[Option[String]], Option[String], Method, Option[String]),
     (Option[SoftPayAccount.Client], SD),
-    (Option[String], Option[String], Option[String], Option[String], Payment),
+    (Option[String], Option[String], Option[String], Option[String], Payment, String),
     Any,
     (Seq[Option[String]], Option[CookieValueWithMeta]),
     Unit,
@@ -40,6 +40,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           .description("Payment to perform")
           .example(payment)
       )
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
 
   val preAuthorize: ServerEndpoint[Any with AkkaStreams, Future] =
     payment(
@@ -76,10 +77,10 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic(principal => {
-        case (language, accept, userAgent, ipAddress, payment, creditedAccount) =>
+        case (language, accept, userAgent, ipAddress, payment, correlationId, creditedAccount) =>
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
           import payment._
-          run(
+          val cmd =
             PreAuthorize(
               orderUuid,
               externalUuidWithProfile(principal._2),
@@ -97,7 +98,8 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               paymentMethodId = paymentMethodId,
               registerMeansOfPayment = registerMeansOfPayment
             )
-          ).map {
+          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+          run(cmd).map {
             case result: PaymentPreAuthorized => Right(result)
             case result: PaymentRedirection   => Right(result)
             case result: PaymentRequired      => Right(result)
@@ -121,6 +123,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))*/
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         oneOf[PaymentResult](
           oneOfVariant[PaymentPreAuthorized](
@@ -138,16 +141,17 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .description("Pre authorize card for 3D secure")
-      .serverLogic { case (orderUuid, params) =>
+      .serverLogic { case (orderUuid, params, correlationId) =>
         val preAuthorizationIdParameter =
           params.get("preAuthorizationIdParameter").getOrElse("preAuthorizationId")
         val preAuthorizationId = params.get(preAuthorizationIdParameter).getOrElse("")
         val registerMeansOfPayment =
           params.get("registerMeansOfPayment").getOrElse("false").toBoolean
         val printReceipt = params.get("printReceipt").getOrElse("false").toBoolean
-        run(
+        val cmd =
           PreAuthorizeCallback(orderUuid, preAuthorizationId, registerMeansOfPayment, printReceipt)
-        ).map {
+        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+        run(cmd).map {
           case result: PaymentPreAuthorized => Right(result)
           case result: PaymentRedirection   => Right(result)
           case other                        => Left(error(other))
@@ -167,7 +171,6 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
     )
       .in(PaymentSettings.PaymentConfig.payInRoute)
       .in(path[String].description("credited account"))
-      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .post
       .out(
         oneOf[PaymentResult](
@@ -186,7 +189,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic(principal => {
-        case (language, accept, userAgent, ipAddress, payment, creditedAccount, correlationId) =>
+        case (language, accept, userAgent, ipAddress, payment, correlationId, creditedAccount) =>
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
           import payment._
           val cmd =
@@ -230,6 +233,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .description("Pay in query parameters")
       /*.in(query[String]("transactionId").description("Payment transaction id"))
       .in(query[Boolean]("printReceipt").description("Whether or not a receipt should be printed"))*/
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         oneOf[PaymentResult](
           oneOfVariant[PaidIn](
@@ -247,16 +251,16 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .description("Pay in with card")
-      .serverLogic { case (orderUuid, params) =>
+      .serverLogic { case (orderUuid, params, correlationId) =>
         val transactionIdParameter =
           params.get("transactionIdParameter").getOrElse("transactionId")
         val transactionId = params.get(transactionIdParameter).getOrElse("")
         val registerMeansOfPayment =
           params.get("registerMeansOfPayment").getOrElse("false").toBoolean
         val printReceipt = params.get("printReceipt").getOrElse("false").toBoolean
-        run(
-          PayInCallback(orderUuid, transactionId, registerMeansOfPayment, printReceipt)
-        ).map {
+        val cmd = PayInCallback(orderUuid, transactionId, registerMeansOfPayment, printReceipt)
+        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+        run(cmd).map {
           case result: PaidIn             => Right(result)
           case result: PaymentRedirection => Right(result)
           case result: PaymentRequired    => Right(result)
@@ -287,10 +291,18 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic(principal => {
-        case (language, accept, userAgent, ipAddress, payment, recurringPaymentRegistrationId) =>
+        case (
+              language,
+              accept,
+              userAgent,
+              ipAddress,
+              payment,
+              correlationId,
+              recurringPaymentRegistrationId
+            ) =>
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
           import payment._
-          run(
+          val cmd =
             ExecuteFirstRecurringPayment(
               recurringPaymentRegistrationId,
               externalUuidWithProfile(principal._2),
@@ -298,7 +310,8 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               browserInfo,
               statementDescriptor
             )
-          ).map {
+          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+          run(cmd).map {
             case result: FirstRecurringPaidIn => Right(result)
             case result: PaymentRedirection   => Right(result)
             case other                        => Left(error(other))
@@ -313,6 +326,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       )
       .in(path[String].description("Recurring payment registration Id"))
       .in(query[String]("transactionId").description("First recurring payment transaction Id"))
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         oneOf[PaymentResult](
           oneOfVariant[PaidIn](
@@ -330,10 +344,11 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .description("Execute first recurring payment for 3D secure")
-      .serverLogic { case (recurringPayInRegistrationId, transactionId) =>
-        run(
+      .serverLogic { case (recurringPayInRegistrationId, transactionId, cid) =>
+        val cmd =
           RecurringPaymentCallback(recurringPayInRegistrationId, transactionId)
-        ).map {
+        cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+        run(cmd).map {
           case result: PaidIn             => Right(result)
           case result: PaymentRedirection => Right(result)
           case other                      => Left(error(other))

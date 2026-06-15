@@ -1,5 +1,6 @@
 package app.softnetwork.payment.service
 
+import app.softnetwork.api.server.HttpCorrelation
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
@@ -20,20 +21,24 @@ trait BillingPortalEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
   val createBillingPortalSession: ServerEndpoint[Any with AkkaStreams, Future] =
     requiredSessionEndpoint.post
       .in(PaymentSettings.PaymentConfig.billingPortalRoute)
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .in(jsonBody[BillingPortalRequest])
       .out(
         statusCode(StatusCode.Ok)
           .and(jsonBody[BillingPortalSessionCreated])
       )
       .serverLogic { case (client, session) =>
-        req => {
-          run(
+        args => {
+          val correlationId = args._1
+          val req = args._2
+          val cmd =
             CreateBillingPortalSession(
               externalUuidWithProfile(session),
               req.returnUrl,
               clientId = client.map(_.clientId).orElse(session.clientId)
             )
-          ).map {
+          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
+          run(cmd).map {
             case r: BillingPortalSessionCreated => Right(r)
             case other                          => Left(error(other))
           }

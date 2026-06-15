@@ -430,6 +430,11 @@ trait StripeDirectDebitApi extends DirectDebitApi {
                 params.setStatementDescriptor(directDebitTransaction.statementDescriptor)
               }
 
+              // Propagate all user-supplied metadata to Stripe payment intent object
+              directDebitTransaction.metadata.foreach { case (k, v) => params.putMetadata(k, v) }
+
+              mlog.info(s"Creating direct debit -> ${new Gson().toJson(params.build())}")
+
               PaymentIntent.create(params.build(), requestOptions)
             case _ => throw new Exception("Mandate not found")
           }

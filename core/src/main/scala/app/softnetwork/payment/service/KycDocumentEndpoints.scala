@@ -1,6 +1,6 @@
 package app.softnetwork.payment.service
 
-import app.softnetwork.api.server.ApiErrors
+import app.softnetwork.api.server.{ApiErrors, HttpCorrelation}
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages._
@@ -29,6 +29,7 @@ trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           ) //KYC_REGISTRATION_PROOF, KYC_ARTICLES_OF_ASSOCIATION, KYC_SHAREHOLDER_DECLARATION or KYC_ADDRESS_PROOF
           .example("KYC_IDENTITY_PROOF")
       )
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok)
           .and(
@@ -36,14 +37,19 @@ trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               .description("Kyc document validation report")
           )
       )
-      .serverLogic(principal => { documentType =>
+      .serverLogic(principal => { args =>
+        val documentType = args._1
+        val cid = args._2
         val maybeKycDocumentType: Option[KycDocument.KycDocumentType] =
           KycDocument.KycDocumentType.enumCompanion.fromName(documentType)
         maybeKycDocumentType match {
           case None =>
             Future.successful(Left(ApiErrors.BadRequest("wrong kyc document type")))
           case Some(kycDocumentType) =>
-            run(LoadKycDocumentStatus(externalUuidWithProfile(principal._2), kycDocumentType)).map {
+            val cmd =
+              LoadKycDocumentStatus(externalUuidWithProfile(principal._2), kycDocumentType)
+            cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+            run(cmd).map {
               case r: KycDocumentStatusLoaded => Right(r.report)
               case other                      => Left(error(other))
             }
@@ -62,6 +68,7 @@ trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           .example("KYC_IDENTITY_PROOF")
       )
       .in(multipartBody[UploadDocument].description("Kyc document to record for validation"))
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .out(
         statusCode(StatusCode.Ok).and(
           jsonBody[KycDocumentAdded].description(
@@ -69,14 +76,17 @@ trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           )
         )
       )
-      .serverLogic(principal => { case (documentType, pages) =>
+      .serverLogic(principal => { case (documentType, pages, cid) =>
         val maybeKycDocumentType: Option[KycDocument.KycDocumentType] =
           KycDocument.KycDocumentType.enumCompanion.fromName(documentType)
         maybeKycDocumentType match {
           case None =>
             Future.successful(Left(ApiErrors.BadRequest("wrong kyc document type")))
           case Some(kycDocumentType) =>
-            run(AddKycDocument(externalUuidWithProfile(principal._2), pages.bytes, kycDocumentType))
+            val cmd =
+              AddKycDocument(externalUuidWithProfile(principal._2), pages.bytes, kycDocumentType)
+            cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
+            run(cmd)
               .map {
                 case r: KycDocumentAdded => Right(r)
                 case other               => Left(error(other))
