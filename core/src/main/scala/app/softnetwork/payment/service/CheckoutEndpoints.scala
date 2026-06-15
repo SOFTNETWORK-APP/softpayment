@@ -2,6 +2,7 @@ package app.softnetwork.payment.service
 
 import app.softnetwork.payment.config.PaymentSettings
 import app.softnetwork.payment.handlers.PaymentHandler
+import app.softnetwork.api.server.HttpCorrelation
 import app.softnetwork.payment.message.PaymentMessages._
 import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.session.model.{SessionData, SessionDataDecorator}
@@ -166,6 +167,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
     )
       .in(PaymentSettings.PaymentConfig.payInRoute)
       .in(path[String].description("credited account"))
+      .in(HttpCorrelation.correlationInput) // Story 13.7 — origin correlation id
       .post
       .out(
         oneOf[PaymentResult](
@@ -184,10 +186,10 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         )
       )
       .serverLogic(principal => {
-        case (language, accept, userAgent, ipAddress, payment, creditedAccount) =>
+        case (language, accept, userAgent, ipAddress, payment, creditedAccount, correlationId) =>
           val browserInfo = extractBrowserInfo(language, accept, userAgent, payment)
           import payment._
-          run(
+          val cmd =
             PayIn(
               orderUuid,
               externalUuidWithProfile(principal._2),
@@ -208,7 +210,10 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               paymentMethodId = paymentMethodId,
               clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
             )
-          ).map {
+          // Story 13.7 — stamp the origin correlation id (from X-Correlation-Id, generated if absent)
+          // so it rides the command → the persisted PaidInEvent → the licensing pod.
+          cmd.withCorrelationId(correlationId)
+          run(cmd).map {
             case result: PaidIn             => Right(result)
             case result: PaymentRedirection => Right(result)
             case result: PaymentRequired    => Right(result)
