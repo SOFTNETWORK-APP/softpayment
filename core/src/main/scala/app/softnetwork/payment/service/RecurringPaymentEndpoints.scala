@@ -49,8 +49,7 @@ trait RecurringPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
             debitedAccount = externalUuidWithProfile(session),
             clientId = client.map(_.clientId).orElse(session.clientId)
           )
-          updated.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-          run(updated).map {
+          runCorrelated(updated, correlationId).map {
             case r: RecurringPaymentRegistered  => Right(r)
             case r: MandateConfirmationRequired => Right(r)
             case other                          => Left(error(other))
@@ -101,8 +100,7 @@ trait RecurringPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
       )
       .serverLogic(principal => { case (cmd, correlationId) =>
         val updated = cmd.copy(debitedAccount = externalUuidWithProfile(principal._2))
-        updated.withCorrelationId(correlationId) // Story 13.7 — origin stamp (after copy)
-        run(updated).map {
+        runCorrelated(updated, correlationId).map {
           case r: RecurringCardPaymentRegistrationUpdated => Right(r.result)
           case other                                      => Left(error(other))
         }
@@ -128,8 +126,7 @@ trait RecurringPaymentEndpoints[SD <: SessionData with SessionDataDecorator[SD]]
             None,
             Some(RecurringPayment.RecurringCardPaymentStatus.ENDED)
           )
-        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, correlationId).map {
           case r: RecurringCardPaymentRegistrationUpdated => Right(r.result)
           case other                                      => Left(error(other))
         }

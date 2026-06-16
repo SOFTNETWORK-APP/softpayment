@@ -39,8 +39,7 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         val correlationId = args._2
         val cmd =
           CreateOrUpdateUbo(externalUuidWithProfile(principal._2), ubo)
-        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, correlationId).map {
           case r: UboCreatedOrUpdated => Right(r.ubo)
           case other                  => Left(error(other))
         }
@@ -61,7 +60,7 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .serverLogic(principal =>
         cid => {
           val cmd = GetUboDeclaration(externalUuidWithProfile(principal._2))
-          run(cmd).map {
+          runCorrelated(cmd, cid).map {
             case r: UboDeclarationLoaded => Right(r.declaration.view)
             case other                   => Left(error(other))
           }
@@ -95,8 +94,7 @@ trait UboDeclarationEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           userAgent,
           tokenId
         )
-        cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, cid).map {
           case UboDeclarationAskedForValidation => Right(UboDeclarationAskedForValidation)
           case other                            => Left(error(other))
         }

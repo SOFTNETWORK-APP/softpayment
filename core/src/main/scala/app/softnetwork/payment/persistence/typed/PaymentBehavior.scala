@@ -1028,10 +1028,14 @@ trait PaymentBehavior
             case Some(paymentAccount) =>
               val recurringPaymentRegistrationId = key.split("#").last
               Effect.none.thenRun(_ => {
-                context.self ! ExecuteNextRecurringPayment(
+                val next = ExecuteNextRecurringPayment(
                   recurringPaymentRegistrationId,
                   paymentAccount.externalUuid
                 )
+                // Story 13.7 (DN3) — carry the schedule's correlation id onto the renewal charge so
+                // the cid set at registration propagates to the scheduled "next recurring" events.
+                cmd.schedule.correlationId.filter(_.nonEmpty).foreach(next.withCorrelationId)
+                context.self ! next
                 Schedule4PaymentTriggered(cmd.schedule) ~> replyTo
               })
             case _ =>

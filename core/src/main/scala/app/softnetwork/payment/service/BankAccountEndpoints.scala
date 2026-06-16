@@ -46,8 +46,7 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               clientId = client.map(_.clientId).orElse(session.clientId),
               bankTokenId = bankTokenId
             )
-          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, correlationId).map {
             case r: BankAccountCreatedOrUpdated => Right(r)
             case other                          => Left(error(other))
           }
@@ -71,8 +70,7 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             externalUuidWithProfile(session),
             clientId = client.map(_.clientId).orElse(session.clientId)
           )
-          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, correlationId).map {
             case r: BankAccountLoaded => Right(r.bankAccount.view)
             case other                => Left(error(other))
           }
@@ -92,8 +90,7 @@ trait BankAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           externalUuidWithProfile(principal._2),
           Some(false)
         )
-        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, correlationId).map {
           case BankAccountDeleted => Right(BankAccountDeleted)
           case other              => Left(error(other))
         }

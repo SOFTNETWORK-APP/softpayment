@@ -98,8 +98,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               paymentMethodId = paymentMethodId,
               registerMeansOfPayment = registerMeansOfPayment
             )
-          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, correlationId).map {
             case result: PaymentPreAuthorized => Right(result)
             case result: PaymentRedirection   => Right(result)
             case result: PaymentRequired      => Right(result)
@@ -150,8 +149,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         val printReceipt = params.get("printReceipt").getOrElse("false").toBoolean
         val cmd =
           PreAuthorizeCallback(orderUuid, preAuthorizationId, registerMeansOfPayment, printReceipt)
-        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, correlationId).map {
           case result: PaymentPreAuthorized => Right(result)
           case result: PaymentRedirection   => Right(result)
           case other                        => Left(error(other))
@@ -215,8 +213,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             )
           // Story 13.7 — stamp the origin correlation id (from X-Correlation-Id, generated if absent)
           // so it rides the command → the persisted PaidInEvent → the licensing pod.
-          cmd.withCorrelationId(correlationId)
-          run(cmd).map {
+          runCorrelated(cmd, correlationId).map {
             case result: PaidIn             => Right(result)
             case result: PaymentRedirection => Right(result)
             case result: PaymentRequired    => Right(result)
@@ -259,8 +256,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           params.get("registerMeansOfPayment").getOrElse("false").toBoolean
         val printReceipt = params.get("printReceipt").getOrElse("false").toBoolean
         val cmd = PayInCallback(orderUuid, transactionId, registerMeansOfPayment, printReceipt)
-        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, correlationId).map {
           case result: PaidIn             => Right(result)
           case result: PaymentRedirection => Right(result)
           case result: PaymentRequired    => Right(result)
@@ -310,8 +306,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               browserInfo,
               statementDescriptor
             )
-          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, correlationId).map {
             case result: FirstRecurringPaidIn => Right(result)
             case result: PaymentRedirection   => Right(result)
             case other                        => Left(error(other))
@@ -347,8 +342,7 @@ trait CheckoutEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .serverLogic { case (recurringPayInRegistrationId, transactionId, cid) =>
         val cmd =
           RecurringPaymentCallback(recurringPayInRegistrationId, transactionId)
-        cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, cid).map {
           case result: PaidIn             => Right(result)
           case result: PaymentRedirection => Right(result)
           case other                      => Left(error(other))

@@ -27,6 +27,16 @@ trait BasicPaymentService extends Service[PaymentCommand, PaymentResult] {
     super.run(command.key, command)
   }
 
+  /** Story 13.7 — keyed convenience over the shared `Service.runCorrelated`: tapir `serverLogic`
+    * reads the cid as DATA via `HttpCorrelation.correlationInput` (MDC does not survive the
+    * `serverLogic` `Future` — C14) and dispatches through here, so every keyed command stamps the
+    * id in one place instead of an inline `cmd.withCorrelationId(cid); run(cmd)` per endpoint.
+    */
+  def runCorrelated(command: PaymentCommandWithKey, correlationId: String)(implicit
+    tTag: ClassTag[PaymentCommand]
+  ): Future[PaymentResult] =
+    runCorrelated(command.key, command, correlationId)
+
   def error(result: PaymentResult): ApiErrors.ErrorInfo =
     result match {
       case PaymentAccountNotFound   => ApiErrors.NotFound(PaymentAccountNotFound.message)
