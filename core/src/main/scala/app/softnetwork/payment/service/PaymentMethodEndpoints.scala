@@ -32,8 +32,7 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         cid => {
           val cmd =
             LoadPaymentMethods(externalUuidWithProfile(principal._2))
-          cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, cid).map {
             case r: PaymentMethodsLoaded => Right(PaymentMethodsView(r.paymentMethods).cards)
             case other                   => Left(error(other))
           }
@@ -54,8 +53,7 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
         cid => {
           val cmd =
             LoadPaymentMethods(externalUuidWithProfile(principal._2))
-          cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, cid).map {
             case r: PaymentMethodsLoaded => Right(PaymentMethodsView(r.paymentMethods))
             case other                   => Left(error(other))
           }
@@ -77,7 +75,6 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .serverLogic(principal =>
         args => {
           val cmd = args._1
-          cmd.withCorrelationId(args._2) // Story 13.7 — origin stamp
           var updatedUser =
             if (cmd.user.externalUuid.trim.isEmpty) {
               cmd.user.withExternalUuid(principal._2.id)
@@ -89,12 +86,13 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               updatedUser = updatedUser.withProfile(profile)
             case _ =>
           }
-          run(
+          runCorrelated(
             cmd.copy(
               user = updatedUser,
               paymentType = Transaction.PaymentType.CARD,
               clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
-            )
+            ),
+            args._2
           ).map {
             case r: PaymentMethodPreRegistered => Right(r.preRegistration)
             case other                         => Left(error(other))
@@ -117,7 +115,6 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .serverLogic(principal =>
         args => {
           val cmd = args._1
-          cmd.withCorrelationId(args._2) // Story 13.7 — origin stamp
           var updatedUser =
             if (cmd.user.externalUuid.trim.isEmpty) {
               cmd.user.withExternalUuid(principal._2.id)
@@ -129,11 +126,12 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               updatedUser = updatedUser.withProfile(profile)
             case _ =>
           }
-          run(
+          runCorrelated(
             cmd.copy(
               user = updatedUser,
               clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
-            )
+            ),
+            args._2
           ).map {
             case r: PaymentMethodPreRegistered => Right(r.preRegistration)
             case other                         => Left(error(other))
@@ -156,8 +154,7 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             externalUuidWithProfile(principal._2),
             args._1
           )
-          cmd.withCorrelationId(args._2) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, args._2).map {
             case PaymentMethodDisabled => Right(PaymentMethodDisabled)
             case other                 => Left(error(other))
           }
@@ -179,8 +176,7 @@ trait PaymentMethodEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             externalUuidWithProfile(principal._2),
             args._1
           )
-          cmd.withCorrelationId(args._2) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, args._2).map {
             case PaymentMethodDisabled => Right(PaymentMethodDisabled)
             case other                 => Left(error(other))
           }

@@ -84,8 +84,7 @@ trait PaymentAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               userAgent = userAgent,
               tokenId = tokenId
             )
-          cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, cid).map {
             case r: UserPaymentAccountCreatedOrUpdated => Right(r)
             case other                                 => Left(error(other))
           }
@@ -105,8 +104,7 @@ trait PaymentAccountEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               externalUuidWithProfile(session),
               clientId = client.map(_.clientId).orElse(session.clientId)
             )
-          cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, cid).map {
             case r: PaymentAccountLoaded => Right(r.paymentAccount.view)
             case other                   => Left(error(other))
           }

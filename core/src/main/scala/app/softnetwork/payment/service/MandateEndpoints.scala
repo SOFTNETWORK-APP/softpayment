@@ -46,8 +46,7 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
             iban = maybeIban.map(_.iban),
             clientId = principal._1.map(_.clientId).orElse(principal._2.clientId)
           )
-        cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, correlationId).map {
           case MandateCreated                 => Right(MandateCreated)
           case r: MandateConfirmationRequired => Right(r)
           case other                          => Left(error(other))
@@ -70,8 +69,7 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               externalUuidWithProfile(session),
               clientId = client.map(_.clientId).orElse(session.clientId)
             )
-          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, correlationId).map {
             case MandateCanceled => Right(MandateCanceled)
             case other           => Left(error(other))
           }
@@ -90,8 +88,7 @@ trait MandateEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
       .description("Update mandate status web hook")
       .serverLogic { case (mandateId, cid) =>
         val cmd = UpdateMandateStatus(mandateId)
-        cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-        run(cmd).map {
+        runCorrelated(cmd, cid).map {
           case r: MandateStatusUpdated => Right(r.result)
           case other                   => Left(error(other))
         }

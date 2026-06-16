@@ -21,7 +21,9 @@ object PaymentMessages {
   // Story 13.7 — every payment command carries `var correlationId` + `withCorrelationId` via
   // AuditableCommand (zero constructor churn). The checkout endpoints stamp it from the inbound
   // X-Correlation-Id; the handlers thread it onto the persisted payment events (the durable hop).
-  trait PaymentCommand extends AuditableCommand
+  trait PaymentCommand extends AuditableCommand {
+    override type T = PaymentCommand
+  }
 
   trait PaymentCommandWithKey extends PaymentCommand {
     def key: String

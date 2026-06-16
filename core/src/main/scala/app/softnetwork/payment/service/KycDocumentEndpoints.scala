@@ -48,8 +48,7 @@ trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           case Some(kycDocumentType) =>
             val cmd =
               LoadKycDocumentStatus(externalUuidWithProfile(principal._2), kycDocumentType)
-            cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-            run(cmd).map {
+            runCorrelated(cmd, cid).map {
               case r: KycDocumentStatusLoaded => Right(r.report)
               case other                      => Left(error(other))
             }
@@ -85,8 +84,7 @@ trait KycDocumentEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
           case Some(kycDocumentType) =>
             val cmd =
               AddKycDocument(externalUuidWithProfile(principal._2), pages.bytes, kycDocumentType)
-            cmd.withCorrelationId(cid) // Story 13.7 — origin stamp
-            run(cmd)
+            runCorrelated(cmd, cid)
               .map {
                 case r: KycDocumentAdded => Right(r)
                 case other               => Left(error(other))

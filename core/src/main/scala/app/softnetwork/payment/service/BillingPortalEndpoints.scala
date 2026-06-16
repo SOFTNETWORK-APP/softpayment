@@ -37,8 +37,7 @@ trait BillingPortalEndpoints[SD <: SessionData with SessionDataDecorator[SD]] {
               req.returnUrl,
               clientId = client.map(_.clientId).orElse(session.clientId)
             )
-          cmd.withCorrelationId(correlationId) // Story 13.7 — origin stamp
-          run(cmd).map {
+          runCorrelated(cmd, correlationId).map {
             case r: BillingPortalSessionCreated => Right(r)
             case other                          => Left(error(other))
           }
