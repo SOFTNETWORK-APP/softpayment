@@ -34,7 +34,13 @@ package object data {
   val lastName = "lastName"
   val name = "SoftNetwork"
   val birthday = "26/12/1972"
-  val email = "demo@softnetwork.fr"
+  // Unique per test run (per JVM): the Stripe provider's createOrUpdateCustomer reuses an existing
+  // customer matched by email (Customer.list(email=...).headOption), so a fixed email made every run
+  // attach another pm_card_visa to the SAME persisted customer until Stripe rejected with
+  // `customer_max_payment_methods`. A fresh suffix forces a brand-new customer each run while staying a
+  // single source of truth — it is evaluated ONCE (a val, not a def), so all users/assertions that
+  // reference `email` still see the same value within the run. (+subaddressing keeps it a valid address.)
+  val email = s"demo+${java.util.UUID.randomUUID().toString.take(8)}@softnetwork.fr"
   val phone = "+33102030405"
   val country = "FR"
   val address: Address = Address.defaultInstance
