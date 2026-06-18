@@ -160,47 +160,48 @@ object StripeApi {
               log.info(s"Webhook endpoint found: ${webhookEndpoint.getId}")
               loadSecret(hash) match {
                 case None =>
-                  Try(webhookEndpoint.delete(requestOptions))
+                  // Not deleting the webhook endpoint, as it may be used by other clients
+                  // Try(webhookEndpoint.delete(requestOptions))
                   None
-                case value =>
-                  val url = s"${config.hooksBaseUrl}?hash=$hash"
+                case _ =>
                   Try(
-                    webhookEndpoint.update(
-                      WebhookEndpointUpdateParams
-                        .builder()
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.ACCOUNT__UPDATED
-                        )
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.PERSON__UPDATED
-                        )
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
-                        )
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
-                        )
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
-                        )
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
-                        )
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__UPDATED
-                        )
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
-                        )
-                        .addEnabledEvent(
-                          WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
-                        )
-                        .setUrl(url)
-                        .build(),
-                      requestOptions
-                    )
-                  )
-                  value
+                    webhookEndpoint
+                      .update(
+                        WebhookEndpointUpdateParams
+                          .builder()
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.ACCOUNT__UPDATED
+                          )
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.PERSON__UPDATED
+                          )
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
+                          )
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
+                          )
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
+                          )
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
+                          )
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__UPDATED
+                          )
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
+                          )
+                          .addEnabledEvent(
+                            WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
+                          )
+                          .setUrl(url)
+                          .build(),
+                        requestOptions
+                      )
+                      .getSecret // update secret if changed
+                  ).toOption
               }
             case _ =>
               None
