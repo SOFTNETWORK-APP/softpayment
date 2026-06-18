@@ -15,6 +15,8 @@ import com.typesafe.config.Config
 import org.json4s.Formats
 import org.slf4j.Logger
 
+import scala.util.{Failure, Try}
+
 trait StripeContext extends PaymentContext {
 
   override implicit def config: StripeApi.Config
@@ -51,6 +53,8 @@ class StripeProviderFactory extends PaymentProviderSpi {
 
   @volatile private[this] var _config: Option[StripeApi.Config] = None
 
+  private[this] lazy val log: Logger = org.slf4j.LoggerFactory.getLogger(getClass)
+
   override def providerType: Provider.ProviderType = Provider.ProviderType.STRIPE
 
   override def paymentProvider(p: Client.Provider): StripeProvider = {
@@ -64,7 +68,17 @@ class StripeProviderFactory extends PaymentProviderSpi {
   override def softPaymentProvider(config: Config): Client.Provider = {
     val stripeConfig = StripeSettings(config).StripeApiConfig
     _config = Some(stripeConfig)
-    stripeConfig.softPayProvider
+    val provider = stripeConfig.softPayProvider
+    // Eagerly initialize the Stripe API at application startup so the platform webhook endpoint
+    // (and its signing secret) is provisioned up-front — before any payment operation or inbound
+    // webhook event — instead of lazily on first use. Guarded so a transient Stripe error does not
+    // prevent the application from starting; StripeApi() is retried on first lazy use.
+    Try(StripeApi()(provider, stripeConfig)) match {
+      case Failure(f) =>
+        log.warn(s"Failed to initialize Stripe API at startup: ${f.getMessage}")
+      case _ =>
+    }
+    provider
   }
 
   override def hooksDirectives(implicit
