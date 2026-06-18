@@ -136,6 +136,10 @@ object StripeApi {
 
         val url = s"${config.hooksBaseUrl}?hash=$hash"
 
+        log.info(
+          s"Creating / updating Stripe webhook endpoint for provider ${provider.providerId} at ${config.hooksBaseUrl}?hash=*****"
+        )
+
         import scala.jdk.CollectionConverters._
 
         Try {
