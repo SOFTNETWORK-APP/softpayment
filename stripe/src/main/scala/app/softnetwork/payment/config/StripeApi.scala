@@ -8,11 +8,7 @@ import com.stripe.Stripe
 import com.stripe.model.WebhookEndpoint
 import com.stripe.net.RequestOptions
 import com.stripe.net.RequestOptions.RequestOptionsBuilder
-import com.stripe.param.{
-  WebhookEndpointCreateParams,
-  WebhookEndpointListParams,
-  WebhookEndpointUpdateParams
-}
+import com.stripe.param.{WebhookEndpointCreateParams, WebhookEndpointListParams}
 
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -126,7 +122,7 @@ object StripeApi {
         val clientId = provider.providerId
         val apiKey = provider.providerApiKey
 
-        // create / update stripe webhook endpoint
+        // (re)create stripe webhook endpoint
 
         val hash = sha256(provider.clientId)
 
@@ -137,121 +133,87 @@ object StripeApi {
         val url = s"${config.hooksBaseUrl}?hash=$hash"
 
         log.info(
-          s"Creating / updating Stripe webhook endpoint for provider ${provider.providerId} at ${config.hooksBaseUrl}?hash=*****"
+          s"Provisioning (delete + recreate) Stripe webhook endpoint for provider ${provider.providerId} at ${config.hooksBaseUrl}?hash=*****"
         )
 
         import scala.jdk.CollectionConverters._
 
         Try {
-          ((Option(
-            WebhookEndpoint
-              .list(
-                WebhookEndpointListParams.builder().setLimit(3L).build(),
-                requestOptions
+          // Stripe returns a webhook endpoint's signing secret ONLY at creation time — never on
+          // list / retrieve / update, and stripe-java 26.12.0 exposes no roll-secret API. The only
+          // way to guarantee that the locally stored secret matches the one Stripe actually uses is
+          // therefore to (re)create the endpoint and capture the secret it returns. So we always
+          // delete any endpoint already registered for this provider's URL, then create a fresh one.
+          // The URL carries the per-client hash, so we only ever match — and delete — THIS
+          // provider's endpoint(s), never another client's. We materialize the matches before
+          // deleting so paging is not disturbed by the deletions.
+          WebhookEndpoint
+            .list(
+              WebhookEndpointListParams.builder().setLimit(100L).build(),
+              requestOptions
+            )
+            .autoPagingIterable()
+            .asScala
+            .filter(endpoint => Option(endpoint.getUrl).exists(_.contains(url)))
+            .toList
+            .foreach { endpoint =>
+              log.info(
+                s"Deleting existing Stripe webhook endpoint ${endpoint.getId} to refresh its signing secret"
               )
-              .getData
-          ) match {
-            case Some(data) =>
-              data.asScala.headOption
-            case _ =>
-              None
-          }) match {
-            case Some(webhookEndpoint) =>
-              log.info(s"Webhook endpoint found: ${webhookEndpoint.getId}")
-              loadSecret(hash) match {
-                case None =>
-                  // Not deleting the webhook endpoint, as it may be used by other clients
-                  // Try(webhookEndpoint.delete(requestOptions))
-                  None
+              Try(endpoint.delete(requestOptions)) match {
+                case Failure(f) =>
+                  log.warn(
+                    s"Failed to delete Stripe webhook endpoint ${endpoint.getId}: ${f.getMessage}"
+                  )
                 case _ =>
-                  Try(
-                    webhookEndpoint
-                      .update(
-                        WebhookEndpointUpdateParams
-                          .builder()
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.ACCOUNT__UPDATED
-                          )
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.PERSON__UPDATED
-                          )
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
-                          )
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
-                          )
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
-                          )
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
-                          )
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__UPDATED
-                          )
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
-                          )
-                          .addEnabledEvent(
-                            WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
-                          )
-                          .setUrl(url)
-                          .build(),
-                        requestOptions
-                      )
-                      .getSecret // update secret if changed
-                  ).toOption
               }
-            case _ =>
-              None
-          }).getOrElse {
-            WebhookEndpoint
-              .create(
-                WebhookEndpointCreateParams
-                  .builder()
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.ACCOUNT__UPDATED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.PERSON__UPDATED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__UPDATED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
-                  )
-                  .setUrl(url)
-                  .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)
-                  // connect=true -> events from connected accounts only; connect=false -> events from
-                  // the platform account (customer.updated, invoice.*, subscription.*, payment_method.*).
-                  // Driven by payment.stripe.connected (default false). NOTE: `connect` is immutable
-                  // after endpoint creation, so flipping this requires deleting the existing endpoint
-                  // so it is recreated. FUTURE: support several webhook endpoints per provider (one per
-                  // scope) — not on the roadmap and not needed by the license-server (single endpoint,
-                  // connected=false, suffices to receive customer.updated for org sync).
-                  .setConnect(config.connected)
-                  .build(),
-                requestOptions
-              )
-              .getSecret
-          }
+            }
+
+          WebhookEndpoint
+            .create(
+              WebhookEndpointCreateParams
+                .builder()
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.ACCOUNT__UPDATED
+                )
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.PERSON__UPDATED
+                )
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
+                )
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
+                )
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
+                )
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
+                )
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__UPDATED
+                )
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
+                )
+                .addEnabledEvent(
+                  WebhookEndpointCreateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
+                )
+                .setUrl(url)
+                .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)
+                // connect=true -> events from connected accounts only; connect=false -> events from
+                // the platform account (customer.updated, invoice.*, subscription.*, payment_method.*).
+                // Driven by payment.stripe.connected (default false). NOTE: `connect` is immutable
+                // after endpoint creation, so flipping this requires deleting the existing endpoint
+                // so it is recreated. FUTURE: support several webhook endpoints per provider (one per
+                // scope) — not on the roadmap and not needed by the license-server (single endpoint,
+                // connected=false, suffices to receive customer.updated for org sync).
+                .setConnect(config.connected)
+                .build(),
+              requestOptions
+            )
+            .getSecret
 
         } match {
           case Success(secret) =>
