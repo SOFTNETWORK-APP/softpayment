@@ -5,11 +5,10 @@ import app.softnetwork.payment.model.SoftPayAccount
 import app.softnetwork.payment.model.SoftPayAccount.Client.Provider
 import app.softnetwork.security.sha256
 import com.stripe.Stripe
-import com.stripe.model.WebhookEndpoint
+import com.stripe.model.{Event, WebhookEndpoint}
 import com.stripe.net.RequestOptions
 import com.stripe.net.RequestOptions.RequestOptionsBuilder
 import com.stripe.param.{WebhookEndpointCreateParams, WebhookEndpointListParams}
-
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Paths
@@ -244,6 +243,27 @@ object StripeApi {
     if (provider.providerApiKey.startsWith("sk_test_")) {
       stripeWebHooks = stripeWebHooks.updated(hash, secret)
       addSecret(hash, secret)
+    }
+  }
+
+  /** Log a failed Stripe webhook payload to disk for replaying events that failed to be processed.
+    * @param payload
+    *   - the raw JSON payload of the webhook event that failed to be processed
+    */
+  def writeFailedEvent(payload: String): Unit = {
+    Try {
+      val dir = s"$STRIPE_SECRETS_DIR/failures"
+      Paths.get(dir).toFile.mkdirs()
+      val file = Paths.get(dir, s"failed-event-${System.currentTimeMillis()}.json").toFile
+      file.createNewFile()
+      val writer = new java.io.BufferedWriter(new java.io.FileWriter(file))
+      writer.write(payload)
+      writer.close()
+      log.info(s"Wrote failed Stripe webhook event to ${file.getAbsolutePath}")
+    } match {
+      case Failure(f) =>
+        log.warn(s"Failed to record Stripe event: ${f.getMessage}")
+      case _ =>
     }
   }
 }

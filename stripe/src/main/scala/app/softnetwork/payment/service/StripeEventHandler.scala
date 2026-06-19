@@ -2,6 +2,7 @@ package app.softnetwork.payment.service
 
 import app.softnetwork.concurrent.Completion
 import app.softnetwork.payment.audit.PaymentAuditLog.audit
+import app.softnetwork.payment.config.StripeApi
 import app.softnetwork.payment.handlers.PaymentHandler
 import app.softnetwork.payment.message.PaymentMessages.{
   CreateOrUpdateKycDocument,
@@ -73,6 +74,8 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
       case Failure(f) =>
         log.error(s"[Payment Hooks] Stripe Webhook verification failed: ${f.getMessage}", f)
         log.error(payload)
+        // Save the payload to a file for replaying events that failed to be processed.
+        StripeApi.writeFailedEvent(payload)
         None
     }
   }
