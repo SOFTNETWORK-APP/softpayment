@@ -65,7 +65,12 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
     }
   }
 
-  def toStripeEvent(payload: String, sigHeader: String, secret: String): Option[Event] = {
+  def toStripeEvent(
+    hash: String,
+    payload: String,
+    sigHeader: String,
+    secret: String
+  ): Option[Event] = {
     Try {
       Webhook.constructEvent(payload, sigHeader, secret)
     } match {
@@ -75,7 +80,7 @@ trait StripeEventHandler extends Completion { _: BasicPaymentService with Paymen
         log.error(s"[Payment Hooks] Stripe Webhook verification failed: ${f.getMessage}", f)
         log.error(payload)
         // Save the payload to a file for replaying events that failed to be processed.
-        StripeApi.writeFailedEvent(payload)
+        StripeApi.writeFailedEvent(hash, payload)
         None
     }
   }

@@ -17,7 +17,7 @@ trait StripeHooksDirectives extends HooksDirectives with PaymentHandler with Str
                 if (log.isDebugEnabled) {
                   log.debug(s"[Payment Hooks] Stripe Webhook received: $payload")
                 }
-                toStripeEvent(payload, signature, secret) match {
+                toStripeEvent(hash, payload, signature, secret) match {
                   case Some(event) =>
                     handleStripeEvent(event)
                     log.info(
