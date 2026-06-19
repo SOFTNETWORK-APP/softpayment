@@ -112,7 +112,7 @@ object StripeApi {
     if (file.exists()) {
       import scala.io.Source
       val source = Source.fromFile(file)
-      val kv = source.getLines().mkString.trim.split("=")
+      val kv = source.getLines().mkString.trim.split("=", 2)
       source.close()
       if (kv.length == 2) {
         val id = kv(0).trim
@@ -310,7 +310,7 @@ object StripeApi {
         }) match {
           case Success(stripeWebHook) =>
             log.info(
-              s"Stripe webhook endpoint for provider ${provider.providerId} already exists and was updated at ${config.hooksBaseUrl}?hash=*****"
+              s"Stripe webhook endpoint ${stripeWebHook.id} ready for provider ${provider.providerId} at ${config.hooksBaseUrl}?hash=*****"
             )
             stripeApis = stripeApis.updated(provider.providerId, stripeApi)
             addWebHook(hash, stripeWebHook.secret, stripeWebHook.id)
