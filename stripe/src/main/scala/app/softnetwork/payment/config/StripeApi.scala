@@ -51,6 +51,46 @@ case class StripeApi(
 
 object StripeApi {
 
+  /** The Stripe event types the provisioned webhook endpoint subscribes to, on creation and on
+    * update. The test kit's `stripe listen --events` subscribes to the same list, so the event
+    * types the tests receive cannot drift from the real endpoint's.
+    */
+  val webhookEnabledEvents: Seq[String] = Seq(
+    "account.updated",
+    "person.updated",
+    "invoice.payment_succeeded",
+    "invoice.payment_failed",
+    "customer.subscription.deleted",
+    "customer.subscription.updated",
+    "customer.updated",
+    "payment_method.attached",
+    "payment_method.detached"
+  )
+
+  private[config] lazy val webhookCreateEvents: Seq[WebhookEndpointCreateParams.EnabledEvent] =
+    webhookEnabledEvents.map { event =>
+      WebhookEndpointCreateParams.EnabledEvent
+        .values()
+        .find(_.getValue == event)
+        .getOrElse(
+          throw new IllegalStateException(
+            s"stripe-java has no WebhookEndpointCreateParams.EnabledEvent for '$event'"
+          )
+        )
+    }
+
+  private[config] lazy val webhookUpdateEvents: Seq[WebhookEndpointUpdateParams.EnabledEvent] =
+    webhookEnabledEvents.map { event =>
+      WebhookEndpointUpdateParams.EnabledEvent
+        .values()
+        .find(_.getValue == event)
+        .getOrElse(
+          throw new IllegalStateException(
+            s"stripe-java has no WebhookEndpointUpdateParams.EnabledEvent for '$event'"
+          )
+        )
+    }
+
   case class Config(
     override val clientId: String,
     override val apiKey: String,
@@ -158,33 +198,7 @@ object StripeApi {
               .create(
                 WebhookEndpointCreateParams
                   .builder()
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.ACCOUNT__UPDATED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.PERSON__UPDATED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.CUSTOMER__UPDATED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
-                  )
-                  .addEnabledEvent(
-                    WebhookEndpointCreateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
-                  )
+                  .addAllEnabledEvent(webhookCreateEvents.asJava)
                   .setUrl(url)
                   .setApiVersion(WebhookEndpointCreateParams.ApiVersion.VERSION_2024_06_20)
                   // connect=true -> events from connected accounts only; connect=false -> events from
@@ -236,33 +250,7 @@ object StripeApi {
                   endpoint.update(
                     WebhookEndpointUpdateParams
                       .builder()
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.ACCOUNT__UPDATED
-                      )
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.PERSON__UPDATED
-                      )
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_SUCCEEDED
-                      )
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.INVOICE__PAYMENT_FAILED
-                      )
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__DELETED
-                      )
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__SUBSCRIPTION__UPDATED
-                      )
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.CUSTOMER__UPDATED
-                      )
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__ATTACHED
-                      )
-                      .addEnabledEvent(
-                        WebhookEndpointUpdateParams.EnabledEvent.PAYMENT_METHOD__DETACHED
-                      )
+                      .addAllEnabledEvent(webhookUpdateEvents.asJava)
                       .setUrl(url)
                       .build(),
                     requestOptions

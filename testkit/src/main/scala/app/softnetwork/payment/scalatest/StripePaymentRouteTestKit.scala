@@ -20,8 +20,8 @@ import org.scalatest.Suite
 import java.time.Instant
 import scala.concurrent.Await
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration._
-import scala.sys.process.{Process, ProcessLogger}
 import scala.sys.process.{Process, ProcessLogger}
 import scala.util.{Failure, Success, Try}
 
@@ -45,27 +45,80 @@ trait StripePaymentRouteTestKit[SD <: SessionData with SessionDataDecorator[SD]]
     val serverPort = binding.localAddress.getPort
     val hash = sha256(clientId)
     val secretLatch = new CountDownLatch(1)
-    val secretPattern = "webhook signing secret is (whsec_[a-f0-9]+)".r
+    val cliSecret = new AtomicReference[String]()
+    val installFailure = new AtomicReference[Throwable]()
+    // Stripe has changed this secret's format before (64 lowercase hex characters, later 32
+    // alphanumeric ones), so take everything up to the next whitespace instead of a character class.
+    val secretPattern = "webhook signing secret is (whsec_\\S+)".r
     def processLine(line: String): Unit = {
-      log.info(line)
+      // never write the signing secret itself to the test logs
+      log.info(line.replaceAll("whsec_\\S+", "whsec_***"))
       secretPattern.findFirstMatchIn(line).foreach { m =>
-        val cliSecret = m.group(1)
-        StripeApi.overrideWebHookSecret(hash, cliSecret)
-        log.info(s"Stripe CLI webhook secret saved for hash $hash")
+        val secret = m.group(1)
+        cliSecret.set(secret)
+        Try(StripeApi.overrideWebHookSecret(hash, secret)) match {
+          case Success(_) =>
+            log.info(s"Stripe CLI webhook secret saved for hash $hash (${secret.length} chars)")
+          case Failure(f) => installFailure.set(f)
+        }
         secretLatch.countDown()
       }
     }
-    stripeCLi = Process(
-      s"stripe listen --forward-to ${providerConfig.hooksBaseUrl.replace("9000", s"$serverPort").replace("localhost", interface)}?hash=$hash"
-    ).run(ProcessLogger(processLine, processLine))
-    // Wait for the CLI to output its secret (max 30 seconds)
-    secretLatch.await(30, java.util.concurrent.TimeUnit.SECONDS)
+    val forwardTo =
+      s"${providerConfig.hooksBaseUrl.replace("9000", s"$serverPort").replace("localhost", interface)}?hash=$hash"
+    // Since Stripe CLI 1.51.0, `listen --forward-to` without an event subscription exits at startup.
+    // `--events` exists in every CLI version (`--all-snapshot` only from 1.51.0); subscribing to the
+    // webhook endpoint's own event types keeps the test listener's events aligned with the endpoint.
+    // `--color off`: with colours forced, the CLI wraps the secret in ANSI codes the pattern misses.
+    val command = Seq(
+      "stripe",
+      "listen",
+      "--color",
+      "off",
+      "--events",
+      StripeApi.webhookEnabledEvents.mkString(","),
+      "--forward-to",
+      forwardTo
+    )
+    stripeCLi = Process(command).run(ProcessLogger(processLine, processLine))
+    // Wait for the CLI to output its secret (max 30 seconds), then check it really took effect:
+    // without it no webhook passes signature verification, and every webhook-driven test would
+    // fail later with a misleading timeout.
+    val secretPrinted = secretLatch.await(30, java.util.concurrent.TimeUnit.SECONDS)
+    // `whsec_` plus at least 16 characters: Stripe's CLI secrets have been 64 or 32 characters long.
+    val minWebhookSecretLength = 22
+    val problem: Option[String] =
+      if (!secretPrinted) {
+        val state =
+          if (stripeCLi.isAlive()) "still running" else s"exited with code ${stripeCLi.exitValue()}"
+        Some(s"the Stripe CLI printed no webhook signing secret within 30s ($state)")
+      } else if (installFailure.get != null) {
+        Some(s"installing the Stripe CLI webhook signing secret failed: ${installFailure.get}")
+      } else if (cliSecret.get.length < minWebhookSecretLength) {
+        Some(
+          s"the Stripe CLI webhook signing secret looks truncated (${cliSecret.get.length} chars)"
+        )
+      } else if (!StripeApi.webHookSecret(hash).contains(cliSecret.get)) {
+        Some(
+          "the Stripe CLI webhook signing secret was not installed for the webhook route " +
+          "(StripeApi.overrideWebHookSecret only accepts sk_test_ keys)"
+        )
+      } else None
+    problem.foreach { reason =>
+      // Stop the CLI now so it cannot outlive the suite; ScalaTest still runs afterAll, which
+      // unbinds the HTTP server.
+      if (stripeCLi.isAlive()) stripeCLi.destroy()
+      throw new IllegalStateException(
+        s"Cannot forward Stripe webhooks to the tests: $reason. The Stripe CLI output is logged above " +
+        s"(command: ${command.take(2).mkString(" ")} --events ... --forward-to ...).",
+        installFailure.get
+      )
+    }
   }
 
   override def afterAll(): Unit = {
     log.info("Shutting down Stripe CLI and HTTP server")
-    if (stripeCLi.isAlive())
-      stripeCLi.destroy()
+    Option(stripeCLi).filter(_.isAlive()).foreach(_.destroy())
     webhookBinding.foreach(b => Await.result(b.unbind(), 5.seconds))
     super.afterAll()
   }
