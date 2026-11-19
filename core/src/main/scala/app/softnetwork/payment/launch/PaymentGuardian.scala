@@ -82,8 +82,9 @@ trait PaymentGuardian extends SessionGuardian { _: SchemaProvider with CsrfCheck
       .foreach(provider => {
         implicit val ec: ExecutionContext = system.executionContext
         softPayAccountDao.registerAccountWithProvider(provider)(system) map {
-          case Some(account) =>
-            system.log.info(s"Registered provider account for ${provider.providerId}: $account")
+          case Some(_) =>
+            // Never log the account itself: its clients carry the provider API key in clear.
+            system.log.info(s"Registered provider account ${provider.clientId}")
           case _ =>
             system.log.warn(s"Failed to register provider account for ${provider.providerId}")
         }
