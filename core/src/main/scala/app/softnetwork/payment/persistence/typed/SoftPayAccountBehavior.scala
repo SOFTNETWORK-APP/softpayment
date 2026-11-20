@@ -347,12 +347,8 @@ trait SoftPayAccountBehavior extends AccountBehavior[SoftPayAccount, BasicAccoun
       case AccountMessages.RegisterAccountWithProvider(provider) =>
         state match {
           case Some(account) =>
-            val updatedClient = account.clients.find(_.clientId == provider.clientId) match {
-              case Some(client) =>
-                client.withClientApiKey(provider.client.getClientApiKey)
-              case _ =>
-                provider.client
-            }
+            val updatedClient =
+              SoftPayClientRegistration.registeredClient(account, provider, provider.client)
             accountKeyDao.addAccountKey(provider.clientId, entityId)
             Effect
               .persist(
@@ -465,4 +461,36 @@ trait SoftPayAccountBehavior extends AccountBehavior[SoftPayAccount, BasicAccoun
 
 case object SoftPayAccountBehavior extends SoftPayAccountBehavior with DefaultGenerator {
   override def persistenceId: String = "SoftPayAccount"
+}
+
+private[payment] object SoftPayClientRegistration {
+
+  /** The client to persist when a provider is (re-)registered on an account, e.g. at every start
+    * from the configured provider credentials.
+    *
+    * An existing client keeps its own settings (name, contact emails, address, access token) and
+    * takes the provider credentials of the registration. Keeping the previously stored provider
+    * instead would leave every provider call on the old API key after a key rotation, while the
+    * client API key derived from the new one suggests the rotation was applied.
+    *
+    * @param account
+    *   - the account the provider is registered on
+    * @param provider
+    *   - the provider being registered
+    * @param newClient
+    *   - the client derived from `provider`, used as is when the account has no client for it
+    * @return
+    *   the client to persist
+    */
+  def registeredClient(
+    account: SoftPayAccount,
+    provider: SoftPayAccount.Client.Provider,
+    newClient: => SoftPayAccount.Client
+  ): SoftPayAccount.Client =
+    account.clients.find(_.clientId == provider.clientId) match {
+      case Some(client) =>
+        client.withProvider(provider).withClientApiKey(newClient.getClientApiKey)
+      case _ =>
+        newClient
+    }
 }
